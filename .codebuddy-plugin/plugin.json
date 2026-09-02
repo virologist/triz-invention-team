@@ -1,0 +1,176 @@
+{
+  "name": "triz-invention-team",
+  "version": "2.0.0",
+  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.0: ACP envelope alignment across members.",
+  "author": {
+    "name": "TZUVet",
+    "email": "tzuvet@example.com"
+  },
+  "agents": [
+    "./agents/triz-invention-team-team-lead.md",
+    "./agents/contradiction-analyst.md",
+    "./agents/patent-search-scout.md",
+    "./agents/patent-examiner-sim.md",
+    "./agents/disclosure-architect.md",
+    "./agents/patent-attorney-writer.md",
+    "./agents/second-opinion-reviewer.md"
+  ],
+  "skills": [
+    "./skills/triz-matrix",
+    "./skills/patent-law",
+    "./skills/claims-drafting"
+  ],
+  "expertType": "team",
+  "agentName": "triz-invention-team-team-lead",
+  "teamInfo": {
+    "leadAgent": "triz-invention-team-team-lead",
+    "memberAgents": [
+      "contradiction-analyst",
+      "patent-search-scout",
+      "patent-examiner-sim",
+      "disclosure-architect",
+      "patent-attorney-writer",
+      "second-opinion-reviewer"
+    ]
+  },
+  "displayName": {
+    "en": "TRIZ Invention Team",
+    "zh": "TRIZ通用发明专家团"
+  },
+  "profession": {
+    "en": "TRIZ Invention Team",
+    "zh": "TRIZ通用发明专家团"
+  },
+  "displayDescription": {
+    "en": "Cross-domain TRIZ invention team covering contradiction modeling, three-round patent search, mock examination with second-opinion review, disclosure and patent application drafting",
+    "zh": "跨领域TRIZ发明团队：矛盾建模、查新、模拟审查+二审复核、交底书与申请文件撰写"
+  },
+  "avatar": "avatars/team.jpg",
+  "categoryId": "12-IndustryConsultant",
+  "defaultInitPrompt": {
+    "zh": "我有一个发明想法，请团队帮我从TRIZ矛盾分析走到专利申请文件草稿",
+    "en": "I have an invention idea. Guide me from TRIZ contradiction analysis to a patent application draft"
+  },
+  "plugin": "triz-invention-team",
+  "tags": [
+    {
+      "en": "TRIZ Innovation",
+      "zh": "TRIZ创新"
+    },
+    {
+      "en": "Patent Drafting",
+      "zh": "专利撰写"
+    },
+    {
+      "en": "Prior-art Search",
+      "zh": "专利查新"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "en": "I have an invention idea. Guide me from TRIZ contradiction analysis to a patent application draft",
+      "zh": "我有一个发明想法，请团队帮我从TRIZ矛盾分析走到专利申请文件草稿"
+    },
+    {
+      "en": "My design has a contradiction: improving X worsens Y. Use the contradiction matrix to generate invention directions",
+      "zh": "我的设计存在矛盾：改善X会恶化Y，请用矛盾矩阵推演发明方向"
+    },
+    {
+      "en": "I have a technical scheme. Run three-round prior-art search and assess novelty/inventiveness/utility",
+      "zh": "我已有技术方案，请做三轮专利查新并评估三性风险"
+    }
+  ],
+  "members": [
+    {
+      "id": "triz-invention-team-team-lead",
+      "displayName": {
+        "en": "Qi Chuangjian",
+        "zh": "齐创见"
+      },
+      "profession": {
+        "en": "TRIZ Invention Director",
+        "zh": "TRIZ发明总监"
+      },
+      "avatar": "avatars/triz-invention-team-team-lead.jpg",
+      "role": "lead"
+    },
+    {
+      "id": "contradiction-analyst",
+      "displayName": {
+        "en": "Xie Qifen",
+        "zh": "解其纷"
+      },
+      "profession": {
+        "en": "TRIZ Contradiction Analyst",
+        "zh": "TRIZ矛盾分析师"
+      },
+      "avatar": "avatars/contradiction-analyst.jpg",
+      "role": "member"
+    },
+    {
+      "id": "patent-search-scout",
+      "displayName": {
+        "en": "Zhen Wuyi",
+        "zh": "甄无遗"
+      },
+      "profession": {
+        "en": "Patent Search Specialist",
+        "zh": "专利查新检索员"
+      },
+      "avatar": "avatars/patent-search-scout.jpg",
+      "role": "member"
+    },
+    {
+      "id": "patent-examiner-sim",
+      "displayName": {
+        "en": "Yan Sanxing",
+        "zh": "严三性"
+      },
+      "profession": {
+        "en": "Mock Patent Examiner",
+        "zh": "模拟审查员"
+      },
+      "avatar": "avatars/patent-examiner-sim.jpg",
+      "role": "member"
+    },
+    {
+      "id": "disclosure-architect",
+      "displayName": {
+        "en": "Tan Wuyin",
+        "zh": "谭无隐"
+      },
+      "profession": {
+        "en": "Invention Disclosure Architect",
+        "zh": "交底书架构师"
+      },
+      "avatar": "avatars/disclosure-architect.jpg",
+      "role": "member"
+    },
+    {
+      "id": "patent-attorney-writer",
+      "displayName": {
+        "en": "Quan Yaoda",
+        "zh": "权要达"
+      },
+      "profession": {
+        "en": "Patent Attorney Writer",
+        "zh": "专利代理师"
+      },
+      "avatar": "avatars/patent-attorney-writer.jpg",
+      "role": "member"
+    },
+    {
+      "id": "second-opinion-reviewer",
+      "displayName": {
+        "en": "Shen Waishen",
+        "zh": "审外审"
+      },
+      "profession": {
+        "en": "Independent Second-Opinion Reviewer",
+        "zh": "独立二审员"
+      },
+      "avatar": "avatars/second-opinion-reviewer.jpg",
+      "role": "member"
+    }
+  ]
+}
