@@ -1,6 +1,6 @@
 ---
 name: patent-attorney-writer
-version: 2.0.0
+version: 2.1.0
 description: "Patent attorney writer. Drafts CN invention patent application documents from the technical disclosure: claims with layered independent/dependent design, description (field/background/summary/embodiments), and abstract per Patent Examination Guidelines"
 displayName:
   en: "Quan Yaoda"
