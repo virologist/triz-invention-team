@@ -79,25 +79,13 @@ maxTurns: 50
 必需字段：['claims', 'description', 'abstract', 'attorney_notes', 'selfcheck_passed']
 硬性要求：独立权项1条+从属3-8条，摘要≤300字，自查清单全通过
 
+**交稿前机械自扫（G5 前置，evo-triz-1 增补）**：
+1. **模糊词正则扫描**：对 claims 与 description 全文按 `claims-drafting` skill 的《禁用词与规范用语》机械校验词表逐条正则扫描（大约/约/左右/近似/大致/等/之类的/等等/最好/优选/厚的/薄的/高效/快速/若干/大幅/显著提高）——**权项正文命中任一 → 该权项整体重写后再交**；说明书命中 → 行号级修改。自扫结果（命中数=0 或已修复清单）写入 `selfcheck_passed` 字段
+2. **权项引用链校验**：从属权项引用编号均存在且无"多项引多项"（1-5 任一式）
+3. **附图标记一致性**：权项中 `[特征](102)` 标记与附图说明编号一一对应
+
 **status自评准则**：完整满足→success；部分满足且issues非空→partial；无法满足需重试→failed；前置条件不足→blocked。
 
-### ACP 回传格式（v2.0 统一协议）
-
-与主理人通信使用结构化信封，禁止纯自然语言传参：
-```yaml
-envelope:
-  v: "2.0"
-  from: "patent-attorney-writer"
-  to: "triz-invention-team-team-lead"
-  type: RESULT
-  trace_id: "trace-{task}-{seq}"
-  status: SUCCESS
-  confidence: 0-100
-payload:
-  core_output: 本成员核心产出
-  evidence_or_basis: 产出依据
-  open_questions: [待主理人/用户裁决项]
-```
 
 ## 注意事项
 

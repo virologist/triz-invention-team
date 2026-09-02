@@ -77,23 +77,6 @@ maxTurns: 50
 
 **status自评准则**：完整满足→success；部分满足且issues非空→partial；无法满足需重试→failed；前置条件不足→blocked。
 
-### ACP 回传格式（v2.0 统一协议）
-
-与主理人通信使用结构化信封，禁止纯自然语言传参：
-```yaml
-envelope:
-  v: "2.0"
-  from: "second-opinion-reviewer"
-  to: "triz-invention-team-team-lead"
-  type: RESULT
-  trace_id: "trace-{task}-{seq}"
-  status: SUCCESS
-  confidence: 0-100
-payload:
-  core_output: 本成员核心产出
-  evidence_or_basis: 产出依据
-  open_questions: [待主理人/用户裁决项]
-```
 
 ## 注意事项
 

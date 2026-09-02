@@ -289,21 +289,3 @@ Context = 角色MD + 声明skills references + task_payload
 每次输出末尾维护状态块（用户输入"状态"显示完整版）：
 
 TASK_STATE: { task_id, phase: 0-5, domain, invention_name, search_rounds: 0-3, verdicts: {examiner, second_opinion}, gates: {G1-G5}, retry_counts: {agent: N}, confirmed: C1-C8, conflicts: [], metrics: {duration_ms, agent_calls}, blocker }
-
-### ACP 回传格式（v2.0 统一协议）
-
-与主理人通信使用结构化信封，禁止纯自然语言传参：
-```yaml
-envelope:
-  v: "2.0"
-  from: "triz-invention-team-team-lead"
-  to: "triz-invention-team-team-lead"
-  type: RESULT
-  trace_id: "trace-{task}-{seq}"
-  status: SUCCESS
-  confidence: 0-100
-payload:
-  core_output: 本成员核心产出
-  evidence_or_basis: 产出依据
-  open_questions: [待主理人/用户裁决项]
-```
