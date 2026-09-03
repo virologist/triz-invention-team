@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbuddy.local/schemas/agent-protocol/result_envelope.schema.json",
+  "title": "Agent Result Envelope",
+  "description": "上行信封契约：成员产出回传主理人时必须附加的JSON信封（基于主理人MD 265-297行定义，2026-09-03形式化）。",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "agent_id",
+    "task_id",
+    "phase",
+    "status",
+    "confidence",
+    "deliverable_summary"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$",
+      "minLength": 3,
+      "maxLength": 64,
+      "description": "成员ID（kebab-case，对应MD文件名）"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^T-[0-9]{8}-[0-9]{3,}$",
+      "description": "任务ID（YYYYMMDD-NNN）"
+    },
+    "phase": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "阶段编号0-5"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial", "failed", "blocked"],
+      "description": "状态自评（success=完整满足 / partial=部分满足issues非空 / failed=无法满足需重试 / blocked=前置条件不足）"
+    },
+    "confidence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "置信度自评0-100"
+    },
+    "deliverable_summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "一句话摘要"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "ref"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["skill_ref", "prior_artifact", "source"]
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "used_for": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "产出依据证据链（推荐但非必须）"
+    },
+    "issues": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "自评发现的问题列表"
+    },
+    "next_agent_hint": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "建议下游agent"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "duration_ms": {"type": "integer", "minimum": 0},
+        "retry_count": {"type": "integer", "minimum": 0}
+      },
+      "description": "执行指标（推荐但非必须）"
+    }
+  },
+  "version": "1.0.0",
+  "deprecated_fields": []
+}

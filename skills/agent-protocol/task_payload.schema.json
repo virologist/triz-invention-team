@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbuddy.local/schemas/agent-protocol/task_payload.schema.json",
+  "title": "Agent Task Payload",
+  "description": "下行任务契约：主理人spawn成员时必须下发的task_payload（基于主理人MD 265-280行定义，2026-09-03形式化）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "phase",
+    "instruction"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^T-[0-9]{8}-[0-9]{3,}$",
+      "description": "任务ID（YYYYMMDD-NNN）"
+    },
+    "phase": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "阶段编号0-5"
+    },
+    "instruction": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "任务指令（具体可执行）"
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+          "dependency_artifacts": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "依赖的前序phase产出标识"
+          },
+          "domain_context": {
+            "type": "string",
+            "description": "领域上下文（坍缩结果）"
+          }
+        },
+      "description": "任务输入上下文（推荐）"
+    },
+    "output_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_fields": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "min_directions": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "方向数下限（如≥3）"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["markdown", "json", "text", "html"]
+        }
+      },
+      "description": "输出契约约束（推荐）"
+    },
+    "constraints": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "硬约束清单（推荐）"
+    },
+    "state_snapshot": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "状态快照（推荐）"
+    }
+  },
+  "version": "1.0.0",
+  "deprecated_fields": []
+}
