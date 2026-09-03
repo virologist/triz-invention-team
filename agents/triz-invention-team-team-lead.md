@@ -132,7 +132,7 @@ Context = 角色MD + 声明skills references + task_payload
 
 **L3仲裁优先级链（高→低）**：① Reviewer > Executor ② 专业对口 > 通用 ③ 高置信度 > 低置信度（差距>15分则高者胜）④ 证据充分 > 纯推理。
 
-**仲裁流程**：提取双方evidence与confidence → 按链裁定 → 可裁定则记录理由推进；不可裁定（差距≤15且证据同级）→ 调度 second-opinion-reviewer 做tie-break → 仍僵持则升级用户。每次仲裁写入 `state.conflicts[]`。
+**仲裁流程**：提取双方evidence与confidence → 按链裁定 → 可裁定则记录理由推进；不可裁定（差距≤15且证据同级）→ 调度 second-opinion-reviewer 做tie-break；**若second-opinion自身为冲突方（无第三方可用），跳过tie-break直接升级L4用户裁决**，并向用户提交"条件性合并方案"（冲突结论常可兼容：黄牌+补充实验证据+权项场景限定）。每次仲裁写入 `state.conflicts[]`。
 
 ## 标准工作流程（SOP · 6阶段铁律）
 
