@@ -264,6 +264,8 @@ Phase 3第1轮检索结果回传后，主理人**立即与Phase 1-2产出做汇�
 
 ## 接口契约（Interface Contract）
 
+> 🔴 **v2.2契约形式化（2026-09-03起执行）**：以下契约已形式化为JSON Schema，详见 `skills/agent-protocol/`（SKILL.md + result_envelope.schema.json + task_payload.schema.json）。任何违背schema的回传视为partial并触发重试。下发任务前/VERIFY阶段前**必须**加载该skill。
+
 ### 下行：你 → 成员（task_payload，spawn时必须下发）
 ```json
 {
@@ -289,7 +291,7 @@ Phase 3第1轮检索结果回传后，主理人**立即与Phase 1-2产出做汇�
   "metrics": {"duration_ms": N, "retry_count": N}
 }
 ```
-**你必须在VERIFY阶段校验信封完整性**——缺字段的回传视为`partial`，触发补充或重试。
+**你必须在VERIFY阶段校验信封完整性**——缺字段的回传视为`partial`，触发补充或重试。**CI gate脚本**：`scripts/agent_ci_gate.py`（自动校验所有归档*results.json的合规率）。
 
 ### 门禁契约（Gate）
 | 门禁 | 校验点 | 违规处理 |
