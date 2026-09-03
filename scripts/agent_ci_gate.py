@@ -40,6 +40,9 @@ KNOWN_AGENTS = {
     "second-opinion-reviewer", "triz-invention-team-team-lead",
 }
 
+# 历史归档边界：2026-09-03前归档标记为legacy（pre-v2.0无信封）
+LEGACY_CUTOFF = "2026-09-03"
+
 # 信封提取：栈平衡JSON扫描（替代贪婪正则，处理嵌套{}）
 def extract_envelopes(text: str) -> list:
     """从产出文本中提取所有可解析的信封候选。返回(envelope_dict|raw_str, 是否成功解析)元组列表。
@@ -168,7 +171,9 @@ def extract_envelopes(text: str) -> list:
 
 def process_results_file(results_path: Path, schema: dict) -> dict:
     """处理单个*-results.json文件，返回校验报告。"""
-    report = {"file": results_path.name, "messages": [], "total": 0, "valid": 0, "partial": 0, "failed": 0, "details": []}
+    report = {"file": results_path.name, "messages": [], "total": 0, "valid": 0, "partial": 0, "failed": 0, "legacy": 0, "details": []}
+    # legacy判定：文件名以arch/integration/e2e/tiebreak/search-r2等开头且时间早于cutoff视为legacy
+    is_legacy = any(prefix in results_path.name for prefix in ("arch-", "tiebreak-", "search-r2-", "integration-")) or "search-r2" in results_path.name
     try:
         with open(results_path) as f:
             data = json.load(f)
@@ -185,8 +190,12 @@ def process_results_file(results_path: Path, schema: dict) -> dict:
         envelopes = extract_envelopes(text)
         # 兼容旧版函数返回空（保持API稳定）
         if not envelopes:
-            report["failed"] += 1
-            report["details"].append({"sender": sender, "result": "no_envelope_found", "issue": "未发现上行信封"})
+            if is_legacy:
+                report["legacy"] += 1
+                report["details"].append({"sender": sender, "result": "LEGACY", "issue": "pre-v2.0归档，不计入合规率分母"})
+            else:
+                report["failed"] += 1
+                report["details"].append({"sender": sender, "result": "no_envelope_found", "issue": "未发现上行信封"})
             continue
         # 取首个可解析信封
         parsed_env = None
@@ -274,7 +283,7 @@ def main():
         return 0
 
     print(f"\n=== 校验 {len(results_files)} 个测试结果文件 ===")
-    grand_total = grand_valid = grand_partial = grand_failed = 0
+    grand_total = grand_valid = grand_partial = grand_failed = grand_legacy = 0
     file_reports = []
     for rf in results_files:
         rp = process_results_file(Path(rf), schema)
@@ -283,16 +292,19 @@ def main():
         grand_valid += rp["valid"]
         grand_partial += rp["partial"]
         grand_failed += rp["failed"]
+        grand_legacy += rp["legacy"]
         status_icon = "✅" if rp["failed"] == 0 and rp["partial"] == 0 else ("⚠️" if rp["valid"] > 0 else "❌")
-        print(f"  {status_icon} {rp['file']}: total={rp['total']} valid={rp['valid']} partial={rp['partial']} failed={rp['failed']}")
+        print(f"  {status_icon} {rp['file']}: total={rp['total']} valid={rp['valid']} partial={rp['partial']} failed={rp['failed']} legacy={rp['legacy']}")
         for d in rp["details"]:
             if d["result"] != "PASS":
                 print(f"      {d}")
 
-    pass_rate = (grand_valid + grand_partial) / grand_total * 100 if grand_total else 0
+    # 合规率分母扣除legacy
+    effective_total = grand_total - grand_legacy
+    pass_rate = (grand_valid + grand_partial) / effective_total * 100 if effective_total else 0
     print(f"\n═══ 总计 ═══")
-    print(f"  总信封: {grand_total}, 完整合规: {grand_valid}, partial: {grand_partial}, failed: {grand_failed}")
-    print(f"  合规率(含partial): {pass_rate:.1f}%")
+    print(f"  总信封: {grand_total}, 完整合规: {grand_valid}, partial: {grand_partial}, failed: {grand_failed}, legacy(扣除): {grand_legacy}")
+    print(f"  合规率(扣除legacy后): {pass_rate:.1f}%")
 
     # 写入报告
     report_path = results_dir / "ci_gate_report.json"
@@ -303,6 +315,7 @@ def main():
         "grand_valid": grand_valid,
         "grand_partial": grand_partial,
         "grand_failed": grand_failed,
+        "grand_legacy": grand_legacy,
         "pass_rate": pass_rate,
         "files": file_reports,
     }

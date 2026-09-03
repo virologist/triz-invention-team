@@ -23,8 +23,8 @@
     },
     "task_id": {
       "type": "string",
-      "pattern": "^T-[0-9]{8}-[0-9]{3,}$",
-      "description": "任务ID（YYYYMMDD-NNN）"
+      "pattern": "^T-[0-9]{8}-[A-Za-z0-9]{1,8}$",
+      "description": "任务ID（YYYYMMDD-{NNN|字母数字后缀}，例T-20260903-001或T-20260903-B01）"
     },
     "phase": {
       "type": "integer",

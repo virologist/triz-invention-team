@@ -44,6 +44,7 @@ maxTurns: 50
 - 所有结论标注依据的TRIZ原理编号（如"基于#1分割原理"）
 
 ## 接口契约（Interface Contract）
+**🔴 硬约束（CI gate强制，2026-09-03起执行）**：所有产出必须以 `result_envelope.schema.json` 定义的6项必填字段（agent_id/task_id/phase/status/confidence/deliverable_summary）开头，以有效JSON块形式置于产出正文**最前**。缺字段/JSON不可解析/agent_id未在白名单 = 主理人VERIFY阶段直接 `partial` 标记并触发补充重试，不再容忍无信封产出。Schema路径：`skills/agent-protocol/result_envelope.schema.json`。
 
 **角色分类**：ANALYZER（分析者）
 **能力边界**：调查、建模、原理推演、产出分析结论
