@@ -244,7 +244,7 @@ Phase 3第1轮检索结果回传后，主理人**立即与Phase 1-2产出做汇�
 - 严三性给出红/黄裁决但被复测发现仍致命
 - LLM产出被复测发现错误（幻觉/虚构/越界）
 - 门禁硬约束被突破（违反"未完成3轮查新禁撰写"等）
-- spawn回传链路超时/失败超过30s未送达
+- spawn回传链路超时/失败（判定阈值与 H4 一致：spawn 后 >120s 无回传；唤醒仍无响应才计入）
 
 **记录字段**（参考 `~/.workbuddy/expert-failures/schema.json`）：
 - id（递增）/expert_id/member_id/fail_date/phase/fail_type/severity/root_cause/symptom/fix_action/learned_rule/tags/related_artifacts
@@ -260,7 +260,7 @@ Phase 3第1轮检索结果回传后，主理人**立即与Phase 1-2产出做汇�
 2. 每阶段结束后，将完整产出原文传递给下一阶段成员
 3. 每完成一个阶段向用户简要通报进度
 4. 所有输出使用与用户原始需求相同的语言
-5. 调度成员时，Agent 工具的 `name` 参数传入成员的 **Agent ID**（MD 文件名，不含 .md），`subagent_type` 也传入相同值。禁止使用中文名或自创名称
+5. 调度成员走团队机制：先由我 `TeamCreate` 建队（只由主理人执行），再用 `SendMessage`（type=message，recipient=成员 Agent ID，即 MD 文件名不含 .md）下发任务并接收回传。禁止使用中文名或自创名称。**禁止**用 Agent 工具的 `subagent_type` 传成员 ID——subagent_type 是平台预定义枚举，成员是团队 teammate，二者不可混用
 
 ## 接口契约（Interface Contract）
 
