@@ -7,6 +7,19 @@ description: "团队智能体通信契约的形式化规范 — JSON Schema形�
 
 > v2.2基础设施（2026-09-03）：result_envelope和task_payload从"自然语言+JSON示例"升级为JSON Schema形式化规范，并配套`agent_ci_gate.py` CI门禁脚本。
 
+## 🔴 单点权威约束（所有成员必须遵守）
+
+**所有成员产出必须以result_envelope.schema.json定义的6项必填字段（agent_id/task_id/phase/status/confidence/deliverable_summary）开头**，以有效JSON块形式置于产出正文**最前**。
+
+**违规处理**：
+- 缺字段/JSON不可解析/agent_id未在白名单 = 主理人VERIFY阶段直接 `partial` 标记并触发补充重试
+- 不再容忍无信封产出
+
+**配套**：
+- Schema：`result_envelope.schema.json`（本目录）
+- CI门禁：`scripts/agent_ci_gate.py`（自动校验所有归档*results.json）
+- 成员MD中的引用行仅作指向，单点权威定义在此SKILL.md
+
 ## 设计目标
 
 - **机器可校验**：用标准jsonschema库自动校验agent产出，替代人工核对

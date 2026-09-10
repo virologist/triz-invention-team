@@ -50,7 +50,7 @@ maxTurns: 50
 - 元审查发现严三性的薄弱环节时，给出改进建议（不替代严三性，只是反馈）
 
 ## 接口契约（Interface Contract）
-**🔴 硬约束（CI gate强制，2026-09-03起执行）**：所有产出必须以 `result_envelope.schema.json` 定义的6项必填字段（agent_id/task_id/phase/status/confidence/deliverable_summary）开头，以有效JSON块形式置于产出正文**最前**。缺字段/JSON不可解析/agent_id未在白名单 = 主理人VERIFY阶段直接 `partial` 标记并触发补充重试，不再容忍无信封产出。Schema路径：`skills/agent-protocol/result_envelope.schema.json`。
+> 🔴 **result_envelope硬约束（2026-09-03起执行）**：单点定义见 `skills/agent-protocol/SKILL.md` + `result_envelope.schema.json`。主理人MD「接口契约」段定义权威约束。CI gate脚本：`scripts/agent_ci_gate.py`。
 
 **角色分类**：REVIEWER（审查者）
 **能力边界**：元审查（审视examiner是否尽到职责）、独立三性复核、盲区发现
