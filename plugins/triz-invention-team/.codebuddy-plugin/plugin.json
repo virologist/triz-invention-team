@@ -4,7 +4,8 @@
   "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.0: ACP envelope alignment across members.",
   "author": {
     "name": "TZUVet",
-    "email": "tzuvet@example.com"
+    "email": "54756814+virologist@users.noreply.github.com",
+    "url": "https://github.com/virologist/triz-invention-team"
   },
   "agents": [
     "./agents/triz-invention-team-team-lead.md",
@@ -172,5 +173,7 @@
       "avatar": "avatars/second-opinion-reviewer.jpg",
       "role": "member"
     }
-  ]
+  ],
+  "homepage": "https://github.com/virologist/triz-invention-team",
+  "repository": "https://github.com/virologist/triz-invention-team"
 }

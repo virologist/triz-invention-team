@@ -17,36 +17,54 @@ v2.2 版本把代理间契约形式化为 JSON Schema（`agent-protocol`），�
 - **专利组合策略**（核心 / 外围 / 替代路线）—— 加强保护范围
 - **实施例参数范围设计**：每个数值范围配 ≥3 个实施例点位（端值×2 + 中间值×1），符合中国专利法第 26.3-26.4 条
 - **JSON Schema 契约 + CI gate 脚本**：扣除 legacy 后 100% 合规率
-- **跨平台插件格式**：双清单并列（`.claude-plugin/` + `.codebuddy-plugin/`），同时兼容 Claude Code、GitHub Copilot CLI 和 WorkBuddy
+- **跨平台插件格式**：双清单并列（`.claude-plugin/` + `.codebuddy-plugin/`）+ 双市场描述文件，同一仓库同时兼容 Claude Code、GitHub Copilot CLI 与 WorkBuddy
 
 ---
 
 ## 📦 安装
 
-### 方式 A — Claude Code / GitHub Copilot CLI
+本仓库是一个**单插件市场（single-plugin marketplace）**。两个生态都可直接从 GitHub 添加，无需手工拷贝。
 
-将本仓库作为私有 marketplace 添加：
+### 方式 A — Claude Code / GitHub Copilot CLI
 
 ```bash
 # 在 Claude Code 或 Copilot CLI 内
-/plugin marketplace add biodog/triz-invention-team
+/plugin marketplace add virologist/triz-invention-team
 /plugin install triz-invention-team@triz-invention-team-marketplace
 ```
 
-或使用 `claude` CLI：
+> **私有仓库？** 请先完成 `gh auth login` 或导出 `GITHUB_TOKEN`，否则市场克隆会失败。
+
+备选——直接加载本地克隆：
 
 ```bash
-gh repo clone biodog/triz-invention-team ~/claude-plugins/triz-invention-team
-claude --plugin-dir ~/claude-plugins/triz-invention-team
+gh repo clone virologist/triz-invention-team ~/claude-plugins/triz-invention-team
+claude --plugin-dir ~/claude-plugins/triz-invention-team/plugins/triz-invention-team
 ```
 
 ### 方式 B — WorkBuddy
 
+WorkBuddy 原生支持 git 型市场，因此命令与上面一致：
+
 ```bash
-# 复制到 WorkBuddy marketplaces 目录
-mkdir -p ~/.workbuddy/plugins/marketplaces/triz-invention-team
-cp -R ./* ~/.workbuddy/plugins/marketplaces/triz-invention-team/
+/plugin marketplace add virologist/triz-invention-team
+/plugin install triz-invention-team@triz-invention-team-marketplace
+```
+
+或注册为本地目录型市场：
+
+```bash
+gh repo clone virologist/triz-invention-team \
+  ~/.workbuddy/plugins/marketplaces/triz-invention-team-marketplace
 # 重启 WorkBuddy，团队将出现在"专家团"列表
+```
+
+### 方式 C — 手工 / 其他 agent 宿主
+
+插件在 `plugins/triz-invention-team/` 下**完全自包含**。把该目录放到宿主 agent 的插件发现路径即可：
+
+```bash
+cp -R plugins/triz-invention-team <你的agent插件目录>/
 ```
 
 ---
@@ -91,23 +109,25 @@ cp -R ./* ~/.workbuddy/plugins/marketplaces/triz-invention-team/
 ## 🛠️ 仓库结构
 
 ```
-triz-invention-team/
-├── .claude-plugin/         # Claude Code / Copilot CLI 清单 + marketplace
-│   ├── plugin.json
-│   └── marketplace.json
-├── .codebuddy-plugin/      # WorkBuddy 清单 + marketplace
-│   ├── plugin.json
-│   └── marketplace.json
-├── agents/                  # 7 个代理角色定义（Markdown）
-├── skills/                  # 4 个技能包
-├── scripts/                 # CI gate + token 预算校验
-├── docs/                    # architecture.md + OPERATIONS.md
-├── avatars/                 # 512×512 代理头像
-├── settings.json
-├── README.md                # ← 你在这里（英文）
-├── README.zh.md             # ← 中文版（当前文件）
-├── LICENSE                  # Apache-2.0
-└── CHANGELOG.md            # 发布历史
+triz-invention-team/                          # ← 市场根目录
+├── .claude-plugin/
+│   └── marketplace.json                      # Claude Code / Copilot CLI 市场描述
+├── .codebuddy-plugin/
+│   └── marketplace.json                      # WorkBuddy 市场描述
+├── plugins/
+│   └── triz-invention-team/                  # ← 自包含插件本体
+│       ├── .claude-plugin/plugin.json        # Claude Code / Copilot CLI 清单
+│       ├── .codebuddy-plugin/plugin.json     # WorkBuddy 清单
+│       ├── agents/                           # 7 个代理角色定义（Markdown）
+│       ├── skills/                           # 4 个技能包
+│       ├── scripts/                          # CI gate + token 预算校验
+│       ├── docs/                             # architecture · OPERATIONS · evolution-log
+│       ├── avatars/                          # 512×512 代理头像
+│       └── settings.json
+├── README.md                                 # 英文版
+├── README.zh.md                              # ← 中文版（当前文件）
+├── CHANGELOG.md                              # 发布历史
+└── LICENSE                                   # Apache-2.0
 ```
 
 ---
@@ -115,10 +135,11 @@ triz-invention-team/
 ## 🧪 质量门禁
 
 ```bash
-# 校验专家包
-python3 scripts/agent_ci_gate.py --self-test          # schema 自测
-python3 scripts/agent_ci_gate.py --results-dir outputs/ # CI gate 校验所有归档测试
-python3 scripts/token_budget_check.py --conservative  # H1 上下文装配预算
+cd plugins/triz-invention-team
+
+python3 scripts/agent_ci_gate.py --self-test              # schema 自测
+python3 scripts/agent_ci_gate.py --results-dir outputs/   # CI gate 校验所有归档测试
+python3 scripts/token_budget_check.py --conservative      # H1 上下文装配预算
 ```
 
 CI gate 当前对所有 v2.2 后归档报告 **100% 合规率**（legacy 早期归档按设计豁免）。
@@ -127,13 +148,14 @@ CI gate 当前对所有 v2.2 后归档报告 **100% 合规率**（legacy 早期�
 
 ## 🔄 发布流程
 
-1. 更新 agents / skills / scripts
-2. 跑 `scripts/agent_ci_gate.py --strict` 把守 commit 门禁
-3. 同时 bump `.claude-plugin/plugin.json` 和 `.codebuddy-plugin/plugin.json` 的版本号（semver）
-4. 打 tag：`git tag v2.x.y`
-5. push 到 GitHub
+1. 更新 `plugins/triz-invention-team/` 下的 agents / skills / scripts
+2. 跑 `python3 plugins/triz-invention-team/scripts/agent_ci_gate.py --strict` 把守 commit 门禁
+3. 同时 bump `plugins/triz-invention-team/.claude-plugin/plugin.json` 和 `plugins/triz-invention-team/.codebuddy-plugin/plugin.json` 的版本号（semver）
+4. 保持两个市场描述文件同步：`.claude-plugin/marketplace.json`、`.codebuddy-plugin/marketplace.json`
+5. 打 tag：`git tag v2.x.y`
+6. 推送：`git push origin main --tags`
 
-完整跨会话恢复剧本见 [`docs/OPERATIONS.md`](docs/OPERATIONS.md)。
+完整跨会话恢复剧本见 [`docs/OPERATIONS.md`](plugins/triz-invention-team/docs/OPERATIONS.md)。
 
 ---
 
@@ -141,7 +163,7 @@ CI gate 当前对所有 v2.2 后归档报告 **100% 合规率**（legacy 早期�
 
 欢迎 issue 和 PR。请确保：
 
-1. 新代理 prompt 含 `result_envelope` JSON 块（参照 [`agent-protocol` schema](skills/agent-protocol/result_envelope.schema.json)）
+1. 新代理 prompt 含 `result_envelope` JSON 块（参照 [`agent-protocol` schema](plugins/triz-invention-team/skills/agent-protocol/result_envelope.schema.json)）
 2. CI gate `--strict` 通过
 3. 单代理 token 预算不超过 20K（用 `scripts/token_budget_check.py` 验证）
 

@@ -17,36 +17,54 @@ This v2.2 release formalizes the inter-agent contract as a JSON Schema (`agent-p
 - **Patent portfolio strategy** (core / peripheral / alternative lines) for stronger protection
 - **Embodiment parameter range design** — every numeric range backed by ≥3 data points (end × 2 + middle × 1) per CN Patent Law Art. 26.3-26.4
 - **JSON Schema contract** with `agent_ci_gate.py` CI gate — 100% compliance rate (deducting legacy archives)
-- **Cross-platform plugin format**: dual-manifest (`.claude-plugin/` + `.codebuddy-plugin/`) compatible with Claude Code, GitHub Copilot CLI, and WorkBuddy
+- **Cross-platform plugin format**: dual manifest (`.claude-plugin/` + `.codebuddy-plugin/`) plus dual marketplace descriptors, working with Claude Code, GitHub Copilot CLI, and WorkBuddy from one repository
 
 ---
 
 ## 📦 Installation
 
-### Option A — Claude Code / GitHub Copilot CLI
+This repository is a **single-plugin marketplace**. Both supported ecosystems can add it straight from GitHub — no manual copying needed.
 
-Add this repo as a private marketplace:
+### Option A — Claude Code / GitHub Copilot CLI
 
 ```bash
 # Inside Claude Code or Copilot CLI
-/plugin marketplace add biodog/triz-invention-team
+/plugin marketplace add virologist/triz-invention-team
 /plugin install triz-invention-team@triz-invention-team-marketplace
 ```
 
-Or with `claude` CLI:
+> **Private repository?** Authenticate `gh` first (`gh auth login`) or export `GITHUB_TOKEN`, so the marketplace clone can succeed.
+
+Alternative — load a local clone directly:
 
 ```bash
-gh repo clone biodog/triz-invention-team ~/claude-plugins/triz-invention-team
-claude --plugin-dir ~/claude-plugins/triz-invention-team
+gh repo clone virologist/triz-invention-team ~/claude-plugins/triz-invention-team
+claude --plugin-dir ~/claude-plugins/triz-invention-team/plugins/triz-invention-team
 ```
 
 ### Option B — WorkBuddy
 
+WorkBuddy natively supports git-hosted marketplaces, so the same commands apply:
+
 ```bash
-# Place under WorkBuddy marketplaces directory
-mkdir -p ~/.workbuddy/plugins/marketplaces/triz-invention-team
-cp -R ./* ~/.workbuddy/plugins/marketplaces/triz-invention-team/
-# Restart WorkBuddy; the team will appear under "Expert Teams"
+/plugin marketplace add virologist/triz-invention-team
+/plugin install triz-invention-team@triz-invention-team-marketplace
+```
+
+Or register it as a local directory marketplace:
+
+```bash
+gh repo clone virologist/triz-invention-team \
+  ~/.workbuddy/plugins/marketplaces/triz-invention-team-marketplace
+# Restart WorkBuddy → the team appears under "Expert Teams"
+```
+
+### Option C — Manual / any other agent host
+
+The plugin is fully self-contained under `plugins/triz-invention-team/`. Drop that folder wherever your host agent discovers plugins:
+
+```bash
+cp -R plugins/triz-invention-team <your-agent-plugins-dir>/
 ```
 
 ---
@@ -91,23 +109,25 @@ The director will run a Socratic Phase 0 (≤5 rounds × ≤5 questions) to lock
 ## 🛠️ Repository Structure
 
 ```
-triz-invention-team/
-├── .claude-plugin/         # Claude Code / Copilot CLI manifest + marketplace
-│   ├── plugin.json
-│   └── marketplace.json
-├── .codebuddy-plugin/      # WorkBuddy manifest + marketplace
-│   ├── plugin.json
-│   └── marketplace.json
-├── agents/                  # 7 agent role definitions (Markdown)
-├── skills/                  # 4 skill packages
-├── scripts/                 # CI gate + token budget checker
-├── docs/                    # architecture.md + OPERATIONS.md
-├── avatars/                 # 512×512 agent portraits
-├── settings.json
-├── README.md                # ← you are here (English)
-├── README.zh.md             # Chinese version
-├── LICENSE                  # Apache-2.0
-└── CHANGELOG.md            # release history
+triz-invention-team/                          # ← marketplace root
+├── .claude-plugin/
+│   └── marketplace.json                      # Claude Code / Copilot CLI marketplace
+├── .codebuddy-plugin/
+│   └── marketplace.json                      # WorkBuddy marketplace
+├── plugins/
+│   └── triz-invention-team/                  # ← the self-contained plugin
+│       ├── .claude-plugin/plugin.json        # Claude Code / Copilot CLI manifest
+│       ├── .codebuddy-plugin/plugin.json     # WorkBuddy manifest
+│       ├── agents/                           # 7 agent role definitions (Markdown)
+│       ├── skills/                           # 4 skill packages
+│       ├── scripts/                          # CI gate + token budget checker
+│       ├── docs/                             # architecture · OPERATIONS · evolution-log
+│       ├── avatars/                          # 512×512 agent portraits
+│       └── settings.json
+├── README.md                                 # ← you are here (English)
+├── README.zh.md                              # Chinese version
+├── CHANGELOG.md                              # release history
+└── LICENSE                                   # Apache-2.0
 ```
 
 ---
@@ -115,10 +135,11 @@ triz-invention-team/
 ## 🧪 Quality Gates
 
 ```bash
-# Validate the package
-python3 scripts/agent_ci_gate.py --self-test          # schema self-test
-python3 scripts/agent_ci_gate.py --results-dir outputs/ # CI gate over all archived test runs
-python3 scripts/token_budget_check.py --conservative  # H1 context assembly budget
+cd plugins/triz-invention-team
+
+python3 scripts/agent_ci_gate.py --self-test              # schema self-test
+python3 scripts/agent_ci_gate.py --results-dir outputs/   # CI gate over archived test runs
+python3 scripts/token_budget_check.py --conservative      # H1 context assembly budget
 ```
 
 The CI gate currently reports **100% compliance** on all post-v2.2 archives (legacy pre-v2.0 archives are exempt by design).
@@ -127,13 +148,14 @@ The CI gate currently reports **100% compliance** on all post-v2.2 archives (leg
 
 ## 🔄 Release Process
 
-1. Update agents / skills / scripts
-2. Run `scripts/agent_ci_gate.py --strict` to gate the commit
-3. Bump version in **both** `.claude-plugin/plugin.json` and `.codebuddy-plugin/plugin.json` (semver)
-4. Tag the release: `git tag v2.x.y`
-5. Push to GitHub
+1. Update agents / skills / scripts under `plugins/triz-invention-team/`
+2. Run `python3 plugins/triz-invention-team/scripts/agent_ci_gate.py --strict`
+3. Bump the version in **both** `plugins/triz-invention-team/.claude-plugin/plugin.json` and `plugins/triz-invention-team/.codebuddy-plugin/plugin.json` (semver)
+4. Keep the two marketplace descriptors in sync: `.claude-plugin/marketplace.json`, `.codebuddy-plugin/marketplace.json`
+5. Tag the release: `git tag v2.x.y`
+6. Push: `git push origin main --tags`
 
-See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the full cross-session recovery playbook.
+See [`docs/OPERATIONS.md`](plugins/triz-invention-team/docs/OPERATIONS.md) for the full cross-session recovery playbook.
 
 ---
 
@@ -141,7 +163,7 @@ See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the full cross-session recove
 
 Issues and PRs welcome. Please ensure:
 
-1. New agent prompts include a `result_envelope` JSON block per the [`agent-protocol` schema](skills/agent-protocol/result_envelope.schema.json)
+1. New agent prompts include a `result_envelope` JSON block per the [`agent-protocol` schema](plugins/triz-invention-team/skills/agent-protocol/result_envelope.schema.json)
 2. CI gate passes with `--strict`
 3. Token budget stays under 20K per agent (use `scripts/token_budget_check.py` to verify)
 

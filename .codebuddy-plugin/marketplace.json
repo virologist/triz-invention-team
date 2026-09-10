@@ -2,21 +2,22 @@
   "name": "triz-invention-team-marketplace",
   "owner": {
     "name": "TZUVet",
-    "email": "tzuvet@example.com"
+    "email": "54756814+virologist@users.noreply.github.com",
+    "url": "https://github.com/virologist"
   },
   "plugins": [
     {
       "name": "triz-invention-team",
       "description": "Cross-domain TRIZ invention team: contradiction analysis, three-round patent search, examination simulation with second-opinion review, disclosure and patent application drafting for CN invention patents (v2.2).",
-      "source": "./",
+      "source": "./plugins/triz-invention-team",
       "version": "2.2.0",
       "author": {
         "name": "TZUVet",
-        "email": "tzuvet@example.com",
-        "url": "https://github.com/biodog/triz-invention-team"
+        "email": "54756814+virologist@users.noreply.github.com",
+        "url": "https://github.com/virologist/triz-invention-team"
       },
-      "homepage": "https://github.com/biodog/triz-invention-team",
-      "repository": "https://github.com/biodog/triz-invention-team",
+      "homepage": "https://github.com/virologist/triz-invention-team",
+      "repository": "https://github.com/virologist/triz-invention-team",
       "license": "Apache-2.0",
       "keywords": [
         "TRIZ",

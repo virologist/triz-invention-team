@@ -3,7 +3,8 @@
   "name": "triz-invention-team-marketplace",
   "owner": {
     "name": "TZUVet",
-    "email": "tzuvet@example.com"
+    "email": "54756814+virologist@users.noreply.github.com",
+    "url": "https://github.com/virologist"
   },
   "metadata": {
     "description": "Private marketplace for the TRIZ Invention Team (v2.2) — cross-domain multi-agent invention workflow",
@@ -16,11 +17,12 @@
       "version": "2.2.0",
       "author": {
         "name": "TZUVet",
-        "email": "tzuvet@example.com"
+        "email": "54756814+virologist@users.noreply.github.com",
+        "url": "https://github.com/virologist/triz-invention-team"
       },
-      "source": "./",
-      "homepage": "https://github.com/biodog/triz-invention-team",
-      "repository": "https://github.com/biodog/triz-invention-team",
+      "source": "./plugins/triz-invention-team",
+      "homepage": "https://github.com/virologist/triz-invention-team",
+      "repository": "https://github.com/virologist/triz-invention-team",
       "license": "Apache-2.0",
       "keywords": [
         "TRIZ",
