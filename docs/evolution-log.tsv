@@ -1,0 +1,7 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+
+2026-09-02T12:05	33feab1	system	-	71	baseline	-	v2.0架构+历史4轮测试加权	full_test
+2026-09-02T12:15	e2fc586	system	71	74	keep	D1协议冲突	7文件ACP清除统一result_envelope	full_test
+2026-09-02T12:20	921c1b1	system	74	82	keep	D2-D5	自适应交互+组合策略+Fan-in显式化+实施例范围	full_test
+2026-09-02T12:30	1d3147c	system	82	84	keep	H1预算	token校验工具落地6/6双口径PASS	full_test
+2026-09-03T08:20	d09838f	system	84	85	keep	仲裁边界	tie-break利益冲突修复(极端僵局实测暴露)	full_test

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "triz-invention-team-marketplace",
+  "owner": {
+    "name": "TZUVet",
+    "email": "tzuvet@example.com"
+  },
+  "metadata": {
+    "description": "Private marketplace for the TRIZ Invention Team (v2.2) — cross-domain multi-agent invention workflow",
+    "version": "2.2.0"
+  },
+  "plugins": [
+    {
+      "name": "triz-invention-team",
+      "description": "Cross-domain TRIZ invention team: contradiction analysis, three-round patent search, examination simulation with second-opinion review, disclosure and patent application drafting for CN invention patents.",
+      "version": "2.2.0",
+      "author": {
+        "name": "TZUVet",
+        "email": "tzuvet@example.com"
+      },
+      "source": "./",
+      "homepage": "https://github.com/biodog/triz-invention-team",
+      "repository": "https://github.com/biodog/triz-invention-team",
+      "license": "Apache-2.0",
+      "keywords": [
+        "TRIZ",
+        "invention",
+        "patent",
+        "multi-agent",
+        "creativity",
+        "contradiction-matrix",
+        "40-invention-principles"
+      ],
+      "category": "research",
+      "strict": true
+    }
+  ]
+}
