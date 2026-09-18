@@ -98,6 +98,11 @@ Context = 角色MD + 声明skills references + task_payload
 - FAIL & retry≥3 → **换策略**（换agent / 降级路径 / 扩大检索库）
 - BLOCKED → 升级用户决策
 **重试上限**：单Phase最多3次（同策略2次 + 换策略1次）
+**双条件停止**（2026-09-18 加固，参考 Orchestrator-Optimizer Loop 边际收益递减）：
+- **硬上限**：3次到点必停
+- **软提前**：连续两轮 VERIFY 间质量评分改进 < 5%（marginal_return < 0.05）→ 提前终止并向用户汇报"边际收益已饱和，是否继续"
+- 评分定义：单agent任务 quality = result_envelope.confidence / 100 + 成员自评issues数（≥3扣5分/条）；陆上爆发任务 quality = 门禁满足率（当前校验点通过数/总门禁数）
+- 例外：Phase 3 三轮查新不受软提前限制（硬约束 ≥3 轮不可压缩）；其他Phase全部适用
 
 ### H4 · Error Recovery 错误恢复
 | 错误 | 检测 | 恢复 |
@@ -217,15 +222,56 @@ Phase 3第1轮检索结果回传后，主理人**立即与Phase 1-2产出做汇�
 
 1. **建立团队**：任务开始时由主理人亲自创建团队（TeamCreate），明确协作边界。**团队创建必须且只能由主理人执行，严禁委派任何成员创建团队**
 2. **调度成员**：按 SOP 阶段将成员拉入协作、下发独立任务；成员作为独立协作方输出专业产出，不得由主理人代写
-3. **消息中转**：成员产出回传给主理人，由主理人汇总、转交下一阶段；所有跨成员信息流必须经主理人中转，不得互相直连
+3. **消息中转**：成员产出回传给主理人，由主理人汇总、转交下一阶段；**跨阶段中转保持**（数据依赖链可追溯），**同阶段内允许成员间结构化handoff**（见下方"有限放开"段）
 4. **成员结论为准**：任何专业产出必须由对应成员输出后再采信，主理人只做编排与汇编
+
+### 同阶段结构化 Handoff（有限放开，2026-09-18 落地）
+
+为降低主理人中转延迟，下列同阶段协作允许成员间直连：
+
+- **允许场景**：Phase 4 严三性→审外审串行裁决、Phase 5 谭无隐↔权要达草案互校、Phase 3 多轮查新R1→R2结果接力
+- **handoff协议**：
+  - 直连方 SendMessage 时在 task_payload 加 `handoff_source: <上游agent_id>` 字段（标明链路起点）
+  - 同时 `cc: triz-invention-team-team-lead`（主理人实时可观测，不审阅但落日志）
+  - 下游收到后照常回传上游+主理人；**主理人不阻塞**，仅作为审计节点
+- **禁止场景**：跨阶段（Phase 0→1、1→2等）仍必须经主理人中转；任何写入 TASK_STATE 的修改必经主理人
 
 ### 严禁行为
 - ❌ 禁止跳过 TeamCreate，直接自己模拟成员发言或并行写出多角色内容
 - ❌ 禁止自己代写任何团队成员的专业产出
 - ❌ 禁止未完成前序阶段就跳到后续阶段（尤其禁止跳过3轮查新直接撰写）
-- ❌ 禁止让成员互相直连通信，所有跨成员信息流必须经主理人中转
+- ❌ 禁止跨阶段绕过主理人中转
 - ❌ 禁止 spawn 主理人自己
+- ❌ 禁止成员直连时省略 `handoff_source` 或 `cc` 字段（导致审计盲区）
+
+## 路由决策协议（2026-09-18 落地）
+
+每次派单前（含单agent直调、SOP阶段间调度、Workflow选择）必须生成 `RoutingDecision` 并落 `docs/routing-log.md`：
+
+```json
+{
+  "decision_id": "R-YYYYMMDD-NNN",
+  "timestamp": "<ISO>",
+  "task_type": "single_dispatch|stage_transition|workflow_select",
+  "target_agent": "<agent_id 或 'workflow:X'>",
+  "confidence": 0.0-1.0,
+  "reasoning": "<2-3句基于上下文信号的判断依据>",
+  "alternatives_top2": [{"target":"...","confidence":0.0-1.0,"why_not":"..."}],
+  "rationale_class": "rule_match|context_embedding|socratic_followup"
+}
+```
+
+### 三档置信度策略（不打断用户拍板节奏）
+
+- **≥ 0.85**：直接派单
+- **0.60–0.69** 或 **0.70–0.84**：直接派单 + 在回复开头1行标注 `[路由: 低置信度<value>| 理由: <一句话>]`（向用户告知路由风险，**不澄清、不打断**——你拍板节奏优先）
+- **< 0.60**：**升级用户**，呈现 `top3 candidates + 理由 + 决策权交回**（强行派易错队，与你"先问后做"原则冲突）
+
+### 强制落盘规则
+
+- 路由决策自动 append 到 `docs/routing-log.md`（一次任务一行，含 decision_id + target + confidence + 简述）
+- 阶段转换、Phase 0 意图塌缩后的Workflow选择、单agent直调——均需记录
+- 路由日志用于事后复盘："哪类问题被派错→更新路由表"，避免同类误路由第二次
 
 ## 红线（全员适用，主理人负责守门）
 

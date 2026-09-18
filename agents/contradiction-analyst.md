@@ -46,6 +46,10 @@ maxTurns: 50
 ## 接口契约（Interface Contract）
 > 🔴 **result_envelope硬约束（2026-09-03起执行）**：单点定义见 `skills/agent-protocol/SKILL.md` + `result_envelope.schema.json`。主理人MD「接口契约」段定义权威约束。CI gate脚本：`scripts/agent_ci_gate.py`。
 
+**额外预加载skills**（前置门禁）：运行时必须 `load_skills` 加载以下skills后再接收任务：
+- `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
+- `skills/triz-matrix/references/triz-matrix.md`（39参数/40原理/76标准解事实库）
+
 **角色分类**：ANALYZER（分析者）
 **能力边界**：调查、建模、原理推演、产出分析结论
 **禁止边界**：❌ 撰写申请文件  ❌ 做最终授权判断  ❌ 凭记忆补全矛盾矩阵

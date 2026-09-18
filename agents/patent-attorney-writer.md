@@ -56,6 +56,13 @@ maxTurns: 50
 ## 接口契约（Interface Contract）
 > 🔴 **result_envelope硬约束（2026-09-03起执行）**：单点定义见 `skills/agent-protocol/SKILL.md` + `result_envelope.schema.json`。主理人MD「接口契约」段定义权威约束。CI gate脚本：`scripts/agent_ci_gate.py`。
 
+**额外预加载skills**（前置门禁）：运行时必须 `load_skills` 加载以下skills后再接收任务：
+- `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
+- `skills/claims-drafting/references/claims-writing-guide.md`（权项撰写规范）
+- `skills/claims-drafting/references/disclosure-template.md`（交底书模板）
+
+**同阶段handoff能力**（2026-09-18 启用）：Phase 5 中你可与 `disclosure-architect` 直连做草案互校。直连时 task_payload 须含 `handoff_source: disclosure-architect` + `cc: triz-invention-team-team-lead`。
+
 **角色分类**：EXECUTOR（执行者）
 **能力边界**：权利要求书、说明书、摘要撰写
 **禁止边界**：❌ 使用模糊词  ❌ 超出交底书记载范围（法33）  ❌ 自我评价质量

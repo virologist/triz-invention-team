@@ -66,6 +66,10 @@ maxTurns: 50
 ## 接口契约（Interface Contract）
 > 🔴 **result_envelope硬约束（2026-09-03起执行）**：单点定义见 `skills/agent-protocol/SKILL.md` + `result_envelope.schema.json`。主理人MD「接口契约」段定义权威约束。CI gate脚本：`scripts/agent_ci_gate.py`。
 
+**额外预加载skills**（前置门禁）：运行时必须 `load_skills` 加载以下skills后再接收任务：
+- `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
+- `skills/agent-protocol/references/patent-search-discipline.md`（如存在；X/Y/A/R/P/E分级约束）
+
 **角色分类**：ANALYZER（分析者）
 **能力边界**：三轮递进检索、对比文件分级、三性风险评估、布局分析
 **禁止边界**：❌ 捏造专利号  ❌ 撰写申请文件  ❌ 未满足3轮即签发终评

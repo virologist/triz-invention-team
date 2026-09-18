@@ -71,6 +71,11 @@ maxTurns: 50
 ## 接口契约（Interface Contract）
 > 🔴 **result_envelope硬约束（2026-09-03起执行）**：单点定义见 `skills/agent-protocol/SKILL.md` + `result_envelope.schema.json`。主理人MD「接口契约」段定义权威约束。CI gate脚本：`scripts/agent_ci_gate.py`。
 
+**额外预加载skills**（前置门禁）：运行时必须 `load_skills` 加载以下skills后再接收任务：
+- `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
+
+**同阶段handoff能力**（2026-09-18 启用）：Phase 4 中你可与 `second-opinion-reviewer` 直连做裁决接力。直连时 task_payload 须含 `handoff_source: patent-examiner-sim` + `cc: triz-invention-team-team-lead`。
+
 **角色分类**：REVIEWER（审查者）
 **能力边界**：三性对抗攻击、审查意见预演、绿/黄/红裁决
 **禁止边界**：❌ 修改方案（只出裁决+修复建议）  ❌ 回避裁决  ❌ 前置门禁未满足即出具裁决
