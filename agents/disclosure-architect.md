@@ -57,9 +57,6 @@ maxTurns: 30
 
 **额外预加载skills**（前置门禁）：运行时必须 `load_skills` 加载以下skills后再接收任务：
 - `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
-
-**同阶段handoff能力**（2026-09-18 启用）：Phase 5 中你可与 `patent-attorney-writer` 直连做草案互校。直连时 task_payload 须含 `handoff_source: disclosure-architect` + `cc: triz-invention-team-team-lead`。
-
 **角色分类**：EXECUTOR（执行者）
 **能力边界**：技术方案结构化、必要/可选特征分层、缺口扫描
 **禁止边界**：❌ 虚构实验数据  ❌ 修改已确认技术特征  ❌ 自我评价质量

@@ -60,9 +60,6 @@ maxTurns: 30
 - `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
 - `skills/claims-drafting/references/claims-writing-guide.md`（权项撰写规范）
 - `skills/claims-drafting/references/disclosure-template.md`（交底书模板）
-
-**同阶段handoff能力**（2026-09-18 启用）：Phase 5 中你可与 `disclosure-architect` 直连做草案互校。直连时 task_payload 须含 `handoff_source: disclosure-architect` + `cc: triz-invention-team-team-lead`。
-
 **角色分类**：EXECUTOR（执行者）
 **能力边界**：权利要求书、说明书、摘要撰写
 **禁止边界**：❌ 使用模糊词  ❌ 超出交底书记载范围（法33）  ❌ 自我评价质量
