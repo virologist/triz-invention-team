@@ -20,3 +20,6 @@
 | R-20260930-007 | 2026-09-30T15:27+08:00 | stage_transition | second-opinion-reviewer | 0.88 | Phase 4 二审·严三性🟡黄+修复清单已落盘·执行L3元审查+盲区发现+表决 |
 | R-20260930-008 | 2026-09-30T15:30+08:00 | stage_transition | disclosure-architect | 0.95 | Phase 5a 交底书·基于二审⚠附条件+7盲区+4附加条件C1-C4兑现·G3门禁校验准备 |
 | R-20260930-009 | 2026-09-30T15:35+08:00 | stage_transition | patent-search-scout | 0.90 | Phase 3 R2·基于R1 19件反推IPC主类·补E/P类·关闭G1门禁前置 |
+| R-20260930-010 | 2026-09-30T15:42+08:00 | stage_transition | patent-search-scout | 0.88 | Phase 3 R3差异化验证+复验R1/R2 X/Y级·三要素核验协议·关闭G1门禁·三步法终评 |
+| R-20260930-011 | 2026-09-30T15:50+08:00 | stage_transition | patent-attorney-writer | 0.93 | Phase 5b 权项+说明书+摘要·G1门禁已通过（scout R3🟢绿）·兑现严三性6修复+审外审C1-C4 |
+| R-20260930-012 | 2026-09-30T15:55+08:00 | stage_transition | patent-attorney-writer | 0.95 | Phase 5b修复·G5门禁违规：摘要实测371字符>300·重写≤300·仅限摘要段不超范围 |
