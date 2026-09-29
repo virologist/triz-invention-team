@@ -17,3 +17,6 @@
 | R-20260930-004 | 2026-09-30T15:45+08:00 | stage_transition | patent-search-scout | 0.92 | 重构后重跑Phase 3 R1：429已重置；本次走v2.3装配脚本（assemble_spawn_prompt.py）+落盘验收完整派单链 |
 | R-20260930-005 | 2026-09-30T15:20+08:00 | stage_transition | patent-examiner-sim | 0.93 | Phase 4 严三性三性对抗·基于R-004 19件威胁·G1/G2门禁校验·落盘R1+严三性串联审查 |
 | R-20260930-006 | 2026-09-30T15:21+08:00 | stage_transition | second-opinion-reviewer | 0.90 | Phase 4 二审·严三性落盘后自动接棒·H4冲突仲裁（L3 tie-break） |
+| R-20260930-007 | 2026-09-30T15:27+08:00 | stage_transition | second-opinion-reviewer | 0.88 | Phase 4 二审·严三性🟡黄+修复清单已落盘·执行L3元审查+盲区发现+表决 |
+| R-20260930-008 | 2026-09-30T15:30+08:00 | stage_transition | disclosure-architect | 0.95 | Phase 5a 交底书·基于二审⚠附条件+7盲区+4附加条件C1-C4兑现·G3门禁校验准备 |
+| R-20260930-009 | 2026-09-30T15:35+08:00 | stage_transition | patent-search-scout | 0.90 | Phase 3 R2·基于R1 19件反推IPC主类·补E/P类·关闭G1门禁前置 |
