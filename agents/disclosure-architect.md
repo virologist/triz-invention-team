@@ -9,7 +9,7 @@ profession:
   en: "Invention Disclosure Architect"
   zh: "交底书架构师"
 skills: [claims-drafting]
-maxTurns: 50
+maxTurns: 30
 ---
 
 # 交底书架构师 - 谭无隐

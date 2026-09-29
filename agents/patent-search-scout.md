@@ -9,7 +9,7 @@ profession:
   en: "Patent Search Specialist"
   zh: "专利查新检索员"
 skills: [patent-law]
-maxTurns: 50
+maxTurns: 80
 ---
 
 # 专利查新检索员 - 甄无遗

@@ -9,7 +9,7 @@ profession:
   en: "Independent Second-Opinion Reviewer"
   zh: "独立二审员"
 skills: [patent-law, triz-matrix]
-maxTurns: 50
+maxTurns: 40
 ---
 
 # 独立二审员 - 审外审

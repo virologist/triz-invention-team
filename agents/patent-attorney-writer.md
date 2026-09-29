@@ -9,7 +9,7 @@ profession:
   en: "Patent Attorney Writer"
   zh: "专利代理师"
 skills: [claims-drafting, patent-law]
-maxTurns: 50
+maxTurns: 30
 ---
 
 # 专利代理师 - 权要达

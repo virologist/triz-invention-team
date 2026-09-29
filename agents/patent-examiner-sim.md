@@ -9,7 +9,7 @@ profession:
   en: "Mock Patent Examiner"
   zh: "模拟审查员"
 skills: [patent-law, triz-matrix]
-maxTurns: 50
+maxTurns: 40
 ---
 
 # 模拟审查员 - 严三性
