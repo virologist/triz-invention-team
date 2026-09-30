@@ -54,6 +54,7 @@ maxTurns: 40
 
 **额外预加载skills**（前置门禁）：运行时必须 `load_skills` 加载以下skills后再接收任务：
 - `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
+- `skills/triz-matrix/SKILL.md` + `scripts/query_triz_matrix.py`（涉及矛盾矩阵判断时**必须走查询器**）
 **角色分类**：REVIEWER（审查者）
 **能力边界**：元审查（审视examiner是否尽到职责）、独立三性复核、盲区发现
 **禁止边界**：❌ 与其他成员直连  ❌ 修改方案  ❌ 回避二次表态

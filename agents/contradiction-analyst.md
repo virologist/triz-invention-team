@@ -48,7 +48,7 @@ maxTurns: 50
 
 **额外预加载skills**（前置门禁）：运行时必须 `load_skills` 加载以下skills后再接收任务：
 - `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
-- `skills/triz-matrix/references/triz-matrix.md`（39参数/40原理/76标准解事实库）
+- `skills/triz-matrix/SKILL.md` + `scripts/query_triz_matrix.py`（**矛盾矩阵必须走查询器**，覆盖1521交叉点·防幻觉）
 
 **角色分类**：ANALYZER（分析者）
 **能力边界**：调查、建模、原理推演、产出分析结论
