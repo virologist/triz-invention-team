@@ -1,6 +1,21 @@
 ---
 name: triz-matrix
-description: TRIZ contradiction modeling toolkit - 40 inventive principles, 39 engineering parameters, contradiction matrix quick-reference (high-frequency pairs), separation principles, ARIZ outline, substance-field analysis, 76 standard solutions catalog
+displayName:
+  en: "TRIZ Contradiction Matrix Toolkit"
+  zh: "TRIZ 矛盾矩阵工具箱"
+description: "TRIZ矛盾建模工具箱——40发明原理+39工程参数+12对常用矛盾速查+物理矛盾四大分离原理+ARIZ-85C+物-场76标准解+五级发明等级判定。适用：当用户面对'改善X会恶化Y'的技术矛盾、需要降级路径（越表→物理矛盾/物-场）、需评估发明高度1-5级、需ARIZ框架解高难度问题。中文触发词：TRIZ/矛盾矩阵/40原理/39参数/分离原理/物场模型/76标准解/ARIZ/发明等级/IFR。"
+trigger_keywords:
+  - "TRIZ"
+  - "矛盾矩阵"
+  - "技术矛盾"
+  - "物理矛盾"
+  - "分离原理"
+  - "40原理"
+  - "39参数"
+  - "ARIZ"
+  - "发明等级"
+  - "76标准解"
+  - "IFR"
 ---
 
 # TRIZ矛盾建模工具箱
@@ -16,3 +31,38 @@ description: TRIZ contradiction modeling toolkit - 40 inventive principles, 39 e
 1. 矛盾矩阵查询：先在 triz-matrix.md 中定位39参数编号，再按改善×恶化参数对查常用速查表
 2. 若所求矛盾对不在速查表——**禁止凭记忆补全39×39完整交叉数据**，降级到物理矛盾+四大分离原理路径继续
 3. 76标准解速查按编号精确取用（1.1补全物场、1.2引入S3中介、2.1引入S3增强、4.1检测派生量、5.1廉价替代等）
+
+### 降级路径决策树（实操必备）
+
+```
+起点：拿到具体矛盾（改善#A × 恶化#B）
+  │
+  ├─ A和B都在12条高频速查库内？
+  │    ├─ ✅ → 直接查表得2-4个原理编号，逐原理落地
+  │    └─ ❌ → 进入"越表"分支
+  │
+  ├─ 越表分支（关键决策点）
+  │    ├─ 是技术矛盾？（两参数方向不同）
+  │    │    ├─ ✅ → 检索#A和#B相关全部40原理，自己组合2-3个候选（不再承诺"矩阵推荐"）
+  │    │    └─ ❌ → 进入物理矛盾分支
+  │    │
+  │    ├─ 物理矛盾分支（同一参数需同时满足相反状态）
+  │    │    └─ 查"四大分离原理快速匹配表"（已在references）
+  │    │
+  │    └─ 物-场模型分支（功能不足/有害/测量困难）
+  │         └─ 查76标准解（按编号精确取用，禁用词不可改）
+  │
+  └─ 兜底：登记为`待领域核实`+`[INFERRED]`+`缺少真实39×39数据源`，向主理人反馈
+```
+
+### 失败处理·强制三件套（任何降级路径都需）
+
+1. **登记限制**：`[速查库越表·缺乏原始Altshuller矩阵]`，写入result_envelope.issues
+2. **不补全**：绝不凭训练记忆生成未在12条速查表内的原理编号（防幻觉硬约束）
+3. **降级路径标注**：使用physical contradiction / 76 standard solutions 时需同时标注"降级来源"和"本LLM未内置完整39×39矩阵"
+
+### 常见错误自查清单
+
+- ❌ 把76标准解编号改写（如1.1.1写成1.1）→ 立即修正为references原文编号
+- ❌ 把分离原理映射到矩阵推荐编号（如"用#13"替代"用分离原理空间分离"）→ 矩阵未涵盖的必须用分离原理
+- ❌ 跨矩阵库硬拼（把"物场5.1"和"矩阵#35"混用而不标层级）→ 必须分层标注
