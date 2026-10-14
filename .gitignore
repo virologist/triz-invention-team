@@ -4,3 +4,7 @@
 *.bak.*
 *.orig
 .claude-plugin/
+
+# Python bytecode
+__pycache__/
+*.pyc

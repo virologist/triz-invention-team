@@ -2,6 +2,38 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-10-15
+
+> 完成 2026-10-14 五维诊断的 P2 全项（P2-9~P2-12）+ 补 commit 级门禁。
+> 上游 P0-1~P0-3、P1-4~P1-8 见 [2.4.0]。
+
+### Added
+- **`scripts/run_regression.py` + `tests/` 回归测试集（P2-9）**：3 个固定用例
+  （workflow-a-01 全链路 L2 / workflow-b-01 analyst L1 / workflow-c-01 scout L1）+
+  12 种断言引擎（任务包四要素 / 信封 6 必填（栈平衡提取）/ 模糊词零命中（自动剔除
+  代码块与自检行防 failure-006 假阳性）/ 摘要机械计量 / 门禁登记 / 预算汇总等）。
+  用法 `--list | --scaffold | --case X --dir <run>`，报告落盘 `regression_report__*.json` 可跨轮对比。
+- **`scripts/failure_memory.py`（P2-12）**：episodic 失败记忆注入器——按「本次派单成员 +
+  任务域关键词」从 `~/.workbuddy/expert-failures/` 运行时筛出 learned_rule 摘要，
+  供主理人追加到 spawn 文案（永远最新，替代静态抄写）。
+- **`~/.workbuddy/git-hooks/pre-commit`（P1-6 补全 · commit 级门禁）**：三层快速校验——
+  ① `agent_ci_gate.py --strict` ② `scripts/*.py` 语法 ③ 装配链 `--list-members` 冒烟
+  （防 shared-core 断链类事故）；硬失败阻断提交。与既有 push 级门禁（release-sync.sh
+  `run_gates` 三闸）构成 commit→push 双层防护。
+- **并行与预装配协议（P2-10 · 主理人 MD）**：① 预装配流水线强制（等待窗口完成下一
+  成员的装配/预读，重叠开销）② 并行白名单 W1 独立咨询 / W2 盲态双审（默认关闭，
+  启用须登记对账段）③ 禁用清单（有依赖的串行对禁止假并行）④ routing-log 记录义务。
+
+### Changed
+- **主理人 MD 人设注入协议：强制三步 → 强制四步**（新增第 2 步「失败记忆注入」）
+- **Phase 3 查新并行化评估结论（P2-11）**：三轮串行为设计约束不做轮间并行；
+  新增可选「紧凑模式」（R2+R3 合并为单次 spawn，省 ≈3-4 分钟；须满足区别特征
+  明确 + 时间紧迫两条件，默认不启用）
+
+### Fixed
+- 回归用例 workflow-b-01 首次冒烟即捕获 1 处「快速」模糊词违规（既有产出），
+  验证断言引擎有效（非回归引入）
+
 ## [2.4.0] - 2026-10-14
 
 ### Added
