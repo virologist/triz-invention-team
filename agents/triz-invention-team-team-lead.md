@@ -180,6 +180,18 @@ Context = 角色MD + 声明skills references + task_payload
 
 **常规记录项**：每次调度记录 `duration_ms / duration_ms_wall / status / confidence / retry_count`。汇总指标：一次通过率、平均重试次数、幻觉发生率、端到端延迟（**一律用 wall**）。
 
+**🔧 机械计量（2026-10-14，P1-8）**：产出规模与耗时**一律机械计量，不采信自报**——
+failure-006 已实证自报不可靠（摘要自评 281 字 vs 实测 371 字符）。每轮收尾跑：
+
+```bash
+python3 scripts/token_budget_check.py --meter outputs/<run-dir> --ledger
+```
+
+- 从落盘产出文件机械统计 `chars / bytes / out_tokens_est`，并核对信封里的 `duration_ms_wall`
+- 缺失墙钟 → 标记 `墙钟未回填`（提醒你补 VERIFY 回填）；自报与墙钟偏差 >50% → 标记 `耗时自报失真`
+- `--ledger` 把结果 append 到 `<run-dir>/metrics.jsonl`，作为跨轮次台账（可统计一次通过率/平均耗时）
+- 默认模式（不带 `--meter`）仍校验**输入侧** H1 上下文装配预算（≤20K/成员），两者互补
+
 ## 任务分配策略
 
 > 🔴 **执行提醒（2026-09-30加固）**：下表任何模式的**每次触发都必须生成RoutingDecision并append到`docs/routing-log.md`**——这是路由决策协议的强制落盘点，漏记=违反协议（9-30诊断#8：协议上线后零记录，形同虚设）。

@@ -7,9 +7,15 @@ token_budget_check.py — TRIZ专家团 H1上下文装配预算校验
 
 用法：
   python3 scripts/token_budget_check.py [专家包根目录] [--budget 20000]
-估算方法：中文约1 token/1.5-2字节，混合内容按 bytes/3.5 近似（保守上界用 bytes/2.5）
+  python3 scripts/token_budget_check.py --meter outputs/<run-dir> [--ledger]   # 实测计量（P1-8）
+估算方法：中文约1 token/1.5-2字节，混合内容按 bytes/3.5 近似（conservative 用 bytes/2.5）
+
+【--meter 实测计量模式（2026-10-14 新增，P1-8）】
+从**落盘文件**机械计量产出规模，替代成员自报——自报已被 failure-006 实证不可靠
+（摘要自评 281 字 vs 实测 371 字符）。同时回填/核对双轨制耗时字段（duration_ms_wall）。
+输出：每个成员一行；--ledger 时把结果 append 到 <run-dir>/metrics.jsonl 作为跨轮次台账。
 """
-import sys, os, json, argparse
+import sys, os, json, argparse, re, glob, datetime
 
 # 成员 → skills references 映射（与各MD frontmatter声明一致）
 MEMBER_SKILLS = {
@@ -44,13 +50,101 @@ def est_tokens(text_len_bytes: int, conservative: bool = False) -> int:
     return int(text_len_bytes / (2.5 if conservative else 3.5))
 
 
+FILENAME_RE = re.compile(r"(T-\d{8}-\d{3})__([a-z0-9-]+)\.md$")
+
+
+def meter_run(run_dir, ledger=False, conservative=False, global_budget=120_000):
+    """实测计量：从落盘文件机械统计产出规模（P1-8）。
+
+    计量口径（全部机械，不采信任何自报值）：
+      - out_bytes / out_chars：落盘产出文件大小
+      - out_tokens：est_tokens(out_bytes)（产出侧估算）
+      - wall_ms：仅当信封里已被主理人回填 duration_ms_wall 才计入，否则标 missing
+      - self_ms：成员自报 duration_ms，仅作展示，不参与任何汇总
+    """
+    files = sorted(glob.glob(os.path.join(run_dir, "*__*.md")))
+    if not files:
+        print("❌ 未找到落盘产出（匹配 *__*.md）：%s" % run_dir)
+        return 1
+    print("📏 实测计量 — run_dir=%s（口径：机械，不采信自报）" % run_dir)
+    print("=" * 92)
+    print(f"{'任务':<18}{'成员':<24}{'chars':>8}{'tokens':>8}{'自报ms':>9}{'墙钟ms':>10}  状态")
+    print("-" * 92)
+
+    rows, total_tokens = [], 0
+    for f in files:
+        m = FILENAME_RE.search(os.path.basename(f))
+        if not m:
+            continue
+        task_id, member = m.group(1), m.group(2)
+        raw = open(f, "rb").read()
+        nbytes, text = len(raw), raw.decode("utf-8", errors="replace")
+        nchars = len(text)
+        tok = est_tokens(nbytes, conservative)
+        total_tokens += tok
+
+        # 提取信封（首个 json 代码块）
+        env = {}
+        mm = re.search(r"```json\s*(\{.*?\})\s*```", text, re.S)
+        if mm:
+            try:
+                env = json.loads(mm.group(1))
+            except Exception:
+                env = {}
+        met = env.get("metrics") or {}
+        self_ms = met.get("duration_ms")
+        wall_ms = met.get("duration_ms_wall")
+        wall_txt = str(wall_ms) if wall_ms is not None else "missing"
+        self_txt = str(self_ms) if self_ms is not None else "—"
+
+        flags = []
+        if wall_ms is None:
+            flags.append("墙钟未回填")
+        elif self_ms not in (None, 0) and wall_ms:
+            if abs(self_ms - wall_ms) / wall_ms > 0.5:
+                flags.append("耗时自报失真(>50%)")
+        status = "✅" if not flags else "⚠️ " + "、".join(flags)
+
+        print(f"{task_id:<18}{member:<24}{nchars:>8}{tok:>8}{self_txt:>9}{wall_txt:>10}  {status}")
+        rows.append({
+            "task_id": task_id, "member": member,
+            "file": os.path.basename(f), "chars": nchars, "bytes": nbytes,
+            "out_tokens_est": tok,
+            "duration_ms_self": self_ms, "duration_ms_wall": wall_ms,
+            "status": env.get("status"), "confidence": env.get("confidence"),
+            "flags": flags,
+            "metered_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        })
+
+    print("-" * 92)
+    ratio = total_tokens / global_budget if global_budget else 0
+    print(f"合计产出估算 {total_tokens:,} tokens（占全局预算 {ratio*100:.0f}%，上限 {global_budget:,}）")
+    if ratio > 0.8:
+        print("⚠️ 已超 80%，H3.5 要求向用户预警")
+    print("注：本表只计**产出侧**；输入侧上下文预算另跑无 --meter 的默认模式。")
+
+    if ledger:
+        lp = os.path.join(run_dir, "metrics.jsonl")
+        with open(lp, "a", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print("📒 台账已 append：%s（%d 行）" % (lp, len(rows)))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("root", nargs="?", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     ap.add_argument("--budget", type=int, default=20000)
     ap.add_argument("--conservative", action="store_true", help="保守估算(bytes/2.5)")
+    ap.add_argument("--meter", default="", help="实测计量：传入 run-dir（含 *__*.md 落盘产出）")
+    ap.add_argument("--ledger", action="store_true", help="实测计量结果 append 到 <run-dir>/metrics.jsonl")
+    ap.add_argument("--global-budget", type=int, default=120_000, help="全局预算(H3.5)，用于占比预警")
     args = ap.parse_args()
     root = args.root
+
+    if args.meter:
+        return meter_run(args.meter, args.ledger, args.conservative, args.global_budget)
 
     payload_bytes = len(json.dumps(SAMPLE_PAYLOAD, ensure_ascii=False).encode("utf-8"))
     print(f"H1上下文装配预算校验  (预算={args.budget} tokens, 估算={'保守' if args.conservative else '常规'})")

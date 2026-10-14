@@ -29,7 +29,7 @@
     "结垢成分（CaCO₃ / 微生物黏泥 / 铁氧化物占比）未给定，D2 水质调节路线的具体药剂选型需先做垢样分析，未在本阶段定案。"
   ],
   "next_agent_hint": "patent-search-scout",
-  "metrics": {"duration_ms": 0, "retry_count": 1}
+  "metrics": {"duration_ms": 0, "duration_ms_wall": 1077000, "duration_source": "self_report", "retry_count": 1}
 }
 ```
 
