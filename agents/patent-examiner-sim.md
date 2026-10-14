@@ -90,9 +90,13 @@ maxTurns: 40
   "evidence": [{"type": "skill_ref|prior_artifact|source", "ref": "...", "used_for": "..."}],
   "issues": ["<自评发现的问题>"],
   "next_agent_hint": "<建议下游>",
-  "metrics": {"duration_ms": <耗时>, "retry_count": <重试次数>}
+  "metrics": {"duration_ms": <自身执行耗时ms·自报，不含调度排队与回传>, "retry_count": <重试次数>}
 }
 ```
+
+> ⏱️ **duration_ms 口径（2026-10-14 双轨制）**：本字段只填**你自身**的执行耗时（收到任务→产出完成）。
+> 主理人会另行实测 spawn→回传的墙钟（`duration_ms_wall`），两者不必吻合，**禁止**为迎合墙钟而改写本字段。
+> 无法估算时填 0 并在 `issues` 注明「耗时无法自估」，**不得**凭感觉填整数。
 
 ### 输出契约校验
 必需字段：['attacks', 'three_step_analysis', 'verdict', 'rubric_score', 'repair_list']

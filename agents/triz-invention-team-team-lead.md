@@ -141,7 +141,23 @@ Context = 角色MD + 声明skills references + task_payload
 - **已有部件清单**：可复用/必换的现有组件
 
 ### H5 · Observability 可观测性
-每次调度记录 `duration_ms / status / confidence / retry_count`。汇总指标：一次通过率、平均重试次数、幻觉发生率、端到端延迟。
+
+**🔴 耗时双轨制（2026-10-14 修复指标失真，P0-3）**：成员自报耗时与平台实测墙钟是**两个不同口径**，实测偏差可达 6 倍（2026-09-30 案例：成员自报 600000ms vs 平台实测 101s）。两者**必须各留其名，禁止互相覆盖**：
+
+| 字段 | 产生方 | 口径 | 用途 |
+|---|---|---|---|
+| `metrics.duration_ms` | 成员自报 | 自身执行耗时（收到任务→产出完成），不含调度排队与回传链路 | **仅作参考** |
+| `metrics.duration_ms_wall` | 主理人实测回填 | spawn → 收到回传的真实墙钟 | **权威**：端到端延迟、预算消耗一律用它 |
+| `metrics.duration_source` | 回填方标记 | `self_report` / `lead_measured` / `estimated` | 判断该数字能不能信 |
+
+**主理人回填义务**：每次 VERIFY 前，用平台回传时间戳减去 spawn 时间戳得到墙钟，写入 `duration_ms_wall` 并置 `duration_source=lead_measured`。**禁止**把墙钟写回 `duration_ms`。
+
+**失真检测**：若 `|duration_ms - duration_ms_wall| / duration_ms_wall > 0.5`，判定该成员耗时自报失真——
+1. 本次汇总指标只取 `duration_ms_wall`；
+2. 在 TASK_STATE.metrics 标注 `duration_selfreport_unreliable: [agent_id]`；
+3. 记入失败索引（`fail_type: metrics_distortion`），`learned_rule` 写明该成员自报不可作为预算依据。
+
+**常规记录项**：每次调度记录 `duration_ms / duration_ms_wall / status / confidence / retry_count`。汇总指标：一次通过率、平均重试次数、幻觉发生率、端到端延迟（**一律用 wall**）。
 
 ## 任务分配策略
 
@@ -408,10 +424,11 @@ RoutingDecision 的 alternatives_top2 与 reasoning 同时写入装配产出的�
   "deliverable_summary": "...",
   "evidence": [{"type": "skill_ref|prior_artifact|source", "ref": "...", "used_for": "..."}],
   "issues": [...], "next_agent_hint": "...",
-  "metrics": {"duration_ms": N, "retry_count": N}
+  "metrics": {"duration_ms": N, "duration_ms_wall": N, "duration_source": "lead_measured", "retry_count": N}
 }
 ```
-**你必须在VERIFY阶段校验信封完整性**——缺字段的回传视为`partial`，触发补充或重试。**CI gate脚本**：`scripts/agent_ci_gate.py`（自动校验所有归档*results.json的合规率）。
+**你必须在VERIFY阶段校验信封完整性**——缺字段的回传视为`partial`，触发补充或重试。
+**同时必须回填 `duration_ms_wall`**（spawn→回传实测墙钟）与 `duration_source`——不得改写成员自报的 `duration_ms`（双轨制见 H5）。**CI gate脚本**：`scripts/agent_ci_gate.py`（自动校验所有归档*results.json的合规率）。
 
 ### 门禁契约（Gate）
 | 门禁 | 校验点 | 违规处理 |

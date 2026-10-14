@@ -85,12 +85,26 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "duration_ms": {"type": "integer", "minimum": 0},
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "成员自报：自身执行耗时（收到任务→产出完成），不含调度排队与回传链路。仅作参考，主理人不得用墙钟覆盖本字段。"
+        },
+        "duration_ms_wall": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "主理人回填：spawn→回传实测墙钟。端到端延迟与预算消耗一律以本字段为准。"
+        },
+        "duration_source": {
+          "type": "string",
+          "enum": ["self_report", "lead_measured", "estimated"],
+          "description": "duration_ms 的口径来源。主理人回填 duration_ms_wall 时应同时置为 lead_measured。"
+        },
         "retry_count": {"type": "integer", "minimum": 0}
       },
-      "description": "执行指标（推荐但非必须）"
+      "description": "执行指标（推荐但非必须）。duration_ms 与 duration_ms_wall 为两个独立口径，禁止互相覆盖（2026-10-14 双轨制）。"
     }
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "deprecated_fields": []
 }
