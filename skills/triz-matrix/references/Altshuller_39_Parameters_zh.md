@@ -2,6 +2,12 @@
 
 > 英文原名权威源：Altshuller_39_Parameters.csv（jenson500/triz-prompt-engineering）。
 > 中文译名为英文标准译名的直译对照，**仅用于从中文场景定位参数编号**；编号为准，译名不引入新事实。
+>
+> ⚠️ **2026-10-14 缺陷修复（回归实测发现，failure-007）**：#34、#35 两行中文译名曾错填为
+> #36、#37 的译名（#34 误作"装置复杂性"、#35 误作"监控与测试的复杂性"）。因
+> `scripts/query_triz_matrix.py` 会把本表译名直接打进查询结果，该错误会注入成员上下文——
+> 且 #34 可维修性是高频参数。**编号列始终正确，错误仅限译名列**。
+> 防复发：改动本表后必须跑 `python3 scripts/verify_triz_data.py`（39 行编号连续 + 译名不重复 + 与 CSV 英文列对齐）。
 
 | # | 英文 | 中文对照 |
 |---|---|---|
@@ -38,8 +44,8 @@
 | 31 | Object-generated harmful factor | 物体产生的有害因素 |
 | 32 | Ease of manufacture | 可制造性 |
 | 33 | Ease of operation | 操作便利性 |
-| 34 | Ease of repair | 装置复杂性 |
-| 35 | Adaptability or Versatility | 监控与测试的复杂性 |
+| 34 | Ease of repair | 可维修性 |
+| 35 | Adaptability or Versatility | 适应性及多用性 |
 | 36 | Device complexity | 装置的复杂性 |
 | 37 | Difficulty of detection | 检测与测量的复杂性 |
 | 38 | Extent of automation | 自动化程度 |

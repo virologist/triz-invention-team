@@ -23,3 +23,4 @@
 | R-20260930-010 | 2026-09-30T15:42+08:00 | stage_transition | patent-search-scout | 0.88 | Phase 3 R3差异化验证+复验R1/R2 X/Y级·三要素核验协议·关闭G1门禁·三步法终评 |
 | R-20260930-011 | 2026-09-30T15:50+08:00 | stage_transition | patent-attorney-writer | 0.93 | Phase 5b 权项+说明书+摘要·G1门禁已通过（scout R3🟢绿）·兑现严三性6修复+审外审C1-C4 |
 | R-20260930-012 | 2026-09-30T15:55+08:00 | stage_transition | patent-attorney-writer | 0.95 | Phase 5b修复·G5门禁违规：摘要实测371字符>300·重写≤300·仅限摘要段不超范围 |
+| R-20261014-013 | 2026-10-14T22:40+08:00 | stage_transition | contradiction-analyst | 0.92 | P0-2 定向回归验证·与9-30基线同域（肉鸡舍地暖·农业×机械）·验证 shared-core 下沉后装配链 + 双轨制指标 + 门禁四要素校验 |

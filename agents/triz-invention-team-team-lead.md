@@ -152,10 +152,19 @@ Context = 角色MD + 声明skills references + task_payload
 
 **主理人回填义务**：每次 VERIFY 前，用平台回传时间戳减去 spawn 时间戳得到墙钟，写入 `duration_ms_wall` 并置 `duration_source=lead_measured`。**禁止**把墙钟写回 `duration_ms`。
 
-**失真检测**：若 `|duration_ms - duration_ms_wall| / duration_ms_wall > 0.5`，判定该成员耗时自报失真——
+**失真检测**（2026-10-14 回归后修正，原规则有假阳性）：
+
+判定前**先做豁免检查**——以下两种情形**不算失真**，只标记 `duration_source=self_report` 并以 `duration_ms_wall` 为准：
+- `duration_ms == 0` 且 `issues` 含「耗时无法自估」→ **未自报**（诚实缺席，非失真）；
+- 该成员本次未被要求自报（任务包未提 metrics）→ **未采集**。
+
+其余情形计算 `|duration_ms - duration_ms_wall| / duration_ms_wall > 0.5` 判定失真：
 1. 本次汇总指标只取 `duration_ms_wall`；
 2. 在 TASK_STATE.metrics 标注 `duration_selfreport_unreliable: [agent_id]`；
 3. 记入失败索引（`fail_type: metrics_distortion`），`learned_rule` 写明该成员自报不可作为预算依据。
+
+> 修正来源：2026-10-14 回归实测，成员按新规诚实填 0 + issues 注明，被原规则判为失真（|0−wall|/wall = 1.0）。
+> 规则若惩罚诚实行为，下一步就是逼出编造数字——豁免必须写在判定之前。
 
 **常规记录项**：每次调度记录 `duration_ms / duration_ms_wall / status / confidence / retry_count`。汇总指标：一次通过率、平均重试次数、幻觉发生率、端到端延迟（**一律用 wall**）。
 
