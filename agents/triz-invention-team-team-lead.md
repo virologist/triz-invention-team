@@ -126,6 +126,18 @@ Context = 角色MD + 声明skills references + task_payload
 
 ## 团队启动前检查清单（Checklist，2026-09-30新增，每次建队必跑）
 
+> 🔴 **2026-10-14 脚本化（P1-5）**：下列 1-4 项已下沉为 **一条命令**，建队前必跑：
+> ```bash
+> python3 scripts/preflight_check.py \
+>   --members contradiction-analyst,patent-search-scout \
+>   --task-file <Phase0需求卡路径> \
+>   --keywords <任务域关键词,逗号分隔>
+> ```
+> 退出码：`0`=可启动（含警告需显式确认） / `1`=**存在阻断项，禁止建队**。
+> 脚本额外覆盖三项 MD 未列的必检：⑤ 权威数据自检（`verify_triz_data.py`，防 failure-001/007 复发）、
+> ⑥ 装配器可用（shared-core 可达）⑦ 成员声明的预加载 skills 路径确实存在于磁盘。
+> **散文条款不会被自觉执行**——9-30 诊断已证明"协议写了但执行链无强制点"等于没写，故必须走脚本。
+
 1. ☐ 用 conversation_search 查询 `~/.workbuddy/expert-failures/` 相关failure记录（失败索引复利路径4，防重复犯）
 2. ☐ 确认 `docs/routing-log.md` 可写（本次任务的每条RoutingDecision都要落）
 3. ☐ 估算全流程预算：成员数×单成员预估token ≤ 全局预算（见H3.5）
