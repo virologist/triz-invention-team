@@ -50,7 +50,8 @@ def est_tokens(text_len_bytes: int, conservative: bool = False) -> int:
     return int(text_len_bytes / (2.5 if conservative else 3.5))
 
 
-FILENAME_RE = re.compile(r"(T-\d{8}-\d{3})__([a-z0-9-]+)\.md$")
+# 与 result_envelope.schema.json 的 task_id pattern 对齐（允许字母数字后缀，如 T-20261015-B01）
+FILENAME_RE = re.compile(r"(T-\d{8}-[A-Za-z0-9]{1,8})__([a-z0-9-]+)\.md$")
 
 
 def meter_run(run_dir, ledger=False, conservative=False, global_budget=120_000):

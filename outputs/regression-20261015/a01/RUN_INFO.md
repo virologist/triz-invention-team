@@ -1,7 +1,7 @@
 # 回归运行 · workflow-a-01
 
 - 用例：`tests/cases/workflow-a-01.task.md`（L2 级 · 目标 full-team）
-- 建议任务 ID：`T-20261015-REG-A01`
+- 建议任务 ID：`T-20261015-A01`
 - 运行目录：`outputs/regression-20261015/a01`
 
 ## 派单步骤（主理人执行）
@@ -9,7 +9,7 @@
 1. 装配 spawn 文案：
    ```bash
    python3 scripts/assemble_spawn_prompt.py --member <成员> \
-     --phase 2 --task-id T-20261015-REG-A01 --task-file tests/cases/workflow-a-01.task.md \
+     --phase 2 --task-id T-20261015-A01 --task-file tests/cases/workflow-a-01.task.md \
      --run-dir outputs/regression-20261015/a01 --check-task-package \
      --out outputs/regression-20261015/a01/spawn.md
    ```

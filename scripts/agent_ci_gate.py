@@ -43,52 +43,6 @@ KNOWN_AGENTS = {
 # 历史归档边界：2026-09-03前归档标记为legacy（pre-v2.0无信封）
 LEGACY_CUTOFF = "2026-09-03"
 
-# 信封提取：栈平衡JSON扫描（替代贪婪正则，处理嵌套{}）
-def extract_envelopes(text: str) -> list:
-    """从产出文本中提取所有可解析的信封候选。返回(envelope_dict|raw_str, 是否成功解析)元组列表。
-
-    算法：从每个'{'开始向后扫描，遇'{' depth+1，遇'}' depth-1，depth=0时结束。"""
-    results = []  # type: list[tuple[object, bool]]
-    i = 0
-    while i < len(text):
-        if text[i] != '{':
-            i += 1
-            continue
-        depth = 0
-        in_str = False
-        esc = False
-        start = i
-        # 找到这个 {对应的闭合
-        while i < len(text):
-            c = text[i]
-            if in_str:
-                if esc: esc = False
-                elif c == '\\': esc = True
-                elif c == '"': in_str = False
-            else:
-                if c == '"': in_str = True
-                elif c == '{': depth += 1
-                elif c == '}':
-                    depth -= 1
-                    if depth == 0:
-                        candidate = text[start:i+1]
-                        try:
-                            env = json.loads(candidate)
-                            # if not isinstance(env, dict) or 'agent_id' not in env: raise ValueError
-                            if not isinstance(env, dict):
-                                raise ValueError("not a dict")
-                            results.append((env, True))
-                        except Exception:
-                            pass  # 非信封JSON，跳过（避免误报）
-                        break
-            i += 1
-        else:
-            # 未闭合，跳过
-            pass
-        i += 1
-    return results
-
-
 def manual_validate(instance: dict, schema: dict) -> list:
     """无jsonschema依赖的手动校验：必填+枚举+pattern。返回错误列表（空=通过）。"""
     errors = []
@@ -132,6 +86,7 @@ def validate_envelope(envelope: dict, schema: dict) -> list:
     return manual_validate(envelope, schema)
 
 
+# 信封提取：栈平衡JSON扫描（替代贪婪正则，处理嵌套{}）。仅收含 agent_id 的 dict，避免误报。
 def extract_envelopes(text: str) -> list:
     """栈平衡JSON扫描（替代贪婪正则，处理嵌套{}）。返回[(envelope_dict, True), ...]列表。"""
     results = []

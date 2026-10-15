@@ -2,6 +2,23 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-10-15
+
+> L1 回归（workflow-b-01）首跑暴露的契约一致性缺陷修复（failure-008）。
+
+### Fixed
+- **task_id 契约漂移（failure-008）**：`run_regression.py` scaffold 曾生成违约 ID（`T-<date>-REG-B01`，
+  第三段含连字符，违反 `result_envelope.schema.json`）→ ①改为合规 ID（`T-<date>-B01`）②新增自校验：
+  读取 schema pattern，违约即 exit 2 拒绝生成（fail fast）
+- **`token_budget_check.py` FILENAME_RE 过窄**：仅接受 `\d{3}` 数字后缀，比 schema 契约更窄 →
+  合法字母数字 ID 被 `--meter` 静默跳过（表现为计量 0 行）。已放宽为与 schema 对齐的 `[A-Za-z0-9]{1,8}`
+- **`agent_ci_gate.py` 重复 `extract_envelopes` 定义**：删除死代码（1505 字符），保留版加来源注释；`--self-test` 复验通过
+
+### Added
+- **L1 回归首跑通过**（`outputs/regression-20261015/b01/`）：7/8 断言 PASS（1 INFO）；机械计量
+  20,018 字符 / ≈10.8k out-tokens / 墙钟 321s（lead_measured）；`_VERIFY.md` 含完整证据链
+- `outputs/regression-20261015/_pre-fix-b01/`：首跑违约 ID 产物归档 + NOTE 说明（缺陷发现即价值）
+
 ## [2.5.0] - 2026-10-15
 
 > 完成 2026-10-14 五维诊断的 P2 全项（P2-9~P2-12）+ 补 commit 级门禁。

@@ -314,14 +314,39 @@ def cmd_list():
     return 0
 
 
-def cmd_scaffold(case_id, out_dir):
+def load_task_id_pattern():
+    """从 result_envelope.schema.json 读取 task_id pattern（读不到时用保底字面量）。
+
+    教训（2026-10-15 · failure-008）：scaffold 曾生成 'T-<date>-REG-B01'（第二个连字符），
+    违反 schema 与 meter 的文件名契约 → 在此加自校验，防止再生违约 ID。"""
+    fp = os.path.join(PKG, "skills", "agent-protocol", "result_envelope.schema.json")
+    try:
+        d = json.load(open(fp, encoding="utf-8"))
+        return d["properties"]["task_id"]["pattern"]
+    except Exception:  # noqa
+        return r"^T-[0-9]{8}-[A-Za-z0-9]{1,8}$"
+
+
+def cmd_scaffold(case_id, out_dir, task_id_override=None):
     exp, task_text, task_path = load_case(case_id)
     if exp is None:
         return 2
     out_dir = out_dir or os.path.join(PKG, "outputs", "regression-" + datetime.date.today().strftime("%Y%m%d"))
     os.makedirs(out_dir, exist_ok=True)
     date8 = datetime.date.today().strftime("%Y%m%d")
-    task_id = f"T-{date8}-REG-{case_id.split('-')[-2].upper()}{case_id.split('-')[-1]}"
+    if task_id_override:
+        task_id = task_id_override
+    else:
+        # 合规 ID：workflow-b-01 → T-<date>-B01（字母数字后缀，与 schema 对齐；禁止第二个连字符）
+        parts = [p for p in case_id.split("-") if p]
+        suffix = (parts[-2].upper() + parts[-1]) if len(parts) >= 2 else parts[-1].upper()
+        task_id = f"T-{date8}-{suffix}"
+    # 自校验：违约即拒绝生成（fail fast，防 failure-008 复发）
+    pat = load_task_id_pattern()
+    if not re.match(pat, task_id):
+        print(f"❌ task_id「{task_id}」不符合 envelope schema 约束 {pat}", file=sys.stderr)
+        print("   提示：task_id 形如 T-YYYYMMDD-NNN 或 T-YYYYMMDD-B01（第三段仅字母数字，无连字符）", file=sys.stderr)
+        return 2
     info = f"""# 回归运行 · {case_id}
 
 - 用例：`tests/cases/{case_id}.task.md`（{exp.get('level','L1')} 级 · 目标 {exp.get('target_member')}）
@@ -407,6 +432,7 @@ def main():
     ap.add_argument("--scaffold", action="store_true", help="准备运行目录 + 打印派单指令")
     ap.add_argument("--dir", help="要对之验证的运行目录")
     ap.add_argument("--out", help="scaffold 输出目录（默认 outputs/regression-<date>）")
+    ap.add_argument("--task-id", help="覆盖 scaffold 自动生成的 task_id（须符合 envelope schema）")
     ap.add_argument("--json", action="store_true", help="机器可读输出")
     args = ap.parse_args()
 
@@ -416,7 +442,7 @@ def main():
         ap.print_help()
         return 2
     if args.scaffold:
-        return cmd_scaffold(args.case, args.out)
+        return cmd_scaffold(args.case, args.out, args.task_id)
     if args.dir:
         return cmd_verify(args.case, args.dir, args.json)
     ap.print_help()

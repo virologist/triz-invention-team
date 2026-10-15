@@ -1,0 +1,60 @@
+{
+  "case_id": "workflow-b-01",
+  "run_dir": "outputs/regression-20261015",
+  "checked_at": "2026-10-15T08:04:50.308564",
+  "total": 8,
+  "passed": 7,
+  "failed": 0,
+  "info": 1,
+  "results": [
+    {
+      "id": "A1",
+      "type": "task_package_elements",
+      "pass": true,
+      "detail": "四要素齐全（4 项）"
+    },
+    {
+      "id": "A2",
+      "type": "envelope_required_fields",
+      "pass": true,
+      "detail": "全部信封 6 必填齐全"
+    },
+    {
+      "id": "A3",
+      "type": "envelope_agent_id",
+      "pass": true,
+      "detail": "agent_id=contradiction-analyst（期望 contradiction-analyst）"
+    },
+    {
+      "id": "A4",
+      "type": "min_count",
+      "pass": true,
+      "detail": "directions 命中 40（≥3）"
+    },
+    {
+      "id": "A5",
+      "type": "forbidden_regex",
+      "pass": true,
+      "detail": "零命中"
+    },
+    {
+      "id": "A6",
+      "type": "required_regex",
+      "pass": true,
+      "detail": "全部命中"
+    },
+    {
+      "id": "A7",
+      "type": "min_chars",
+      "pass": true,
+      "detail": "12416 字符（≥3000）"
+    },
+    {
+      "id": "A8",
+      "type": "no_fabrication_marker",
+      "pass": null,
+      "detail": "INFORMATIONAL：诚实降级标记 10 处（A8反向：若出现「矩阵无推荐」属诚实降级，不算失败；此处仅登记）"
+    }
+  ],
+  "verdict": "PASS"
+}
