@@ -25,6 +25,7 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
 """
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -220,13 +221,60 @@ def check_declared_skills():
         ok("7. 成员声明的 %d 处 skill 路径全部存在于磁盘" % checked)
 
 
+def check_c3_trigger(member_id, outputs_dir, x_grade_count, c3_path):
+    """P0-S3-1: C3 检查点自动触发
+
+    当指定成员（默认 patent-search-scout）在 outputs_dir 下的最新产出信封
+    含 X 级文献时，必须提供 c3_path（指向 C3 确认文件）；
+    无该文件则 exit 1（阻断）。
+    """
+    if member_id != "patent-search-scout" or x_grade_count == 0:
+        return
+    if not c3_path:
+        BLOCK.append("8. C3 检查点：X 级出现 %d 条但未提供 --c3-confirmation-path" % x_grade_count)
+        return
+    if not os.path.isfile(c3_path):
+        BLOCK.append("8. C3 检查点：%s 文件不存在" % c3_path)
+        return
+    # 校验确认文件含必要字段（C3_CONFIRMATION 模板）
+    text = open(c3_path, encoding="utf-8").read()
+    for marker in ["C3 检查点确认", "同意按"]:
+        if marker not in text:
+            BLOCK.append("8. C3 检查点：%s 缺关键标记「%s」" % (c3_path, marker))
+            return
+    OK.append("8. C3 检查点：%d 条 X 级已确认（%s）" % (x_grade_count, c3_path))
+
+
+def scan_x_grade(member_id, outputs_dir):
+    """扫指定成员最新产出，统计 X 级文献数（从 threat_list 段）"""
+    if not member_id or not os.path.isdir(outputs_dir):
+        return 0
+    # 找最新落盘
+    pattern = os.path.join(outputs_dir, "T-*__" + member_id + ".md")
+    files = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
+    if not files:
+        return 0
+    text = open(files[0], encoding="utf-8").read()
+    # 找 threat_list 段（scout A01 风格：X 1, Y 12, A 12 等）
+    # 简易：X 后跟数字
+    import re as _re
+    m = _re.search(r"X\s*[\W_]*\s*(\d+)", text)
+    if m:
+        return int(m.group(1))
+    # 备用：从"X 级"统计
+    return len(_re.findall(r"X\s*级", text))
+
+
 def main():
-    global PKG, HERE
+    global PKG, HERE, args
     ap = argparse.ArgumentParser(description="团队启动前检查（preflight）")
     ap.add_argument("--expert-dir", default=PKG)
     ap.add_argument("--members", default="", help="逗号分隔的成员 ID 清单，用于预算估算")
     ap.add_argument("--task-file", default="", help="Phase 0 需求卡/任务包路径")
     ap.add_argument("--keywords", default="", help="逗号分隔关键词，用于检索失败索引")
+    ap.add_argument("--after-search", help="[P0-S3-1] 上一阶段查新成员的 member_id（默认 patent-search-scout）")
+    ap.add_argument("--outputs-dir", default="", help="[P0-S3-1] 查新产出所在目录")
+    ap.add_argument("--c3-confirmation-path", default="", help="[P0-S3-1] C3 确认文件路径（X 级出现时强制要求）")
     args = ap.parse_args()
 
     PKG = os.path.abspath(args.expert_dir)
@@ -244,6 +292,13 @@ def main():
     check_assembler()
     check_declared_skills()
 
+    # P0-S3-1: C3 自动触发
+    if args.outputs_dir:
+        after_member = args.after_search or "patent-search-scout"
+        x_count = scan_x_grade(after_member, args.outputs_dir)
+        if x_count > 0:
+            check_c3_trigger(after_member, args.outputs_dir, x_count, args.c3_confirmation_path)
+
     print("\n———— 结果 ————")
     for m in OK:
         print("  ✅ %s" % m)
@@ -259,4 +314,5 @@ def main():
 
 
 if __name__ == "__main__":
+    args = None  # 让 check_c3_trigger 能访问
     sys.exit(main())
