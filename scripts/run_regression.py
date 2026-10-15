@@ -255,7 +255,7 @@ def check_budget(exp, task_text, run_dir, files, a):
     ml = os.path.join(run_dir, "metrics.jsonl")
     if not os.path.isfile(ml):
         return None, "metrics.jsonl 不存在（未计量，跳过）"
-    latest, wall_max = {}, 0
+    latest, wall_sum, wall_max = {}, 0, 0
     for line in open(ml, encoding="utf-8"):
         line = line.strip()
         if not line:
@@ -266,14 +266,18 @@ def check_budget(exp, task_text, run_dir, files, a):
             continue
         key = (d.get("task_id"), d.get("member"))
         latest[key] = d
+    for d in latest.values():
         w = d.get("duration_ms_wall") or 0
+        wall_sum += w
         wall_max = max(wall_max, w)
     tokens = sum(d.get("out_tokens_est") or 0 for d in latest.values())
-    wall_min = round(wall_max / 60000, 1) if wall_max else None
+    # 口径（2026-10-15 修正）：SOP 为串行链，链式墙钟 ≈ 各成员墙钟之和（下界；不含主理人编排开销）。
+    # 原实现取 max() 会严重低估全流程耗时。
+    wall_min = round(wall_sum / 60000, 1) if wall_sum else None
     ok = tokens <= a["max_tokens"] and (wall_min is None or wall_min <= a["max_wall_min"])
     detail = f"tokens≈{tokens}（≤{a['max_tokens']}）"
     if wall_min is not None:
-        detail += f" · 墙钟≈{wall_min}min（≤{a['max_wall_min']}）"
+        detail += f" · 链式墙钟≈{wall_min}min（Σ成员墙钟·下界，≤{a['max_wall_min']}）"
     return ok, detail
 
 
