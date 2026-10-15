@@ -68,7 +68,7 @@ maxTurns: 80
 
 **额外预加载skills**（前置门禁）：运行时必须 `load_skills` 加载以下skills后再接收任务：
 - `skills/agent-protocol/SKILL.md`（result_envelope契约权威）
-- `skills/agent-protocol/references/patent-search-discipline.md`（如存在；X/Y/A/R/P/E分级约束）
+- X/Y/A/R/P/E 分级约束以任务包与本 MD 正文为准（原引用的 discipline 文件不存在，未建——2026-10-15 悬空引用清理）
 
 **角色分类**：ANALYZER（分析者）
 **能力边界**：三轮递进检索、对比文件分级、三性风险评估、布局分析

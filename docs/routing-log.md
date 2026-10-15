@@ -33,4 +33,5 @@
 | R-20261015-001 | 2026-10-15T07:53+08:00 | single_dispatch | contradiction-analyst | 0.94 | L1回归 workflow-b-01（冷链保温层矛盾建模·固定用例）；装配链含P2-12失败记忆注入；预装配流水线首次实战 |
 | R-20261015-002 | 2026-10-15T08:07+08:00 | single_dispatch | contradiction-analyst | 0.94 | L1回归重跑 workflow-b-01（合规ID T-20261015-B01）·**并行批次：b01+a01独立回归**（无数据依赖·W1模式首次实战） |
 | R-20261015-003 | 2026-10-15T08:07+08:00 | stage_transition | contradiction-analyst | 0.95 | L2回归 Phase1-2 workflow-a-01（T-20261015-A01·刮粪板耐磨）·同一并行批次 |
-| R-20261015-004 | 2026-10-15T08:18+08:00 | stage_transition | patent-search-scout | 0.93 | L2回归 Phase3 查新·**紧凑模式：三轮合并单次派单**（a-01用例约定单成员单文件；区别特征已由Phase2锚定）·依赖Phase2产出 |
+| R-20261015-004 | 2026-10-15T08:16+08:00 | stage_transition | patent-search-scout | 0.93 | L2回归 Phase3 查新·**紧凑模式：三轮合并单次派单**（a-01用例约定单成员单文件；区别特征已由Phase2锚定）·依赖Phase2产出 |
+| R-20261015-005 | 2026-10-15T08:21+08:00 | stage_transition | contradiction-analyst | 0.91 | **查新裁决=红（4条X级）→ 按SOP强制退回Phase2二次迭代**（不得进Phase4）；输入=scout 6.5节4条差异化路径；迭代2任务ID T-20261015-A02 |
