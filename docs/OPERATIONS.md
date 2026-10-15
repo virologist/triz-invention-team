@@ -44,7 +44,7 @@ python3 ~/.workbuddy/plugins/cache/workbuddy-builtin/skill-expert-manager/0.1.0/
 
 | 钩子 | 时机 | 内容 |
 |---|---|---|
-| `pre-commit` | commit 前 | ①`agent_ci_gate --strict` ②`scripts/*.py` 语法 ③装配链冒烟（防 shared-core 断链）；失败阻断（`--no-verify` 可绕过） |
+| `pre-commit` | commit 前 | ①`agent_ci_gate --strict` ②`scripts/*.py` 语法 ③装配链冒烟 ④契约门禁（touches 成员产物→`contract_enforce`，P0-S1-1）；失败阻断（`--no-verify` 可绕过） |
 | `post-commit` | commit 后 | 领先 origin 时提示 `release-sync.sh`（不阻断） |
 | （push级） | `release-sync.sh --confirm` 前 | `run_gates` 三闸：agent_ci_gate / verify_triz_data / preflight；`RELEASE_SYNC_SKIP_GATE=1` 逃生阀（留痕） |
 

@@ -2,6 +2,25 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.3] - 2026-10-15
+
+> 独立诊断（triz-team-diagnosis-independent-20261015.md）P0 三项 + 两项遗留债清偿。
+
+### Added（P0）
+- **S4-1 五包 vendor 兜底**：viral-evo-lab / research-orchestration-team / smart-textbook-team /
+  vet-med-ppt-team 各自获得 vendor/shared-core 三件套 + 防漂移门禁（V1-V5 PASS）；
+  分发工具沉淀至 `shared-core/scripts/distribute_vendor.py`
+- **S1-1 六成员契约化**：6 成员 frontmatter 增 5 字段（schema_version/contract_owner/
+  verified_at/forbidden_phrases/must_verify）；`docs/CONTRACT_ENFORCEMENT.md` +
+  `scripts/contract_enforce.py` 门禁（L2 八阶段产物 10/10 PASS，含豁免链：
+  元数据标记/通用豁免词/反例引用/学术表达）
+- **S3-1 C3 自动触发**：preflight 7→8 项（`--after-search/--outputs-dir/--c3-confirmation-path`）；
+  X 级出现且无确认件 → 阻断（3 场景实测）
+
+### Fixed（遗留债）
+- pre-commit 钩子增第④层：契约门禁（touches 成员产物时自动跑 contract_enforce）
+- `distribute_vendor.py` 入库 shared-core（新增包接入联邦一条命令）
+
 ## [2.5.1] - 2026-10-15
 
 > L1 回归（workflow-b-01）首跑暴露的契约一致性缺陷修复（failure-008）。
