@@ -30,3 +30,4 @@
 | R-20260930-011 | 2026-09-30T15:50+08:00 | stage_transition | patent-attorney-writer | 0.93 | 门禁违规(G5)（摘要实测 371 字符 > 300） | Phase 5b 权项+说明书+摘要·G1门禁已通过（scout R3🟢绿）·兑现严三性6修复+审外审C1-C4 |
 | R-20260930-012 | 2026-09-30T15:55+08:00 | stage_transition | patent-attorney-writer | 0.95 | success（摘要重写 ≤300 通过） | Phase 5b修复·G5门禁违规：摘要实测371字符>300·重写≤300·仅限摘要段不超范围 |
 | R-20261014-013 | 2026-10-14T22:40+08:00 | stage_transition | contradiction-analyst | 0.92 | success（conf=78，6方向，22组查询·1组如实登记无推荐，落盘34591字符） | P0-2 定向回归验证·与9-30基线同域（肉鸡舍地暖·农业×机械）·验证 shared-core 下沉后装配链 + 双轨制指标 + 门禁四要素校验 |
+| R-20261015-001 | 2026-10-15T08:20+08:00 | single_dispatch | contradiction-analyst | 0.94 | L1回归 workflow-b-01（冷链保温层矛盾建模·固定用例）；装配链含P2-12失败记忆注入；预装配流水线首次实战 |

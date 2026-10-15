@@ -31,6 +31,8 @@ tests/
 ```bash
 # 1. 准备运行目录（生成 RUN_INFO.md，含派单指令与断言清单）
 python3 scripts/run_regression.py --case workflow-b-01 --scaffold
+#    同日多用例请各自 --out 子目录（防不同用例的成员落盘文件互相干扰）
+python3 scripts/run_regression.py --case workflow-a-01 --scaffold --out outputs/regression-<date>/a01
 
 # 2. 按 RUN_INFO.md 派单（主理人手工 spawn 成员，产出落盘到运行目录）
 
