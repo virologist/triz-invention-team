@@ -37,3 +37,5 @@
 | R-20261015-005 | 2026-10-15T08:21+08:00 | stage_transition | contradiction-analyst | 0.91 | **查新裁决=红（4条X级）→ 按SOP强制退回Phase2二次迭代**（不得进Phase4）；输入=scout 6.5节4条差异化路径；迭代2任务ID T-20261015-A02 |
 | R-20261015-006 | 2026-10-15T08:52+08:00 | retry_loop | contradiction-analyst | 0.90 | 迭代2首次派单超时30m18s未落盘（读59KB原报告+过度打磨嫌疑）→ TaskStop取消 + **重试#1**（紧凑brief版·禁读原报告·限时）·Loop预算≤3 |
 | R-20261015-007 | 2026-10-15T08:56+08:00 | stage_transition | patent-search-scout | 0.92 | 迭代2落盘（success·4路径全回应）→ Phase3定向复检（T-20261015-A03·限时10min·紧凑输入）；复检通过则进入Phase4 |
+| R-20261015-008 | 2026-10-15T08:59+08:00 | stage_transition | patent-examiner-sim | 0.93 | 复检评级红→黄（中风险·N1+N2+N3绑定前提）→ 按SOP放行Phase4a 对抗式三性确认（T-20261015-A04）；scout建议的N2/N1定向补检因时效约束列入_VERIFY待办 |
+| R-20261015-009 | 2026-10-15T09:03+08:00 | stage_transition | second-opinion-reviewer | 0.92 | 一审裁决黄（黄区上界4/5·M1-M7强制修复）→ Phase4b独立二审（T-20261015-A05·限时8min）；二审通过后进Phase5a |

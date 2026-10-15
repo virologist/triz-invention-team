@@ -89,6 +89,9 @@ Context = 角色MD + 声明skills references + task_payload
 ```
 单agent上下文预算 ≤ 20K tokens。产出超预算时压缩（保留结论，丢弃推演过程）。
 
+> 🔴 **大产出压缩（2026-10-15 L2实测教训 · H1强制补充）**：上游产出 **>30KB** 时，主理人**必须**先做「紧凑摘要」（≤8KB：结论 + 清单 + 关键路径指针）再随任务包下发；**禁止把超大产出全文塞给下游**。
+> 实测对照：把 59KB 查新报告全文作为输入 → 成员 30 分钟超时未落盘（TaskStop 取消）；改用 4KB 紧凑 brief（含 X 级速览 + 差异化路径 + 路径指针）→ **2 分 40 秒**完成且四项要求全达标。此规则即 H1「仅本阶段依赖部分」的执行标准。
+
 ### H2 · State Store 状态存储
 维护全局唯一状态对象，随每次调度下发快照：`task_id / phase / domain / search_rounds / verdicts{examiner,second_opinion} / gates{search_3rounds_complete, c1_c8_confirmed, ...} / retry_counts / confirmed_items / conflicts / metrics`。
 
@@ -123,6 +126,7 @@ Context = 角色MD + 声明skills references + task_payload
 | 内容幻觉 | Reviewer检出虚构 | 强制重做 + 记failure-xxx |
 | Agent冲突 | 两Reviewer结论不一致 | 触发仲裁协议 |
 | **平台级错误**（2026-09-30新增） | 成员报429/配额耗尽/模型不可用，或失败消息含频率限制关键词 | **立即停派同批后续成员**（避免连环撞墙）；记录预计重置时间；三选一降级：a)等待重置后重试 b)主理人降级亲自执行该Phase（标注[主理人代执行]） c)上报用户切换模型/改期。**禁止**对同成员在重置前重复spawn |
+| **成员超时/停滞**（2026-10-15新增） | spawn后 **>10min 未落盘** 且无进度信号（或催办后仍无响应） | ①SendMessage催办（限时+「可partial落盘」指令）②仍无响应 → `TaskStop` 取消 ③**紧凑brief重试**：按 H1「大产出压缩」规则重建任务包 + 明确"限时N分钟 / 禁读超大文件 / 查询数上限"，Loop 预算内（≤3）。实测：30min 停滞 → 取消后 brief 重试 **2m40s** 通过 |
 
 ## 团队启动前检查清单（Checklist，2026-09-30新增，每次建队必跑）
 
