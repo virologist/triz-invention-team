@@ -1,0 +1,34 @@
+{
+  "skill": "agent-protocol",
+  "version": "1.0.0",
+  "created": "2026-10-15",
+  "note": "信封 schema 回归：合规样本过 / 缺字段拒（failure-008 后与 run_regression A2 断言同源）",
+  "cases": [
+    {
+      "id": "P1",
+      "type": "valid_envelope",
+      "fixture": {
+        "agent_id": "contradiction-analyst",
+        "task_id": "T-20261015-X01",
+        "phase": 2,
+        "status": "success",
+        "confidence": 80,
+        "deliverable_summary": "测试摘要"
+      },
+      "expect": "schema validate pass"
+    },
+    {
+      "id": "P2",
+      "type": "invalid_envelope",
+      "fixture": {
+        "agent_id": "contradiction-analyst",
+        "task_id": "T-20261015-X-01",
+        "phase": 2,
+        "status": "success",
+        "confidence": 80,
+        "deliverable_summary": "task_id第三段含连字符应拒"
+      },
+      "expect": "schema reject (task_id pattern)"
+    }
+  ]
+}

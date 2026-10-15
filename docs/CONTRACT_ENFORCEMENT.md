@@ -98,3 +98,18 @@ python3 scripts/contract_enforce.py \
 
 - 契约字段与本表必须同步：改 frontmatter `must_verify` 时同步改本表
 - 禁止触发词与 failure-006/007 教训同步：所有新失败都回灌到 `forbidden_phrases` 段
+---
+
+## deliverable_summary 格式规范（S5-4 · 2026-10-15）
+
+信封 `deliverable_summary` 全员统一格式（便于跨成员可比与复盘检索）：
+
+```
+「<对象>」完成<动作>：<关键结论A>；<关键结论B>；<关键结论C>（≤60字符·含裁决/评级时必含）
+```
+
+- 长度 40–60 字符（中文计）；超长截断到完整分句
+- 必含元素（按成员）：analyst→推荐方向；scout→X级数+综合评级；examiner→裁决灯色；
+  reviewer→二次表态；architect→必要特征数；writer→摘要实测字符数
+- 反例：`完成了分析`（无结论）/ 150字流水账（超长）——均为契约违反（WARN级）
+

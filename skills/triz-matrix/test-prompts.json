@@ -1,0 +1,60 @@
+{
+  "skill": "triz-matrix",
+  "version": "1.0.0",
+  "created": "2026-10-15",
+  "note": "回归基线：期望输出为权威矩阵实测值（failure-007 后由 verify_triz_data.py 保证数据源）",
+  "cases": [
+    {
+      "id": "M1",
+      "type": "exact",
+      "query": "python3 scripts/query_triz_matrix.py --improve 22 --worsen 7",
+      "expect_exit": 0,
+      "expect_contains": [
+        "7",
+        "18",
+        "23"
+      ]
+    },
+    {
+      "id": "M2",
+      "type": "exact",
+      "query": "python3 scripts/query_triz_matrix.py --improve 17 --worsen 7",
+      "expect_exit": 0,
+      "expect_contains": [
+        "34",
+        "39",
+        "40",
+        "18"
+      ]
+    },
+    {
+      "id": "M3",
+      "type": "exact",
+      "query": "python3 scripts/query_triz_matrix.py --improve 7 --worsen 22",
+      "expect_exit": 0,
+      "expect_contains": [
+        "7",
+        "15",
+        "13",
+        "16"
+      ]
+    },
+    {
+      "id": "M4",
+      "type": "empty",
+      "query": "python3 scripts/query_triz_matrix.py --improve 25 --worsen 39",
+      "expect_exit": 1,
+      "expect_contains": []
+    },
+    {
+      "id": "M5",
+      "type": "smoke",
+      "query": "python3 scripts/query_triz_matrix.py --list-params",
+      "expect_exit": 0,
+      "expect_contains": [
+        "34",
+        "35"
+      ]
+    }
+  ]
+}
