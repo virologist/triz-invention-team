@@ -40,3 +40,6 @@
 | R-20261015-008 | 2026-10-15T08:59+08:00 | stage_transition | patent-examiner-sim | 0.93 | 复检评级红→黄（中风险·N1+N2+N3绑定前提）→ 按SOP放行Phase4a 对抗式三性确认（T-20261015-A04）；scout建议的N2/N1定向补检因时效约束列入_VERIFY待办 |
 | R-20261015-009 | 2026-10-15T09:03+08:00 | stage_transition | second-opinion-reviewer | 0.92 | 一审裁决黄（黄区上界4/5·M1-M7强制修复）→ Phase4b独立二审（T-20261015-A05·限时8min）；二审通过后进Phase5a |
 | R-20261015-010 | 2026-10-15T09:07+08:00 | stage_transition | disclosure-architect | 0.91 | 二审⚠附条件同意（K1-K7）→ Phase5a交底书（T-20261015-A06）；K4已由主理人补记（C3_CONFIRMATION.md）；K1-K3/K6/K7按「兑现或登记待办」逐项处置 |
+| R-20261015-011 | 2026-10-15T09:11+08:00 | stage_transition | patent-attorney-writer | 0.93 | Phase5a完成（M1-M6兑现/K表齐备/附录D提示M7需增补2辅助式）→ Phase5b申请文件草稿（T-20261015-A07·**摘要须机械计量**·failure-006重点防复发） |
+| R-20261015-012 | 2026-10-15T09:14+08:00 | retry_loop | patent-attorney-writer | 0.90 | A07首次派单**平台级500错误**（5s即失败·非成员错误）→ 按H4重试#1（同任务包·平台级错误不消耗Loop预算的成员侧额度，但记入本任务retry_count） |
+| R-20261015-013 | 2026-10-15T10:08+08:00 | stage_transition | patent-attorney-writer | 0.94 | **L2全链路收官**：A07r落盘（重试#1·摘要258字符python3实测·零禁用词）→ 8阶段全部完成 → 主理人VERIFY：7 PASS / 1 partial → **🟡黄（黄区上界）**结论性条件性通过 |
