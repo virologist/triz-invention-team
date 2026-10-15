@@ -39,3 +39,4 @@
 | R-20261015-007 | 2026-10-15T08:56+08:00 | stage_transition | patent-search-scout | 0.92 | 迭代2落盘（success·4路径全回应）→ Phase3定向复检（T-20261015-A03·限时10min·紧凑输入）；复检通过则进入Phase4 |
 | R-20261015-008 | 2026-10-15T08:59+08:00 | stage_transition | patent-examiner-sim | 0.93 | 复检评级红→黄（中风险·N1+N2+N3绑定前提）→ 按SOP放行Phase4a 对抗式三性确认（T-20261015-A04）；scout建议的N2/N1定向补检因时效约束列入_VERIFY待办 |
 | R-20261015-009 | 2026-10-15T09:03+08:00 | stage_transition | second-opinion-reviewer | 0.92 | 一审裁决黄（黄区上界4/5·M1-M7强制修复）→ Phase4b独立二审（T-20261015-A05·限时8min）；二审通过后进Phase5a |
+| R-20261015-010 | 2026-10-15T09:07+08:00 | stage_transition | disclosure-architect | 0.91 | 二审⚠附条件同意（K1-K7）→ Phase5a交底书（T-20261015-A06）；K4已由主理人补记（C3_CONFIRMATION.md）；K1-K3/K6/K7按「兑现或登记待办」逐项处置 |
