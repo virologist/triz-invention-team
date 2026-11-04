@@ -123,7 +123,7 @@ triz-invention-team/                          # ← 市场根目录
 │       ├── scripts/                          # CI gate + token 预算校验
 │       ├── docs/                             # architecture · OPERATIONS · evolution-log
 │       ├── avatars/                          # 512×512 代理头像
-│       └── settings.json
+│       └── （无 settings.json）               # 宿主会删单键 agent 型文件，见 docs/OPERATIONS.md §二
 ├── README.md                                 # 英文版
 ├── README.zh.md                              # ← 中文版（当前文件）
 ├── CHANGELOG.md                              # 发布历史

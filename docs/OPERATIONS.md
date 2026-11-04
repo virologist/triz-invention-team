@@ -7,23 +7,38 @@
 
 | 症状 | 处置 |
 |---|---|
-| `validate_expert.py` 报 `Team type must have settings.json` | 见下方「恢复playbook」 |
+| ~~`validate_expert.py` 报 `Team type must have settings.json`~~ | **已失效症状**：现行宿主 `validate_expert.py` 已移除该判据（2026-11-04 核验）。若仍遇到，属旧版缓存脚本，见 §二「禁止恢复」 |
 | `assemble_spawn_prompt.py --list-members` 退出码 3 | shared-core 不可达 → 检查 `vendor/shared-core/` 兜底是否存在（`tests/test_vendor_core.py` 可自检） |
 | `token_budget_check.py --meter` 输出 0 行 | 落盘文件 task_id 不符合 `T-YYYYMMDD-{NNN或字母数字}` 契约 → 见 failure-008 |
 | 回归断言 FAIL 但成员自评 success | 先核对文件是否仍在写入（cksum 两次一致性），再查 `regression_report__*.json` 明细 |
 
-## 二、恢复playbook（settings.json 跨会话丢失 · 30秒）
+## 二、~~恢复playbook~~ **已废弃 · 禁止执行（2026-11-04 订正）**
 
-```bash
-cd ~/.workbuddy/plugins/marketplaces/my-experts/plugins/triz-invention-team
-# 1) 重建 settings.json（内容固定不变）
-printf '{\n  "agent": "triz-invention-team-team-lead"\n}\n' > settings.json
-# 2) 恢复 .created-by-session（用最近一次的 session-id）
-echo "<session-id>" > .created-by-session
-# 3) 验证 + 注册
-python3 ~/.workbuddy/plugins/cache/workbuddy-builtin/skill-expert-manager/0.1.0/scripts/validate_expert.py .
-python3 ~/.workbuddy/plugins/cache/workbuddy-builtin/skill-expert-manager/0.1.0/scripts/register_expert.py . --session-id <session-id>
-```
+> ⚠️ **本节原有的 `settings.json` 重建脚本已作废，任何情况下都不要执行。**
+> 原文（保留作纠错轨迹，勿照抄）：
+> ```
+> printf '{\n  "agent": "triz-invention-team-team-lead"\n}\n' > settings.json
+> python3 .../skill-expert-manager/0.1.0/scripts/validate_expert.py .
+> python3 .../skill-expert-manager/0.1.0/scripts/register_expert.py . --session-id <session-id>
+> ```
+
+**根因（已从宿主 `app.asar` 源码取证）**：`ExpertPluginService.readGeneratedAgentOverride(path)`
+把「JSON **恰有 1 个键且该键为非空字符串 `agent`**」的 `settings.json` 判定为**宿主私有 agent override 缓存**，
+于是 `removeGeneratedAgentOverrideFile()`（激活专家时）与 `removePersistedGeneratedAgentOverrides()`
+（**宿主启动时**遍历 `marketplaces/*/plugins/*/settings.json`）都会 `unlink` 它。
+上面那行 `printf` 生成的**正是这个格式** ⇒ 重建一次、宿主删一次，这是「跨会话丢失」的真相，
+不是 OneDrive 同步竞态，也不是工具时序问题。
+
+**另外两条已失效的前提**：
+1. 宿主解析 agent 名走 `plugin.json` 的 `agentName` / `teamInfo.leadAgent` / `agents[]` 与 markdown frontmatter，
+   **从不读 `settings.json`** ⇒ 该文件运行时无功能价值。
+2. 现行 `validate_expert.py`（`workbuddy-builtin/skill-expert-manager/5.9.3-*`）**已无 settings.json 判据**；
+   旧文档中写死的 `0.1.0` 版本目录也早已不存在 ⇒ 双重悬空引用。
+
+**现行做法**：本包 `settings.json` 已移除（commit `91be1a1`）。校验/注册用 `plugin.json` 即可，
+脚本路径按 `~/.workbuddy/plugins/cache/workbuddy-builtin/skill-expert-manager/<实际版本>/scripts/` 动态定位，
+**不要写死版本号**。若某处仍报「Team 型必需 settings.json」，那是旧版缓存脚本，先核对脚本版本，
+而不是把文件加回来。
 
 ## 三、工具清单（v2.5.1 · 8 个脚本）
 
@@ -64,6 +79,6 @@ python3 ~/.workbuddy/plugins/cache/workbuddy-builtin/skill-expert-manager/0.1.0/
 
 ## 七、相关 failure 索引
 
-- failure-005（settings.json 跨会话丢失）
+- ~~failure-005（settings.json 跨会话丢失）~~ → **已结案**：根因是宿主 `ExpertPluginService` 主动删除单键 agent 型文件，见 §二；处置为移除该文件，不再恢复
 - failure-006（自评失真→机械计量）、failure-007（权威数据错位）、failure-008（task_id 契约漂移）
 - 完整索引：`~/.workbuddy/expert-failures/index.md`
