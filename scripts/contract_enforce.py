@@ -23,54 +23,79 @@ HERE = Path(__file__).parent
 PKG = HERE.parent
 DOCS = PKG / "docs" / "CONTRACT_ENFORCEMENT.md"
 
-# 6 成员契约（与 docs/CONTRACT_ENFORCEMENT.md 同步——双源防漂移）
-CONTRACTS = {
-    "contradiction-analyst": {
-        "forbidden": [r"approximately|左右|大概|约\d+字", r"I think|我觉得|可能|也许"],
-        "verifications": [
-            ("directions≥3",  lambda out: len(re.findall(r"#?\d+\.|方向[1-9]|IP #\d+", out)) >= 3),
-            ("原理实跑",        lambda out: bool(re.search(r"query_triz_matrix|退出码", out))),
-        ],
-    },
+# 6 成员契约 —— forbidden_phrases 从各成员 frontmatter **解析**（唯一真源，2026-11-07 单源化）
+#   verifications 保留在本脚本（机械实现的归属地），与 docs/CONTRACT_ENFORCEMENT.md 同步维护。
+#   启动时解析失败/缺表 → 该成员 forbidden 回退空列表并告警（不静默吞错）。
+VERIFICATIONS = {
+    "contradiction-analyst": [
+        ("directions≥3",  lambda out: len(re.findall(r"#?\d+\.|方向[1-9]|IP #\d+", out)) >= 3),
+        ("原理实跑",        lambda out: bool(re.search(r"query_triz_matrix|退出码", out))),
+    ],
     # 注: "基本" 是中文常用词，不在禁词列表（已豁免）
-    "patent-search-scout": {
-        "forbidden": [r"approximately|左右|估计|凭记忆|推测"],
-        "verifications": [
-            # 双向契约：首轮查新需6类；定向复检只针对已知X/Y/A/R类，≥3类即可
-            ("X/Y/A/R/P/E 6类 或 复检≥3类", lambda out: _check_xyarpe_or_recheck(out)),
-            ("search_rounds≥3",  lambda out: len(re.findall(r"R[123]|第[一二三]轮", out)) >= 3),
-        ],
-    },
-    "patent-examiner-sim": {
-        "forbidden": [r"approximately|基本.*?(?!设计|物理|常)|整体上.*?可以"],
-        "verifications": [
-            ("裁决显式(绿/黄/红)", lambda out: _check_verdict(out)),
-            ("修复清单(强制/建议)",  lambda out: bool(re.search(r"(强制|建议)", out))),
-        ],
-    },
-    "second-opinion-reviewer": {
-        "forbidden": [r"我同意.*?不附理由", r"基本.*?通过"],
-        "verifications": [
-            ("二次表态显式", lambda out: bool(re.search(r"✅|⚠|🔴|附条件", out))),
-            ("条件清单显式",  lambda out: bool(re.search(r"(附加条件|条件清单|附条件)", out))),
-        ],
-    },
-    "disclosure-architect": {
-        "forbidden": [r"estimated|约|估计|大约"],
-        "verifications": [
-            ("必要/可选分层",  lambda out: bool(re.search(r"(必要特征|可选特征)", out))),
-            ("缺口清单",        lambda out: bool(re.search(r"(缺口|待补)", out))),
-            ("实施例≥2档",     lambda out: len(re.findall(r"实施例\s*\d", out)) >= 2),
-        ],
-    },
-    "patent-attorney-writer": {
-        "forbidden": [r"约\d+字|左右|估计.*?字", r"approximately|大致|基本"],
-        "verifications": [
-            ("摘要≤300+机械证据", lambda out: _check_abstract(out)),
-            ("权利要求禁用词零命中", lambda out: _check_claims_banned(out)),
-        ],
-    },
+    "patent-search-scout": [
+        # 双向契约：首轮查新需6类；定向复检只针对已知X/Y/A/R类，≥3类即可
+        ("X/Y/A/R/P/E 6类 或 复检≥3类", lambda out: _check_xyarpe_or_recheck(out)),
+        ("search_rounds≥3",  lambda out: len(re.findall(r"R[123]|第[一二三]轮", out)) >= 3),
+    ],
+    "patent-examiner-sim": [
+        ("裁决显式(绿/黄/红)", lambda out: _check_verdict(out)),
+        ("修复清单(强制/建议)",  lambda out: bool(re.search(r"(强制|建议)", out))),
+    ],
+    "second-opinion-reviewer": [
+        ("二次表态显式", lambda out: bool(re.search(r"✅|⚠|🔴|附条件", out))),
+        ("条件清单显式",  lambda out: bool(re.search(r"(附加条件|条件清单|附条件)", out))),
+    ],
+    "disclosure-architect": [
+        ("必要/可选分层",  lambda out: bool(re.search(r"(必要特征|可选特征)", out))),
+        ("缺口清单",        lambda out: bool(re.search(r"(缺口|待补)", out))),
+        ("实施例≥2档",     lambda out: len(re.findall(r"实施例\s*\d", out)) >= 2),
+    ],
+    "patent-attorney-writer": [
+        ("摘要≤300+机械证据", lambda out: _check_abstract(out)),
+        ("权利要求禁用词零命中", lambda out: _check_claims_banned(out)),
+    ],
 }
+
+MEMBER_IDS = list(VERIFICATIONS.keys())
+
+
+def _load_frontmatter_forbidden(member_id):
+    """从 agents/<member_id>.md frontmatter 解析 forbidden_phrases 列表（唯一真源）。
+
+    返回 (patterns: list[str], error: str|None)。解析失败时 error 说明原因。
+    """
+    md = PKG / "agents" / (member_id + ".md")
+    if not md.is_file():
+        return [], f"agents/{member_id}.md 不存在"
+    text = md.read_text(encoding="utf-8")
+    # frontmatter = 文件首个 --- 与下一个 --- 之间
+    m = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.S)
+    if not m:
+        return [], "无 frontmatter 块"
+    fm = m.group(1)
+    fm_m = re.search(r"^forbidden_phrases:\s*\n((?:[ \t]+-[ \t]*.*\n?)+)", fm, re.M)
+    if not fm_m:
+        return [], "frontmatter 无 forbidden_phrases 列表"
+    pats = []
+    for line in fm_m.group(1).splitlines():
+        item = re.match(r"^[ \t]+-[ \t]*(.+?)\s*$", line)
+        if item:
+            pats.append(item.group(1))
+    if not pats:
+        return [], "forbidden_phrases 列表为空"
+    return pats, None
+
+
+def _load_contracts():
+    """组装 CONTRACTS：forbidden 来自 frontmatter（真源），verifications 来自本表。"""
+    contracts = {}
+    for mid in MEMBER_IDS:
+        pats, err = _load_frontmatter_forbidden(mid)
+        contracts[mid] = {"forbidden": pats, "verifications": VERIFICATIONS[mid], "source_error": err}
+    return contracts
+
+
+CONTRACTS = _load_contracts()
 
 # 通用豁免标记——成员标注元数据后即使含禁词也通过
 EXEMPT_MARKERS = ["[INFERRED]", "[KNOWN]", "[实测]", "[证据:", "自检节", "【自检】", "**自检**"]
@@ -267,12 +292,16 @@ def check_member(member_id, output_text):
                 r"不[代填估]",
                 r"按[双轨]制.*?不[代迎估]",
                 r"以[代免]",
-                # 反例：成员在写"不得估算/不能代填/不应估计"
+                # 反例：成员在写"不得估算/不能代填/不应估计/而非凭记忆"
                 r"不得[代估按]",
                 r"不[应能要]估",
                 r"未[代估]",
                 r"未[发归生行]",
                 r"[未无][代反]",
+                r"非[凭代估按]",   # [2026-11-07] A02"而非凭记忆引用"漏配补丁
+                r"无一[处个].{0,4}凭",  # [2026-11-07] B01"无一处凭记忆生成"漏配补丁
+                r"[遵按]守?.{0,6}红线",
+                r"红线[：:]",
             ]
             if any(re.search(p, window) for p in anti_pattern_markers):
                 continue
@@ -318,18 +347,28 @@ def main():
     args = ap.parse_args()
 
     if args.self_test:
-        # 用已知 L2 实测产物做自测
+        # 用已知 L2 实测产物做自测 + 三源一致性检查（2026-11-07 单源化新增）
+        ok_all = True
+        print("== 自测1：三源一致性（frontmatter 可解析 + 非空 + 与文档并集一致）==")
+        for mid in MEMBER_IDS:
+            pats, err = _load_frontmatter_forbidden(mid)
+            if err:
+                print(f"  ❌ {mid}: {err}")
+                ok_all = False
+            else:
+                print(f"  ✅ {mid}: {len(pats)} 条禁词模式（真源=frontmatter）")
         test_file = PKG / "outputs" / "regression-20261015" / "a01" / "T-20261015-A07__patent-attorney-writer.md"
-        if not test_file.exists():
-            print("⚠️ 无实测样本·自测跳过")
-            return 0
-        text = test_file.read_text(encoding="utf-8")
-        passed, issues, info = check_member("patent-attorney-writer", text)
-        print(f"  样本: {test_file.name}")
-        print(f"  passed: {passed} | issues: {len(issues)}")
-        for i in issues[:3]:
-            print(f"    - {i}")
-        return 0 if passed else 1
+        if test_file.exists():
+            text = test_file.read_text(encoding="utf-8")
+            passed, issues, info = check_member("patent-attorney-writer", text)
+            print(f"== 自测2：L2 样本回归 ==\n  样本: {test_file.name}\n  passed: {passed} | issues: {len(issues)}")
+            for i in issues[:3]:
+                print(f"    - {i}")
+            if not passed:
+                ok_all = False
+        else:
+            print("== 自测2：⚠️ 无实测样本·跳过 ==")
+        return 0 if ok_all else 1
 
     targets = []
     if args.member and args.output:
@@ -358,6 +397,10 @@ def main():
     if args.json:
         print(json.dumps(results, ensure_ascii=False, indent=2))
     else:
+        # 真源解析失败必须显式告警（不静默吞错）
+        for mid in MEMBER_IDS:
+            if CONTRACTS[mid].get("source_error"):
+                print(f"⚠️  {mid} frontmatter 禁词表解析失败: {CONTRACTS[mid]['source_error']}（forbidden 未生效）")
         for r in results:
             icon = "✅" if r["passed"] else "❌"
             print(f"{icon} {r['member']:30s} {Path(r['file']).name}")

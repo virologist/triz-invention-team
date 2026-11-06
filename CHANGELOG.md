@@ -2,6 +2,33 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-11-07
+
+> 独立再诊断（11 维度·11-07）Batch 1：契约单源化 + 文档对齐。含此前未入账的 3 个 commit。
+
+### Added
+- **契约禁词单源化（S-Q1）**：`contract_enforce.py` 启动时解析各成员 frontmatter
+  `forbidden_phrases` 为唯一真源（删除脚本自维护副本）；`--self-test` 新增三源一致性检查；
+  解析失败显式告警不静默
+- **验证项实现状态标注（S-Q2）**：`CONTRACT_ENFORCEMENT.md` 全部验证项标注
+  `[机械已实现]` / `[暂缓·人工执行]`，消除幽灵验证项；scout「应用号」笔误修正为「申请号」
+
+### Changed
+- **架构文档编排对齐（S-C1）**：`architecture.md` §五任务分配表标注编排权威=主理人 SOP
+  P2-10 白名单（W1/W2），删除已被取代的"Phase1-2‖Phase3 泛并行"旧实例
+- **routing-log 表格修复（S-C3）**：R-004 起断裂在"复盘笔记"后的表格行归位到表结构
+- 6 成员 frontmatter 禁词表归一（含新增 `(显著|大幅|明显|高效).*?(?!附实测|附数据)` 等）
+- anti-pattern 豁免链补 3 条实测漏配（"而非凭记忆/无一处凭记忆/红线："），L2 全量 13/13 PASS
+
+## [2.5.4] - 2026-10-30 ~ 11-04（补录）
+
+> 此前未入 CHANGELOG 的 3 个 commit（S-Q5）。
+
+- `623a19e` vendor 同步：shared-core B21 升级（check_task_package_v5 结构化校验，联邦真源 1809085da349）
+- `91be1a1` fix: 移除 settings.json（宿主 ExpertPluginService 删除判据命中）
+- `90d04bd` fix: 订正 settings.json 恢复playbook（宿主删除机制）+ vendor 清单基线刷新
+  （详见 `docs/OPERATIONS.md` §二 · failure-005 结案记录）
+
 ## [2.5.3] - 2026-10-15
 
 > 独立诊断（triz-team-diagnosis-independent-20261015.md）P0 三项 + 两项遗留债清偿。

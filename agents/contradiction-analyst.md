@@ -17,9 +17,10 @@ schema_version: 1.0.0
 contract_owner: P0-S1-1
 verified_at: 2026-10-15
 
-# 禁止触发词（CI gate 全文 grep 命中即契约违反）
+# 禁止触发词——唯一真源（contract_enforce.py 启动时解析本表；docs/CONTRACT_ENFORCEMENT.md 仅作展示）
+# [2026-11-07 单源化] 与文档并集归一：新增「约\d+字」
 forbidden_phrases:
-  - approximately|左右|大概|估计
+  - approximately|左右|大概|估计|约\d+字
   - I think|我觉得|可能|也许
   - 凭记忆|未核实
 

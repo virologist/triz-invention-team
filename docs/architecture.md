@@ -210,12 +210,15 @@ VERIFY  门禁校验（格式/约束/前置条件/质量）
 
 | 模式 | 适用场景 | 编排方式 | 实例 |
 |------|---------|---------|------|
-| **Parallel 并行** | 成员间无数据依赖 | 单消息内spawn多个 | Phase1-2分析 + Phase3查新可并行启动（分析产出粗方向即启动检索预热） |
+| **Parallel 并行** | 成员间无数据依赖 | 单消息内spawn多个 | ⚠ **编排权威=主理人SOP「批量派单白名单」（P2-10）**：仅 W1 独立咨询 / W2 盲态双审两类；早期"分析产出粗方向即启动检索预热"的泛并行已被 2026-10-15 白名单取代，历史实例仅存档 |
 | **Serial 串行** | 强数据依赖 | 前序回传完整产出后启动下一 | analyst → scout → examiner → second-opinion → disclosure → attorney |
 | **Conditional 条件触发** | 结果分支 | 按前序verdict路由 | examiner=RED → 退回analyst；GREEN/YELLOW → 触发second-opinion |
-| **Fan-out/Fan-in 扇出扇入** | 多维度并行分析 | 编排者分发→汇聚→裁决 | 多方向并行查新，结果汇聚至examiner |
+| **Fan-out/Fan-in 扇出扇入** | 多维度并行分析 | 编排者分发→汇聚→裁决 | Phase 2.5 汇聚校准（Fan-in 显式化） |
 | **Retry Loop 重试循环** | VERIFY失败 | 附反馈重调度同agent | 权项含模糊词 → 附违规点退回重做（≤3次） |
 | **Escalate 升级** | 3次失败/仲裁僵局 | 交用户决策 | 查新连续3轮发现X级文件 → 升级用户决定规避设计or放弃 |
+
+> **单点权威声明（2026-11-07，修 S-C1）**：任务分配的编排语义以 `agents/triz-invention-team-team-lead.md`
+> 的「任务分配策略 + 并行与预装配协议（P2-10）」为唯一权威；本表仅为架构概念层示意，两者冲突时以 SOP 为准。
 
 ---
 

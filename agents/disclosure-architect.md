@@ -17,11 +17,11 @@ schema_version: 1.0.0
 contract_owner: P0-S1-1
 verified_at: 2026-10-15
 
-# 禁止触发词（CI gate 全文 grep 命中即契约违反）
+# 禁止触发词——唯一真源（contract_enforce.py 启动时解析本表；docs/CONTRACT_ENFORCEMENT.md 仅作展示）
+# [2026-11-07 单源化] 采用脚本已验证模式；文档另两条负向上下文断言（编造实验数据/优化无据）
+# 属语义验证，归 must_verify 语义层（grep 无法表达负向断言），见 CONTRACT_ENFORCEMENT.md 标注
 forbidden_phrases:
-  - approximately|左右|大概|估计
-  - I think|我觉得|可能|也许
-  - 凭记忆|未核实
+  - estimated|约|估计|大约
 
 # 强制机械验证项（CI gate 解析+实测；详见 docs/CONTRACT_ENFORCEMENT.md）
 must_verify: 详见同包 docs/CONTRACT_ENFORCEMENT.md（按 member_id 查表）
