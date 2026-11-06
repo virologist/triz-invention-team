@@ -95,6 +95,19 @@ Context = 角色MD + 声明skills references + task_payload
 ### H2 · State Store 状态存储
 维护全局唯一状态对象，随每次调度下发快照：`task_id / phase / domain / search_rounds / verdicts{examiner,second_opinion} / gates{search_3rounds_complete, c1_c8_confirmed, ...} / retry_counts / confirmed_items / conflicts / metrics`。
 
+> 🔴 **状态持久化硬规则（2026-11-07 Batch2 · 修 S-X3）**：内存态不可靠——主理会话中断即丢失。
+> 每次 VERIFY 后**必须**把状态落盘到运行目录（一行命令，确定性）：
+> ```bash
+> python3 scripts/state_store.py update --run-dir <RUN_DIR> \
+>   --set phase=<N> --set gates.G1=true --set verdicts.examiner.result=<green|yellow|red> \
+>   --set verdicts.examiner.score=<N> --set conditions.K1=true
+> ```
+> - scaffold（`run_regression.py --scaffold`）已自动初始化 `state.json`
+> - **会话中断/恢复时第一动作**：`python3 scripts/state_store.py resume --run-dir <RUN_DIR>`——
+>   输出"当前阶段/未关门禁/二审条件未关闭项/下一动作"，据此续接，**禁止**靠重读全部产出人工重建
+> - 二审条件（K/M 表）在 update 时逐键登记 `conditions.Kn=true/false`，为 Phase 5 兑现对账提供数据源（J2）
+> - Reviewer 类成员的信封 `verdicts` 字段（schema v1.2.0）直接机械消费进 state，不再从正文抽取（J1）
+
 ### H3 · Loop Controller 循环控制
 **每个Phase = GATHER → ACT → VERIFY → [ADVANCE | RETRY]**：
 - PASS → 更新state推进；FAIL & retry<3 → 附具体反馈重试同agent

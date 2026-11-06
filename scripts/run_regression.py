@@ -26,6 +26,7 @@ import glob
 import json
 import os
 import re
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -375,7 +376,32 @@ def cmd_scaffold(case_id, out_dir, task_id_override=None):
 """
     for a in exp.get("assertions", []):
         info += f"- [{a.get('id')}] {a.get('type')}：{json.dumps({k: v for k, v in a.items() if k not in ('id','type')}, ensure_ascii=False)}\n"
+    # 恢复点段（v2.6.0 Batch2 · S-X3）：scaffold 同时初始化 state.json，断点续接有确定性入口
+    members_for_state = ",".join(exp["expect"]) if exp.get("target_member") == "full-team" else exp.get("target_member", "")
+    phase_hint = {"full-team": 0, "contradiction-analyst": 1, "patent-search-scout": 3}.get(exp.get("target_member"), 0)
+    info += f"""
+## 恢复点（断点续接 · v2.6.0）
+
+- 状态文件：`state.json`（本目录，已随 scaffold 初始化）
+- 中断恢复：`python3 scripts/state_store.py resume --run-dir {os.path.relpath(out_dir, PKG)}`
+- 每次主理人 VERIFY 后更新：`python3 scripts/state_store.py update --run-dir {os.path.relpath(out_dir, PKG)} --set phase=N --set gates.GX=true`
+- 追加轨迹自动写入 state.json 的 history[]，续接时按"最后更新 + 未关门禁 + 下一动作"三要素恢复
+
+"""
     open(os.path.join(out_dir, "RUN_INFO.md"), "w", encoding="utf-8").write(info)
+    # 初始化 state.json（失败不阻断 scaffold——state 是增强不是依赖）
+    try:
+        subprocess.run(
+            [sys.executable, os.path.join(PKG, "scripts", "state_store.py"), "init",
+             "--run-dir", out_dir, "--task-id", task_id, "--members", members_for_state],
+            capture_output=True, text=True)
+        subprocess.run(
+            [sys.executable, os.path.join(PKG, "scripts", "state_store.py"), "update",
+             "--run-dir", out_dir, "--set", f"phase={phase_hint}"],
+            capture_output=True, text=True)
+        print("   已初始化 state.json（恢复点就绪）")
+    except Exception as e:  # noqa
+        print(f"   ⚠ state.json 初始化失败（不阻断）：{e}")
     print(f"✅ 运行目录就绪：{out_dir}")
     print(f"   已写入 RUN_INFO.md（含派单步骤与断言清单）")
     print(f"   任务 ID 建议：{task_id}")

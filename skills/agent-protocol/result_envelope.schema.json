@@ -103,8 +103,23 @@
         "retry_count": {"type": "integer", "minimum": 0}
       },
       "description": "执行指标（推荐但非必须）。duration_ms 与 duration_ms_wall 为两个独立口径，禁止互相覆盖（2026-10-14 双轨制）。"
+    },
+    "verdicts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "result": {
+          "type": "string",
+          "description": "裁决/表态结果：examiner 用 green|yellow|red；second_opinion 用 agree|conditional|disagree"
+        },
+        "score": {
+          "type": "number",
+          "description": "量化评分（如 examiner 黄区上界 4/5；reviewer 五维加权分）。供 L3 仲裁计分差≥2 自动触发（P2-12）机械比对，替代从正文抽取"
+        }
+      },
+      "description": "结构化裁决（v1.2.0 新增·可选）：Reviewer 类成员填写，供主理人 L3 仲裁与 state_store 直接机械消费（J1）。非裁决类成员可省略。"
     }
   },
-  "version": "1.1.0",
+  "version": "1.2.0",
   "deprecated_fields": []
 }
