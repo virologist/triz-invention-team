@@ -1,16 +1,78 @@
 {
-  "case_id": "workflow-c-01",
-  "workflow": "C",
-  "target_member": "patent-search-scout",
-  "task_package": "workflow-c-01.task.md",
-  "assertions": [
-    {"id": "A1", "type": "task_package_elements", "expect": ["objective", "output_format", "constraints", "task_boundary"]},
-    {"id": "A2", "type": "envelope_required_fields", "expect": ["agent_id", "task_id", "phase", "status", "confidence", "deliverable_summary"]},
-    {"id": "A3", "type": "envelope_agent_id", "expect": "patent-search-scout"},
-    {"id": "A4", "type": "min_count", "field": "search_rounds", "pattern": "第[一二三1-3]轮|R[123]|轮次", "min": 3},
-    {"id": "A5", "type": "required_regex", "patterns": ["E类|E 类|抵触申请"], "note": "E类结论必须显式给出（有/无/未检索），不得静默省略"},
-    {"id": "A6", "type": "required_regex", "patterns": ["法\\s?25|法25"], "note": "客体预审必须显式判定法25排除项"},
-    {"id": "A7", "type": "forbidden_regex", "patterns": ["大约", "左右", "之类的", "最好", "优选", "若干", "高效", "大幅"]},
-    {"id": "A8", "type": "min_chars", "min": 3000}
-  ]
+ "case_id": "workflow-c-01",
+ "workflow": "C",
+ "target_member": "patent-search-scout",
+ "task_package": "workflow-c-01.task.md",
+ "assertions": [
+  {
+   "id": "A1",
+   "type": "task_package_elements",
+   "expect": [
+    "objective",
+    "output_format",
+    "constraints",
+    "task_boundary"
+   ]
+  },
+  {
+   "id": "A2",
+   "type": "envelope_required_fields",
+   "expect": [
+    "agent_id",
+    "task_id",
+    "phase",
+    "status",
+    "confidence",
+    "deliverable_summary"
+   ]
+  },
+  {
+   "id": "A3",
+   "type": "envelope_agent_id",
+   "expect": "patent-search-scout"
+  },
+  {
+   "id": "A4",
+   "type": "min_count",
+   "field": "search_rounds",
+   "pattern": "第[一二三1-3]轮|R[123]|轮次",
+   "min": 3
+  },
+  {
+   "id": "A5",
+   "type": "required_regex",
+   "patterns": [
+    "E类|E 类|抵触申请"
+   ],
+   "note": "E类结论必须显式给出（有/无/未检索），不得静默省略"
+  },
+  {
+   "id": "A6",
+   "type": "required_regex",
+   "patterns": [
+    "法\\s?25|法25"
+   ],
+   "note": "客体预审必须显式判定法25排除项"
+  },
+  {
+   "id": "A7",
+   "type": "forbidden_regex",
+   "patterns": [
+    "大约",
+    "左右",
+    "之类的",
+    "最好",
+    "优选",
+    "若干",
+    "高效",
+    "大幅"
+   ],
+   "patterns_source": "frontmatter"
+  },
+  {
+   "id": "A8",
+   "type": "min_chars",
+   "min": 3000
+  }
+ ]
 }

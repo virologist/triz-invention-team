@@ -28,6 +28,7 @@ import os
 import re
 import subprocess
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(HERE)
@@ -197,13 +198,75 @@ def check_forbidden_regex(exp, task_text, run_dir, files, a):
         mid = exp.get("target_member")
         p = files.get(mid) or (list(files.values())[0] if files else None)
         txt_use = read(p) if p else ""
+
+    # R4 · 2026-11-07：禁词真源归一——patterns_source=frontmatter 时动态读成员
+    # agents/<id>.md frontmatter forbidden_phrases（与 contract_enforce 同一真源），
+    # 消除用例自带静态表这第三源漂移；静态 patterns 保留（claims 限定域等场景仍用）
+    patterns = list(a.get("patterns") or [])
+    if a.get("patterns_source") == "frontmatter":
+        mid = exp.get("target_member")
+        fm_pats, fm_err = _load_frontmatter_patterns(mid)
+        if fm_err:
+            return False, f"frontmatter 真源读取失败: {fm_err}"
+        patterns = fm_pats + patterns
+    if not patterns:
+        return True, "（无禁词断言）"
+
+    # R4：清洗与豁免与 contract_enforce 同构（同真源必须同行为，防两套工具判定漂移）
     txt_use = strip_selfcheck_lines(strip_fences(txt_use))
+    try:
+        import contract_enforce as CE
+        txt_use = CE._clean_for_forbidden_scan(txt_use)
+    except Exception:
+        pass  # 独立部署无 contract_enforce 时退回基础清洗
     hits = []
-    for pat in a["patterns"]:
-        for m in re.finditer(pat, txt_use):
-            s = max(0, m.start() - 10)
-            hits.append(f"「{pat}」@…{txt_use[s:m.end() + 10]}…")
+    for pat in patterns:
+        try:
+            for m in re.finditer(pat, txt_use):
+                s = max(0, m.start() - 10)
+                window = txt_use[s:m.end() + 10]
+                # 命中后走 contract_enforce 同款豁免（EXEMPT_WORDS / 反例标记 / 判断语境）
+                try:
+                    import contract_enforce as CE
+                    wide = txt_use[max(0, m.start() - 30):m.end() + 30]
+                    if any(w in wide for w in CE.EXEMPT_WORDS):
+                        continue
+                    if any(re.search(q, wide) for q in (
+                        r"不得[凭基估按]", r"禁止[凭基估按]", r"非[凭代估按]",
+                        r"无一[处个].{0,4}凭", r"[遵按]守?.{0,6}红线", r"红线[：:]",
+                        r"可能[被导引为会]", r"可能[性体化]")):
+                        continue
+                    _ok, _ = CE._context_exempt(m, txt_use)
+                    if _ok:
+                        continue
+                except Exception:
+                    pass
+                hits.append(f"「{pat}」@…{window}…")
+        except re.error as e:
+            return False, f"禁词正则无效「{pat}」: {e}"
     return (not hits), ("零命中" if not hits else f"{len(hits)} 处命中: " + " | ".join(hits[:3]))
+
+
+def _load_frontmatter_patterns(member_id):
+    """R4：从成员 frontmatter 读 forbidden_phrases（真源）——与 contract_enforce._load_frontmatter_forbidden 同构。
+    返回 (patterns, error)。"""
+    import os
+    md = os.path.join(PKG, "agents", (member_id or "") + ".md")
+    if not os.path.isfile(md):
+        return [], f"agents/{member_id}.md 不存在"
+    text = open(md, encoding="utf-8").read()
+    m = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.S)
+    if not m:
+        return [], "无 frontmatter 块"
+    fm_m = re.search(r"^forbidden_phrases:\s*\n((?:[ \t]+-[ \t]*.*\n?)+)", m.group(1), re.M)
+    if not fm_m:
+        return [], "frontmatter 无 forbidden_phrases"
+    pats = []
+    for line in fm_m.group(1).splitlines():
+        item = re.match(r"^[ \t]+-[ \t]*(.+?)\s*$", line)
+        if item:
+            pats.append(item.group(1))
+    return pats, None
 
 
 def check_required_regex(exp, task_text, run_dir, files, a):

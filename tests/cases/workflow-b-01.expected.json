@@ -1,16 +1,83 @@
 {
-  "case_id": "workflow-b-01",
-  "workflow": "B",
-  "target_member": "contradiction-analyst",
-  "task_package": "workflow-b-01.task.md",
-  "assertions": [
-    {"id": "A1", "type": "task_package_elements", "expect": ["objective", "output_format", "constraints", "task_boundary"]},
-    {"id": "A2", "type": "envelope_required_fields", "expect": ["agent_id", "task_id", "phase", "status", "confidence", "deliverable_summary"]},
-    {"id": "A3", "type": "envelope_agent_id", "expect": "contradiction-analyst"},
-    {"id": "A4", "type": "min_count", "field": "directions", "pattern": "原理|IP #|#\\\\d+", "min": 3},
-    {"id": "A5", "type": "forbidden_regex", "patterns": ["大约", "左右", "之类的", "等等", "最好", "优选", "若干", "高效", "快速", "大幅", "显著提高"], "allow_note": true},
-    {"id": "A6", "type": "required_regex", "patterns": ["query_triz_matrix", "退出码"], "note": "必须出现查询器命令与退出码，证明原理编号来自实跑而非记忆"},
-    {"id": "A7", "type": "min_chars", "min": 3000},
-    {"id": "A8", "type": "no_fabrication_marker", "forbidden": ["矩阵无推荐"], "note": "A8反向：若出现「矩阵无推荐」属诚实降级，不算失败；此处仅登记"}
-  ]
+ "case_id": "workflow-b-01",
+ "workflow": "B",
+ "target_member": "contradiction-analyst",
+ "task_package": "workflow-b-01.task.md",
+ "assertions": [
+  {
+   "id": "A1",
+   "type": "task_package_elements",
+   "expect": [
+    "objective",
+    "output_format",
+    "constraints",
+    "task_boundary"
+   ]
+  },
+  {
+   "id": "A2",
+   "type": "envelope_required_fields",
+   "expect": [
+    "agent_id",
+    "task_id",
+    "phase",
+    "status",
+    "confidence",
+    "deliverable_summary"
+   ]
+  },
+  {
+   "id": "A3",
+   "type": "envelope_agent_id",
+   "expect": "contradiction-analyst"
+  },
+  {
+   "id": "A4",
+   "type": "min_count",
+   "field": "directions",
+   "pattern": "原理|IP #|#\\\\d+",
+   "min": 3
+  },
+  {
+   "id": "A5",
+   "type": "forbidden_regex",
+   "patterns": [
+    "大约",
+    "左右",
+    "之类的",
+    "等等",
+    "最好",
+    "优选",
+    "若干",
+    "高效",
+    "快速",
+    "大幅",
+    "显著提高"
+   ],
+   "allow_note": true,
+   "patterns_source": "frontmatter"
+  },
+  {
+   "id": "A6",
+   "type": "required_regex",
+   "patterns": [
+    "query_triz_matrix",
+    "退出码"
+   ],
+   "note": "必须出现查询器命令与退出码，证明原理编号来自实跑而非记忆"
+  },
+  {
+   "id": "A7",
+   "type": "min_chars",
+   "min": 3000
+  },
+  {
+   "id": "A8",
+   "type": "no_fabrication_marker",
+   "forbidden": [
+    "矩阵无推荐"
+   ],
+   "note": "A8反向：若出现「矩阵无推荐」属诚实降级，不算失败；此处仅登记"
+  }
+ ]
 }
