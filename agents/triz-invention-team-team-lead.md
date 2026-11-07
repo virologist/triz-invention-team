@@ -127,7 +127,7 @@ Context = 角色MD + 声明skills references + task_payload
 
 | 预算项 | 上限 | 触发动作 |
 |---|---|---|
-| 全流程token | ≤120K（6成员×平均20K） | 熔断：汇报已完成Phase+剩余预算+建议裁剪范围（如降级Workflow A→C），交用户决策 |
+| 全流程token | 弹性上限 120K；**L2 实测基线 84K**（a01 全链 83.8K · 2026-11-07 与 preflight DEFAULT_MEMBER_TOKENS 同口径） | 熔断：汇报已完成Phase+剩余预算+建议裁剪范围（如降级Workflow A→C），交用户决策 |
 | 全流程墙钟 | ≤45min | 熔断：同上 |
 | 单成员重试累计 | 同agent全局≤4次（跨Phase累计） | 强制换策略或上报 |
 | 平台429等待 | 单次任务最多等待1次重置窗口 | 超时→上报用户改期 |
