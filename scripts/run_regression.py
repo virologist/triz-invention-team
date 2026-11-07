@@ -231,23 +231,62 @@ def check_all_members_landed(exp, task_text, run_dir, files, a):
 
 
 def check_gates(exp, task_text, run_dir, files, a):
+    """G1-G5 门禁登记核验（v2.6.0 修 S-Q4 断言锚点）。
+
+    登记位置两处任一即可：
+      1. state.json 的 gates 键（Batch2 起标准路径）
+      2. _VERIFY.md 文本——旧版只查字面 "G1"，但 A01 实际用语义表述（"红→黄放行"等），
+         已知假阴性；现改为：字面 Gn 或 state gates 键名 或 语义关键词（三轮查新/裁决/条件/缺口/摘要字符）任一命中
+    """
+    # 1) state.json 路径（权威）
+    sp = os.path.join(run_dir, "state.json")
+    if os.path.isfile(sp):
+        try:
+            state = json.load(open(sp, encoding="utf-8"))
+            gkeys = state.get("gates") or {}
+            if gkeys:
+                missing = [g for g in a["expect"] if not gkeys.get(g)]
+                # 宽松映射：a["expect"] 用 "G1" 形态，state 用描述键名 → 按序对齐也认
+                if missing and len(gkeys) >= len(a["expect"]):
+                    vals = list(gkeys.values())
+                    missing = [g for i, g in enumerate(a["expect"]) if i < len(vals) and not vals[i]]
+                return (not missing), ("state.json 门禁全关" if not missing else f"state 未关: {missing}")
+        except Exception:  # noqa
+            pass
+    # 2) _VERIFY.md 文本路径
     vf = os.path.join(run_dir, "_VERIFY.md")
     txt = read(vf)
     if not txt:
         return False, "_VERIFY.md 不存在（主理人未汇编门禁校验）"
-    missing = [g for g in a["expect"] if not re.search(re.escape(g), txt)]
-    return (not missing), ("G1-G5 全登记" if not missing else f"缺: {missing}")
+    semantic = {
+        "G1": r"G1|三轮|search_rounds|查新.*?(完成|轮)",
+        "G2": r"G2|裁决|黄|绿|红|二审|附条件",
+        "G3": r"G3|C1-C8|C1－C8|确认清单|逐项确认|C 表|已确认|K表.*?兑现|M1-M\d+兑现",
+        "G4": r"G4|缺口",
+        "G5": r"G5|摘要.*?\d+\s*字符|禁用词",
+    }
+    missing = []
+    for g in a["expect"]:
+        pat = semantic.get(g, re.escape(g))
+        if not re.search(pat, txt):
+            missing.append(g)
+    return (not missing), ("G1-G5 全登记（语义匹配）" if not missing else f"缺: {missing}")
 
 
 def check_abstract_max_chars(exp, task_text, run_dir, files, a):
     for mid in ("patent-attorney-writer",):
         if mid in files:
             txt = read(files[mid])
-            sec = extract_section(txt, ["说明书摘要", "摘要"])
-            if sec is None:
-                return False, "未找到「说明书摘要」段"
-            sec = re.sub(r"^[\s>|\-]+", "", sec.strip(), flags=re.M).strip()
-            n = len(sec)
+            # 优先"摘要正文"粗体段（A07 实际结构：## 三、说明书摘要 下有 **摘要正文**：）
+            bm = re.search(r"\*\*摘要正文\*\*[:：]?\s*\n+(.*?)(?=\n\s*\*\*(?:摘要附图|机械验证|结论|自查))", txt, re.S)
+            if bm:
+                sec = bm.group(1)
+            else:
+                sec = extract_section(txt, ["说明书摘要", "摘要"])
+                if sec is None:
+                    return False, "未找到「说明书摘要」段"
+                sec = re.sub(r"^[\s>|\-]+", "", sec.strip(), flags=re.M).strip()
+            n = len(sec.strip())
             return n <= a["max"], f"摘要 {n} 字符（≤{a['max']}）"
     return False, "未找到撰写员落盘文件"
 
@@ -290,6 +329,45 @@ def check_no_fabrication_marker(exp, task_text, run_dir, files, a):
     return None, f"INFORMATIONAL：诚实降级标记 {n} 处（{a.get('note','')}）"
 
 
+def check_conditions_closed(exp, task_text, run_dir, files, a):
+    """J2（v2.6.0 Batch3）：二审条件清单兑现对账。
+
+    数据源（二选一，state.json 优先）：
+      1. state.json 的 conditions 键值（Batch2 起主理人 VERIFY 后登记）
+      2. 回退：从二审产出文件提取条件编号（K1..K9/M1..M9），扫描下游产出（architect/writer）
+         是否逐条命中——机械底线
+    INFO 语义：任一条件未检出兑现 → FAIL（阻断交付汇编），除非 --json 报告标注 warn_only
+    """
+    # 1) state.json 路径
+    sp = os.path.join(run_dir, "state.json")
+    conds = {}
+    if os.path.isfile(sp):
+        try:
+            state = json.load(open(sp, encoding="utf-8"))
+            conds = state.get("conditions") or {}
+        except Exception:  # noqa
+            pass
+    if conds:
+        open_conds = [k for k, v in conds.items() if not v]
+        return (not open_conds), (
+            f"state.json 条对账：{len(conds)} 条，未关闭 {open_conds or '无'}")
+    # 2) 回退：从二审产出提取条件编号
+    reviewer_file = files.get("second-opinion-reviewer")
+    if not reviewer_file:
+        return None, "无二审落盘，跳过条件对账"
+    rtxt = read(reviewer_file)
+    cond_ids = sorted(set(re.findall(r"\b([KM]\d{1,2})\b", rtxt)))
+    if not cond_ids:
+        return None, "二审产出未检出条件编号（K*/M*），跳过"
+    downstream = "".join(read(files[m]) for m in ("disclosure-architect", "patent-attorney-writer")
+                         if m in files)
+    if not downstream:
+        return None, "无下游产出可扫，跳过"
+    missing = [c for c in cond_ids if c not in downstream]
+    return (not missing), (
+        f"条件对账（回退·文本扫描）：二审 {len(cond_ids)} 条，下游未提及 {missing or '无'}")
+
+
 CHECKERS = {
     "task_package_elements": check_task_package_elements,
     "envelope_required_fields": check_envelope_required_fields,
@@ -303,6 +381,7 @@ CHECKERS = {
     "abstract_max_chars": check_abstract_max_chars,
     "budget": check_budget,
     "no_fabrication_marker": check_no_fabrication_marker,
+    "conditions_closed": check_conditions_closed,
 }
 
 

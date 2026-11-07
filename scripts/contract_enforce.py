@@ -58,6 +58,47 @@ VERIFICATIONS = {
 
 MEMBER_IDS = list(VERIFICATIONS.keys())
 
+# 信封 deliverable_summary 格式契约（S5-4 · 2026-10-15 规范 → 2026-11-07 Batch3 机械实现 · 修 S-M1）
+#   「<对象>」完成<动作>：<结论A>；<结论B>；…（40-60字符·含裁决/评级时必含）
+SUMMARY_MIN_CHARS = 40
+SUMMARY_MAX_CHARS = 60
+# 必含元素（按成员）：从 deliverable_summary 里 grep（豁免链外的机械底线）
+SUMMARY_MUST_CONTAIN = {
+    "contradiction-analyst":   [r"方向"],
+    "patent-search-scout":     [r"X\s*级|评级|绿|黄|红"],
+    "patent-examiner-sim":     [r"绿|黄|红"],
+    "second-opinion-reviewer": [r"同意|附条件|不同意|✅|⚠|🔴"],
+    "disclosure-architect":    [r"必要特征|特征"],
+    "patent-attorney-writer":  [r"摘要|\d+\s*字符"],
+}
+
+
+def _check_summary(out):
+    """deliverable_summary 40-60 字符 + 必含元素（从信封 JSON 里取；WARN 级——格式偏离不阻断交付）。
+
+    返回 (ok, detail)；ok=False 时由 check_member 记入 info["summary_warn"]（不计入 issues）。
+    """
+    m = re.search(r"\{[^{}]*\"deliverable_summary\"\s*:\s*\"([^\"]+)\"", out, re.S)
+    if not m:
+        return False, "未提取到信封 deliverable_summary（可能为纯文本产出）"
+    s = m.group(1)
+    n = len(s)
+    mid = None
+    ma = re.search(r"\"agent_id\"\s*:\s*\"([^\"]+)\"", out)
+    if ma:
+        mid = ma.group(1)
+    problems = []
+    if n < SUMMARY_MIN_CHARS:
+        problems.append(f"{n}字符<{SUMMARY_MIN_CHARS}")
+    elif n > SUMMARY_MAX_CHARS:
+        problems.append(f"{n}字符>{SUMMARY_MAX_CHARS}")
+    if mid in SUMMARY_MUST_CONTAIN:
+        if not any(re.search(p, s) for p in SUMMARY_MUST_CONTAIN[mid]):
+            problems.append(f"缺必含元素（{mid}）")
+    if problems:
+        return False, f"summary {n}字符: {'; '.join(problems)}"
+    return True, f"summary {n}字符合规"
+
 
 def _load_frontmatter_forbidden(member_id):
     """从 agents/<member_id>.md frontmatter 解析 forbidden_phrases 列表（唯一真源）。
@@ -268,7 +309,11 @@ def check_member(member_id, output_text):
     c = CONTRACTS[member_id]
 
     issues = []
-    info = {"member": member_id, "forbidden_hits": [], "verification_results": []}
+    info = {"member": member_id, "forbidden_hits": [], "verification_results": [], "summary_warn": []}
+
+    # 0) deliverable_summary 格式检查（WARN 级 · 修 S-M1）——不进 issues，不阻断，只登记
+    sok, sdetail = _check_summary(output_text)
+    info["summary_warn"].append({"ok": sok, "detail": sdetail})
 
     # 1) 禁词检测 —— 仅扫契约正文段（去掉附录/自检/纯表格/代码块/Python字面量）
     cleaned = _clean_for_forbidden_scan(output_text)
@@ -411,6 +456,9 @@ def main():
             for v in r["verification_results"]:
                 if not v["ok"]:
                     print(f"    ❌ VERIFY     {v['name']}: {v['detail']}")
+            for w in r.get("summary_warn", []):
+                if not w["ok"]:
+                    print(f"    ⚠️  SUMMARY-WARN {w['detail']}")
 
     return 0 if (all_ok or not args.exit_on_fail) else 1
 

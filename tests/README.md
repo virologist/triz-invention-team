@@ -60,6 +60,7 @@ python3 scripts/run_regression.py --case workflow-b-01 --dir outputs/regression-
 | `abstract_max_chars` | 撰写员摘要机械计量 ≤300 字（不得自评） |
 | `budget` | 汇总 metrics.jsonl：token ≤120K、墙钟 ≤45min |
 | `no_fabrication_marker` | 信息性：统计「矩阵无推荐」等诚实降级标记（不判失败） |
+| `conditions_closed` | J2（v2.6.0）：二审条件清单逐条兑现对账——state.json conditions 键优先，回退为二审产出提取 K*/M* 编号扫下游命中 |
 
 ## 已知边界
 

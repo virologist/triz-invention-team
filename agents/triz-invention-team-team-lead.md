@@ -117,7 +117,10 @@ Context = 角色MD + 声明skills references + task_payload
 **双条件停止**（2026-09-18 加固，参考 Orchestrator-Optimizer Loop 边际收益递减）：
 - **硬上限**：3次到点必停
 - **软提前**：连续两轮 VERIFY 间质量评分改进 < 5%（marginal_return < 0.05）→ 提前终止并向用户汇报"边际收益已饱和，是否继续"
-- 评分定义：单agent任务 quality = result_envelope.confidence / 100 + 成员自评issues数（≥3扣5分/条）；陆上爆发任务 quality = 门禁满足率（当前校验点通过数/总门禁数）
+- 评分定义：单agent任务 quality = **机械分优先**（2026-11-07 Batch3 · 修 S-A1）：优先用
+  `token_budget_check.py --meter` 的机械计量（产出规模落在用例 min_chars~合理上限区间 = 满分基础）
+  + 门禁满足率（陆上爆发任务）；`result_envelope.confidence` 为**参考项**（failure-006 已证自评不可靠），
+  仅在机械计量不可用时按 confidence/100 + 自评 issues 扣分估算并标注 `[估算口径]`
 - 例外：Phase 3 三轮查新不受软提前限制（硬约束 ≥3 轮不可压缩）；其他Phase全部适用
 
 ### H3.5 · 全局任务预算（2026-09-30新增，堵Workflow级熔断缺口）

@@ -1,0 +1,54 @@
+{
+  "case_id": "workflow-a-01",
+  "run_dir": "outputs/regression-20261015/a01",
+  "checked_at": "2026-11-07T07:26:48.474685",
+  "total": 7,
+  "passed": 7,
+  "failed": 0,
+  "info": 0,
+  "results": [
+    {
+      "id": "A1",
+      "type": "task_package_elements",
+      "pass": true,
+      "detail": "四要素齐全（4 项）"
+    },
+    {
+      "id": "A2",
+      "type": "all_members_landed",
+      "pass": true,
+      "detail": "6 成员全部落盘"
+    },
+    {
+      "id": "A3",
+      "type": "gates",
+      "pass": true,
+      "detail": "G1-G5 全登记（语义匹配）"
+    },
+    {
+      "id": "A4",
+      "type": "abstract_max_chars",
+      "pass": true,
+      "detail": "摘要 258 字符（≤300）"
+    },
+    {
+      "id": "A5",
+      "type": "forbidden_regex",
+      "pass": true,
+      "detail": "零命中"
+    },
+    {
+      "id": "A6",
+      "type": "budget",
+      "pass": true,
+      "detail": "tokens≈83772（≤120000） · 链式墙钟≈31.6min（Σ成员墙钟·下界，≤45）"
+    },
+    {
+      "id": "A7",
+      "type": "conditions_closed",
+      "pass": true,
+      "detail": "条件对账（回退·文本扫描）：二审 14 条，下游未提及 无"
+    }
+  ],
+  "verdict": "PASS"
+}
