@@ -10,7 +10,7 @@
       "name": "triz-invention-team",
       "description": "Cross-domain TRIZ invention team: contradiction analysis, three-round patent search, examination simulation with second-opinion review, disclosure and patent application drafting for CN invention patents (v2.6).",
       "source": "./plugins/triz-invention-team",
-      "version": "2.7.0",
+      "version": "2.8.0",
       "author": {
         "name": "TZUVet",
         "email": "54756814+virologist@users.noreply.github.com",

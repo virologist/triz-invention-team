@@ -2,6 +2,50 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-11-07
+
+> 第三轮独立诊断（triz-team-diagnosis-independent-20261107-r3.md · 11 维度从零基准）R1-R5 修复 + U1-U3 升维（用户 11-07 确认全量执行）。
+
+### Fixed（R1-R5 · 14 项短板）
+- **契约豁免机制重建（R1 · D7-1 高危）**：3 成员 frontmatter 的 `.*?(?!...)` 负向前瞻豁免
+  经实测全部为死代码（`.*?` 匹配空串时前瞻恒成立，豁免从未生效）——删除前瞻、禁词纯净化，
+  豁免职能收敛到 `contract_enforce.py` 新增 CONTEXT_EXEMPT 上下文窗口豁免表（基本X搭配/
+  效果词附证据/约束约定节约复合词/估计否定语境）；`--self-test` 自测3 六组双向断言
+  （豁免样本放行 ∧ 违规样本命中）；历史产出回归 exit=0 零误伤
+- **路由落盘提醒回链（R2 · D2-1 高危）**：CHANGELOG 2.3.0 声明的 RoutingDecision 提醒在
+  v2.4.0 下沉联邦时丢失（联邦真源 0 处该字样）——联邦 core assemble() 尾部注入提醒行 +
+  主理人 MD 双保险 + 5 包 vendor 同步（sha 3c3648f1）V1-V6 全 PASS
+- **预算口径统一（R3 · D4-1）**：主理人 MD H3.5 注释改「弹性上限120K / L2实测基线84K」
+  与 preflight 同口径；**routing-log 单表化（R3 · D2-2）**：断表合并 + R-20260930-004
+  缺号登记（无据不编造）+ R-20261015 系列 13 行结果列按证据回填
+- **禁词第三源归一（R4 · D7-2）**：run_regression forbidden_regex 支持
+  `patterns_source=frontmatter` 动态读真源 + 清洗/豁免与 contract_enforce 同构
+  （import 复用 _clean_for_forbidden_scan + EXEMPT_WORDS + _context_exempt——
+  B01 首跑 4 处误命中正是两套工具行为漂移的实证，同构后 PASS）
+- **登记表回检列（R4 · D6-1）**：诊断登记表增设「48h 回检」列；历史回填教训——
+  v2.4.0 联邦下沉丢路由提醒正是缺回检的代价
+- **.learnings 启用（R4 · D6-2）**：首两条（BSD grep 假阴性 high + 前瞻豁免死代码 critical）
+- **SUMMARY 日期豁免（R5 · D5-1）**：早于 20261015 规范生效日的产出豁免格式告警；
+  **resume 路由行规范（R5 · D10-1）**：中断续接须补 task_type=resume 决策行
+
+### Added（U1-U3 · 升维三项）
+- **成本感知调度（U1）**：`scripts/cost_profile.py`——metrics.jsonl 聚合成员成本画像
+  （n/成功率/tokens 均值·中位·P90/墙钟均值·P90/覆盖率 + ΣP90 预算对照）；主理人路由协议
+  增成本因子提示（P90 做预算线/重成员谨慎派/n<3 标样本不足）
+- **语义禁词两级门禁（U2）**：`contract_enforce.py --llm-review`——机械层负责「抓」
+  （秒级零成本），主理人 LLM 层负责「判」（复核清单：命中行+上下文+复核问题）；
+  承认正则无法表达语义边界，判定权交还语义引擎
+- **专利族谱记忆（U3）**：`scripts/patent_knowledge.py`——scout 产出 X/Y 威胁机械提取入库
+  （幂等去重 patent_no+domain）+ 域/关键词召回（X级排前）+ 失效反馈机制；
+  a01 产出初始化 16 条（X5/Y11）；召回=已知雷区先验**不替代三轮查新**；
+  Phase 3 前召回预热 + 查新后沉淀——一次性查新升维为积累式查新记忆
+
+### 残留（诚实登记）
+- workflow-c-01「法25」断言 FAIL 为历史基线问题（断言按三轮独立产出设计 vs a01 紧凑模式单文件），待用例适配
+- spawn_watchdog（P2-15）未建，H4 人工规则顶替
+- 联邦 3 包 vendor 已同步含 R2 提醒但各自仓库未提交（提交权留各包活跃会话）
+- U3 修复过程自曝并修正 2 处提取正则缺陷（节标题编号在前/专利号尾码 U 漏配）——已入库验证
+
 ## [2.7.0] - 2026-11-07
 
 > 独立再诊断 Batch 4-5：检索源改造 + 升维两项（用户 11-07 确认）。
