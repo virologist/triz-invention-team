@@ -36,6 +36,9 @@ VERIFICATIONS = {
         # 双向契约：首轮查新需6类；定向复检只针对已知X/Y/A/R类，≥3类即可
         ("X/Y/A/R/P/E 6类 或 复检≥3类", lambda out: _check_xyarpe_or_recheck(out)),
         ("search_rounds≥3",  lambda out: len(re.findall(r"R[123]|第[一二三]轮", out)) >= 3),
+        # Batch4（2026-11-07）：检索渠道节显式登记（Google Patents/himmpat 主源 + L1-L4 降档链）
+        # 生效日 2026-11-07：此前历史产出豁免（契约不追溯，保旧归档回归基线稳定）
+        ("检索渠道显式", lambda out: _scoped("20261107", out, _check_search_channel)),
     ],
     "patent-examiner-sim": [
         ("裁决显式(绿/黄/红)", lambda out: _check_verdict(out)),
@@ -300,6 +303,34 @@ def _check_claims_banned(out):
     if hits:
         return False, f"禁用词命中: {hits}（位于 A 区——权利要求+说明书+摘要）"
     return True, "A区零命中"
+
+
+def _scoped(effective_date, out, checker):
+    """日期作用域契约包装：产出首个 JSON 信封的 task_id 日期 ≥ effective_date 才执行检查。
+
+    契约不追溯——历史归档（如 regression-20261015）豁免新契约，保回归基线稳定。
+    返回 (True, "豁免：<原因>") 当产出早于生效日。
+    """
+    m = re.search(r'"task_id"\s*:\s*"T-(\d{8})', out)
+    if m and m.group(1) < effective_date:
+        return True, f"豁免（task 日期 {m.group(1)} 早于生效日 {effective_date}）"
+    return checker(out)
+
+
+def _check_search_channel(out):
+    """scout 检索渠道契约（Batch4 · 2026-11-07）：产出须含「检索渠道」节且登记档位/主源。
+
+    宽松口径：主源名（Google Patents/himmpat/谷歌专利）或档位标记（L1-L4/降档）任一命中。
+    """
+    m = re.search(r"(?:^#{1,4}.*检索渠道.*$)|(?:检索渠道\s*[:：])", out, re.M)
+    if not m:
+        return False, "未找到「检索渠道」节（须登记主源/档位）"
+    window = out[m.start():m.start() + 600]
+    if re.search(r"Google\s*Patents|himmpat|谷歌专利|patents\.google", window, re.I):
+        return True, "检索渠道节含主源登记✅"
+    if re.search(r"L[1-4]|降档", window):
+        return True, "检索渠道节含档位/降档登记✅"
+    return False, "「检索渠道」节缺主源名或档位标记"
 
 
 def check_member(member_id, output_text):
