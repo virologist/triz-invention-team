@@ -463,7 +463,7 @@ RoutingDecision 的 alternatives_top2 与 reasoning 同时写入装配产出的�
      --task-file <任务包文件> --run-dir "$RUN_DIR" --check-task-package \
      --out "$RUN_DIR/spawn__<member-id>.md"
    ```
-   脚本确定性完成：成员 MD 全文注入 + 技能 references 绝对路径解析 + 白名单校验（非 `plugin.json` 中的成员直接 exit 2 拒绝）+ 任务包四要素校验（缺失 exit 4）+ 注入产出落盘契约。
+   脚本确定性完成：成员 MD 全文注入 + 技能 references 绝对路径解析 + 白名单校验（非 `plugin.json` 中的成员直接 exit 2 拒绝）+ 任务包四要素校验（缺失 exit 4）+ 注入产出落盘契约 + **路由落盘提醒**（文案尾部固定行，R2·2026-11-07 回链——v2.4.0 下沉联邦时曾丢失该提醒）。
    `EXPERT_DIR` 不存在时**立即停止并报告用户**，禁止猜测路径。
 
 2. **失败记忆注入（P2-12 · 2026-10-15 新增）**：把该成员相关的历史失败教训摘要**追加到 spawn 文案尾部**——运行时取自 `~/.workbuddy/expert-failures/`（永远最新，不用静态抄写；无相关记录时摘要会注明，成本≈0）：
