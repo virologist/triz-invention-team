@@ -1,0 +1,60 @@
+{
+  "case_id": "workflow-c-01",
+  "run_dir": "outputs/regression-20261015/b01",
+  "checked_at": "2026-11-07T10:16:58.203369",
+  "total": 8,
+  "passed": 4,
+  "failed": 4,
+  "info": 0,
+  "results": [
+    {
+      "id": "A1",
+      "type": "task_package_elements",
+      "pass": true,
+      "detail": "四要素齐全（4 项）"
+    },
+    {
+      "id": "A2",
+      "type": "envelope_required_fields",
+      "pass": true,
+      "detail": "全部信封 6 必填齐全"
+    },
+    {
+      "id": "A3",
+      "type": "envelope_agent_id",
+      "pass": false,
+      "detail": "未找到 patent-search-scout 的落盘文件"
+    },
+    {
+      "id": "A4",
+      "type": "min_count",
+      "pass": false,
+      "detail": "search_rounds 命中 0（≥3）"
+    },
+    {
+      "id": "A5",
+      "type": "required_regex",
+      "pass": false,
+      "detail": "缺: ['E类|E 类|抵触申请']"
+    },
+    {
+      "id": "A6",
+      "type": "required_regex",
+      "pass": false,
+      "detail": "缺: ['法\\\\s?25|法25']"
+    },
+    {
+      "id": "A7",
+      "type": "forbidden_regex",
+      "pass": true,
+      "detail": "零命中"
+    },
+    {
+      "id": "A8",
+      "type": "min_chars",
+      "pass": true,
+      "detail": "20018 字符（≥3000）"
+    }
+  ],
+  "verdict": "FAIL"
+}

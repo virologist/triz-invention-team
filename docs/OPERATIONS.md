@@ -40,11 +40,11 @@
 **不要写死版本号**。若某处仍报「Team 型必需 settings.json」，那是旧版缓存脚本，先核对脚本版本，
 而不是把文件加回来。
 
-## 三、工具清单（v2.5.1 · 8 个脚本）
+## 三、工具清单（v2.6.0 · 10 个脚本）
 
 | 脚本 | 用途 | 何时跑 |
 |---|---|---|
-| `scripts/preflight_check.py` | 建队前 7 项检查（失败索引/路由可写/预算/Phase0五参数/权威数据/装配器/skills路径） | **每次建队前（强制）** |
+| `scripts/preflight_check.py` | 建队前 8 项检查（失败索引/路由可写/预算/Phase0五参数/权威数据/装配器/skills路径/C3检查点） | **每次建队前（强制）** |
 | `scripts/assemble_spawn_prompt.py` | spawn 文案装配（shared-core shim + vendor 兜底） | 每次派单（强制） |
 | `scripts/failure_memory.py` | 失败记忆摘要注入（按成员/关键词筛 expert-failures） | 每次派单第2步（强制） |
 | `scripts/token_budget_check.py` | 预算估算（默认）/ 产出机械计量（`--meter --ledger`） | 建队前 + 每次交付后 |
@@ -52,6 +52,11 @@
 | `scripts/verify_triz_data.py` | 权威数据自检（A/B/C/D 四类不变量） | preflight 内自动 + 改数据后 |
 | `scripts/run_regression.py` | 回归测试集执行（--list/--scaffold/--case X --dir） | L1：日常改动后；L2：发布前 |
 | `scripts/agent_ci_gate.py` | 信封 schema 门禁（`--strict` / `--self-test`） | pre-commit 钩子内自动 + push 门禁 |
+| `scripts/state_store.py` | TASK_STATE 持久化与断点续接（init/update/show/resume） | 每次 VERIFY 后（强制·Batch2） |
+| `scripts/contract_enforce.py` | 6 成员契约门禁（禁词真源=frontmatter + 机械验证） | pre-commit 第④层 + VERIFY |
+| `scripts/check_claim_scope.py` | 交底书必要特征→独立权项 LCS 映射 | Phase 5b 后 |
+| `scripts/skill_test_runner.py` | skills/*/test-prompts.json 回归 | 改 skill 后 |
+| `scripts/triz_benchmark.py` | A-Evolve benchmark 适配/独立求值（0.0-1.0 分） | 演化闭环 / 断言快照（Batch5B） |
 
 ## 四、Git 钩子（双层门禁）
 

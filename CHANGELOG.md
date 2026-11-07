@@ -2,6 +2,39 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-11-07
+
+> 独立再诊断 Batch 4-5：检索源改造 + 升维两项（用户 11-07 确认）。
+
+### Added
+- **检索源冗余降档（Batch4）**：主源 Google Patents + himmpat（Chrome 登录态），
+  L1→L4 逐级降档链（每级登记降档原因 + confidence 折减 L2-5/L3-10/L4-15）；
+  凭记忆红线不因降档豁免；scout 新契约「检索渠道显式」（生效日 2026-11-07，
+  `_scoped` 日期作用域不追溯——历史归档基线稳定）
+- **A-Evolve benchmark 适配（Batch5B）**：`scripts/triz_benchmark.py`——tests/cases 三用例
+  → `TrizBenchmark`（get_tasks/evaluate 鸭子类型接口，不硬依赖 a-evolve 包）；
+  独立求值模式可直接算分（score=断言通过率，success 线 0.75）；演化闭环打通
+- **包内 .learnings/ 三件套**（Batch3）：self-improving-agent 规范（LEARNINGS/ERRORS/FEATURE_REQUESTS）
+- **诊断协议固化（Batch3）**：`docs/diagnosis-protocol.md`——触发器 T1-T4 / 10+1 维清单 /
+  证据纪律 / 批次修复纪律 / 诊断登记表
+
+### Fixed（Batch5A · 联邦层）
+- **shared-core vendor 态 expert_dir 反推死路**：`resolve_expert_dir` 在 core 位于
+  `<pkg>/vendor/shared-core/` 时反推到 `vendor/`（无 agents/）→ exit 3。
+  修复：用 `__file__.parts` 匹配相邻 vendor/shared-core 段上跳到包根
+  （注意 `parent.parent` 后 parts 里已无 shared-core 段——初版修复即栽在此，调试脚本实证）。
+  联邦真源 + 4 包 vendor 副本 + VENDOR.json 清单全量同步，V1-V6 6/6 PASS
+- **run_regression 三处断言锚点**（Batch3）：gates 语义匹配（旧版只查字面 G1-G5，
+  A01 实际用语义表述 → 假阴性）/ abstract 摘要正文段优先锚点 / subprocess 导入缺失
+- **L2 断言首次机械全跑 7/7 PASS**（含新 A7 conditions_closed 条件对账）
+
+### Changed（Batch1-3）
+- 契约禁词单源化：唯一真源=成员 frontmatter `forbidden_phrases`（脚本启动解析）；
+  CONTRACT_ENFORCEMENT.md 全验证项标注 `[机械已实现]`/`[暂缓·人工执行]`
+- TASK_STATE 持久化：`scripts/state_store.py`（init/update/show/resume）+ scaffold 自动初始化
+  + 主理人 SOP H2 落盘硬规则；envelope schema v1.2.0 增可选 `verdicts{result,score}`
+- 预算经验值按 L2 实测校准 111K→84K（92%→70% 预警消除）；H3 软终止评分机械分优先
+
 ## [2.6.0] - 2026-11-07
 
 > 独立再诊断（11 维度·11-07）Batch 1：契约单源化 + 文档对齐。含此前未入账的 3 个 commit。
