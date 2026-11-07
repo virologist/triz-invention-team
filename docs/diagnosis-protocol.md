@@ -53,9 +53,11 @@
 | 日期 | 触发器 | 短板 | 已修复 | 残留 |
 |---|---|---|---|---|
 | 2026-10-15 | T4 手动 | 24 项（S1-1…S5-4） | P0 三项 + P1+P2 九项（v2.5.x） | V6 设计缺陷（联邦层）· spawn_watchdog |
-| 2026-11-07 | T4 手动 | 17 项（S-Q1…S-D1） | Batch1-3 全部（v2.6.0） | 见下方"已知残留" |
+| 2026-11-07 | T4 手动 | 17 项（S-Q1…S-D1） | Batch1-5 全部（v2.6.0+2.7.0） | 见下方"已知残留" |
 
 **已知残留（2026-11-07 交接）**：
-- shared-core V6 vendor 态 shim expert_dir 解析缺陷——**联邦层问题**（4 包共用），升维 Batch5 处理
+- ~~shared-core V6 vendor 态 shim expert_dir 解析缺陷~~ → **Batch5A 已修**（联邦真源+4包同步，V1-V6 6/6）
+- ~~SOP 派单命令 `--check-task-package` 与回归用例 markdown 格式脱节~~ → **交叉验证 R3 已修**（三用例补 B21 五要素 JSON 块）
 - spawn_watchdog（P2-15）：桌面通知通道未建，暂以 H4「>10min 未落盘」人工规则顶替
 - deliverable_summary 校验对历史产出大量 WARN（规范 10-15 才立，旧产出未按 40-60 写）——预期行为，WARN 不阻断；新产出开始生效
+- 联邦 3 包（viral-evo-lab/research-orchestration-team/smart-textbook-team）vendor 已同步至新真源但**各自仓库未提交**——提交权留给各包活跃会话，避免并发冲突
