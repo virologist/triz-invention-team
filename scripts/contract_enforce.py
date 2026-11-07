@@ -80,7 +80,13 @@ def _check_summary(out):
     """deliverable_summary 40-60 字符 + 必含元素（从信封 JSON 里取；WARN 级——格式偏离不阻断交付）。
 
     返回 (ok, detail)；ok=False 时由 check_member 记入 info["summary_warn"]（不计入 issues）。
+    R5（2026-11-07）：S5-4 规范 2026-10-15 才生效，此前产出按日期作用域豁免——
+    历史 WARN 噪音淹没真违规，与 Batch4 检索渠道契约同用 _scoped 思路。
     """
+    # 日期作用域：task_id 日期早于规范生效日 → 豁免（登记但不告警格式问题）
+    m_date = re.search(r'"task_id"\s*:\s*"T-(\d{8})', out)
+    if m_date and m_date.group(1) < "20261015":
+        return True, f"豁免（task 日期 {m_date.group(1)} 早于 S5-4 规范生效日 20261015）"
     m = re.search(r"\{[^{}]*\"deliverable_summary\"\s*:\s*\"([^\"]+)\"", out, re.S)
     if not m:
         return False, "未提取到信封 deliverable_summary（可能为纯文本产出）"
