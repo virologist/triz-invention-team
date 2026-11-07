@@ -444,6 +444,10 @@ def check_member(member_id, output_text):
             if any(re.search(p, window) for p in likely_judgement):
                 continue
             info["forbidden_hits"].append({"pattern": pat, "context": window[:80]})
+            info.setdefault("llm_review_hits", []).append({
+                "pattern": pat, "context": window,
+                "line_hint": cleaned[:m.start()].count("\n") + 1,
+            })
             issues.append(f"FORBIDDEN 命中 {pat}: ...{window[:80]}...")
 
     # 2) 验证项
@@ -472,6 +476,8 @@ def main():
     ap.add_argument("--exit-on-fail", action="store_true", help="有违反即 exit 1")
     ap.add_argument("--self-test", action="store_true", help="跑自测")
     ap.add_argument("--json", action="store_true", help="机器可读输出")
+    ap.add_argument("--llm-review", action="store_true",
+                    help="U2 两级门禁：对机械命中的禁词输出 LLM 语义复核清单（主理人 VERIFY 用），不改变 exit code 语义")
     args = ap.parse_args()
 
     if args.self_test:
@@ -575,6 +581,13 @@ def main():
                 pass
             for h in r["forbidden_hits"]:
                 print(f"    🚫 FORBIDDEN  {h['context']}")
+            if args.llm_review:
+                for h in r.get("llm_review_hits", []):
+                    print(f"    👁 LLM-REVIEW  行~{h['line_hint']} 模式「{h['pattern']}」")
+                    print(f"        上下文: …{h['context']}…")
+                    print(f"        复核问题: 该命中是否为【契约语义内的违规】（模糊估计/无据断言）"
+                          f"而非【合规讨论/引用/反例】？豁免链未覆盖的语义场景由主理人判定，"
+                          f"判违规→回退成员；判豁免→在 VERIFY 记录豁免理由。")
             for v in r["verification_results"]:
                 if not v["ok"]:
                     print(f"    ❌ VERIFY     {v['name']}: {v['detail']}")

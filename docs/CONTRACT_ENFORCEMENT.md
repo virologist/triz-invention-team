@@ -92,7 +92,16 @@ python3 scripts/contract_enforce.py \
 python3 scripts/contract_enforce.py \
   --output-dir outputs/regression-20261015/ \
   --exit-on-fail
+
+# U2 两级门禁：机械命中 + LLM 语义复核清单（主理人 VERIFY 用）
+python3 scripts/contract_enforce.py --member <id> --output <file> --llm-review
 ```
+
+**两级门禁说明（U2 · 2026-11-07）**：第 1 级 = 机械匹配（禁词 + 清洗层 + 豁免链，秒级、零成本）；
+第 2 级 = `--llm-review` 对机械命中项输出语义复核清单（命中行 + 上下文 + 复核问题）——
+**机械层只负责"抓"，语义层负责"判"**：豁免链无法覆盖的场景（如引用讨论、反例教学、
+法条转述）由主理人在 VERIFY 时逐条判定，判违规回退成员、判豁免记录理由。正则永远
+无法完美表达语义边界，两级设计承认这一点并把判定权交还给语义引擎（主理人 LLM）。
 
 退出码：`0`=全过 · `1`=至少一个成员违反 · `2`=参数错。
 
