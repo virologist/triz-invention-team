@@ -146,6 +146,47 @@ EXEMPT_MARKERS = ["[INFERRED]", "[KNOWN]", "[实测]", "[证据:", "自检节", 
 # 通用豁免词——任何含这些词的命中算"在讨论/引用而非使用"
 EXEMPT_WORDS = ["基本设计常识", "基本物理", "基本公式", "基本定理", "基本原理", "基本概念", "基本事实", "成本约束", "工艺约束", "成本与工艺", "受成本约束"]
 
+# ── 上下文窗口豁免表（R1 · 2026-11-07 重建，D7-1/D7-3）──────────────────────────
+# 设计变更：此前 frontmatter 的 `.*?(?!...)` 负向前瞻豁免是死代码（.*? 匹配空串时前瞻
+# 恒成立，豁免从未生效——见 triz-team-diagnosis-independent-20261107-r3.md D7-1）。
+# R1 起豁免职能全部收敛到本表：frontmatter 禁词纯净化（只写禁什么），豁免逻辑集中一处
+# （命中后查前后 30 字符窗口是否含豁免词 → 放行）。
+# 格式：{命中词(子串匹配): [窗口内出现即豁免的词]}
+CONTEXT_EXEMPT = {
+    # "基本X"学术/工程固定搭配（原 examiner 前瞻豁免意图）
+    "基本": ["基本设计常识", "基本物理", "基本公式", "基本定理", "基本原理",
+             "基本概念", "基本事实", "基本参数", "基本结构", "基本思想",
+             "基本形态", "基本要求", "基本条件", "基本单元"],
+    # 效果断言词——上下文附证据即豁免（原 attorney 前瞻豁免意图，改为反向保障）
+    "显著": ["附实测", "附数据", "实测数据", "实验数据", "对比数据", "见表", "见实施例"],
+    "大幅": ["附实测", "附数据", "实测数据", "实验数据", "对比数据", "见表", "见实施例"],
+    "明显": ["附实测", "附数据", "实测数据", "实验数据", "对比数据", "见表", "见实施例"],
+    "高效": ["附实测", "附数据", "实测数据", "实验数据", "对比数据", "见表", "见实施例"],
+    # 单字"约"的复合词误伤（D7-3：约束/约定/节约/条约等此前靠清洗层巧合兜底）
+    "约": ["约束", "约定", "节约", "条约", "公约", "合约", "约于", "签约", "约稿",
+           "隐约", "约略", "绰约"],
+    # "估计"在否定语境
+    "估计": ["不可估计", "无法估计", "难以估计", "不经估计"],
+}
+
+
+def _context_exempt(match, text):
+    """上下文窗口豁免（R1 核心机制）：禁词命中后，取前后 30 字符窗口，
+    若命中词在 CONTEXT_EXEMPT 表中且窗口含对应豁免词 → 放行。
+
+    匹配规则：按「命中文本中包含豁免键」判定（禁词模式多为 alternation，
+    m.group() 可能是"基本设计常识"整体——含"基本"键且窗口含豁免词，双层都过）。
+    返回 (exempt:bool, reason:str|None)。
+    """
+    hit = m_text = match.group(0)
+    window = text[max(0, match.start() - 30):min(len(text), match.end() + 30)]
+    for key, words in CONTEXT_EXEMPT.items():
+        if key in hit:
+            for w in words:
+                if w in window:
+                    return True, f"CONTEXT_EXEMPT[{key}] ← {w}"
+    return False, None
+
 
 def _is_exempt(context):
     """检查一段文本上下文是否含豁免标记或豁免词"""
@@ -357,6 +398,11 @@ def check_member(member_id, output_text):
             # 通用豁免词："基本设计常识"等是讨论/引用而非使用
             if any(w in window for w in EXEMPT_WORDS):
                 continue
+            # 上下文窗口豁免（R1 · 2026-11-07）：CONTEXT_EXEMPT 表驱动——命中词对应的
+            # 豁免词出现在窗口内即放行（取代 frontmatter 前瞻死代码的豁免职能）
+            _ok_ctx, _reason_ctx = _context_exempt(m, cleaned)
+            if _ok_ctx:
+                continue
             # 反例引用豁免：成员在"禁止 X"列表里说"不得X"——window 含禁止信号
             anti_pattern_markers = [
                 r"不得[凭基估按]",
@@ -444,6 +490,45 @@ def main():
                 ok_all = False
         else:
             print("== 自测2：⚠️ 无实测样本·跳过 ==")
+
+        # ── 自测3：CONTEXT_EXEMPT 双向断言（R1 · 2026-11-07，D7-1 回归防线）─────────
+        # 豁免样本必须放行（防"惩罚诚实"——效果显著附实测数据是合规表达）；
+        # 违规样本必须命中（防豁免过宽——无证据断言是契约违规）。
+        print("== 自测3：CONTEXT_EXEMPT 双向断言 ==")
+
+        def _forge(member_id, body):
+            """构造最小可测产出：绕过清洗层干扰，正文直接放契约正文段。"""
+            return body
+
+        attorney_ok, attorney_bad = "该方案净化效率显著提升，附实测数据见表3（99.2% vs 基线87%）。", \
+                                    "该方案净化效率显著提升，适合大规模推广。"
+        a_ok, a_iss, _ = check_member("patent-attorney-writer", _forge("patent-attorney-writer", attorney_ok))
+        a_bad, a_bad_iss, _ = check_member("patent-attorney-writer", _forge("patent-attorney-writer", attorney_bad))
+        ce_ok = ("附实测" in attorney_ok) and not any("显著" in i for i in a_iss)
+        ce_bad = any("显著" in i for i in a_bad_iss)
+        print(f"  {'✅' if ce_ok else '❌'} 豁免样本放行：「…显著…附实测数据见表3…」→ FORBIDDEN={'有' if any('显著' in i for i in a_iss) else '无'}")
+        print(f"  {'✅' if ce_bad else '❌'} 违规样本命中：「…显著提升，适合大规模推广…」→ FORBIDDEN={'有' if ce_bad else '无'}")
+        ok_all &= ce_ok and ce_bad
+
+        examiner_ok, examiner_bad = "该结构基于基本物理原理设计，无需额外验证。", \
+                                    "该结构基本满足要求，可以进入下一阶段。"
+        e_ok, e_iss, _ = check_member("patent-examiner-sim", _forge("patent-examiner-sim", examiner_ok))
+        e_bad, e_bad_iss, _ = check_member("patent-examiner-sim", _forge("patent-examiner-sim", examiner_bad))
+        ee_ok = not any("基本" in i for i in e_iss)
+        ee_bad = any("基本" in i for i in e_bad_iss)
+        print(f"  {'✅' if ee_ok else '❌'} 豁免样本放行：「基于基本物理原理」→ FORBIDDEN={'有' if not ee_ok else '无'}")
+        print(f"  {'✅' if ee_bad else '❌'} 违规样本命中：「基本满足要求」→ FORBIDDEN={'有' if ee_bad else '无'}")
+        ok_all &= ee_ok and ee_bad
+
+        disc_ok, disc_bad = "本方案在成本约束下按合同约定采用标准件。", \
+                            "部件直径约100微米，具体以实施例为准。"
+        d_ok, d_iss, _ = check_member("disclosure-architect", _forge("disclosure-architect", disc_ok))
+        d_bad, d_bad_iss, _ = check_member("disclosure-architect", _forge("disclosure-architect", disc_bad))
+        de_ok = not any("约" in i for i in d_iss)
+        de_bad = any("约" in i for i in d_bad_iss)
+        print(f"  {'✅' if de_ok else '❌'} 豁免样本放行：「按合同约定」→ FORBIDDEN={'有' if not de_ok else '无'}")
+        print(f"  {'✅' if de_bad else '❌'} 违规样本命中：「直径约100微米」→ FORBIDDEN={'有' if de_bad else '无'}")
+        ok_all &= de_ok and de_bad
         return 0 if ok_all else 1
 
     targets = []

@@ -18,8 +18,8 @@ contract_owner: P0-S1-1
 verified_at: 2026-10-15
 
 # 禁止触发词——唯一真源（contract_enforce.py 启动时解析本表；docs/CONTRACT_ENFORCEMENT.md 仅作展示）
-# [2026-11-07 单源化] 采用脚本已验证模式；文档另两条负向上下文断言（编造实验数据/优化无据）
-# 属语义验证，归 must_verify 语义层（grep 无法表达负向断言），见 CONTRACT_ENFORCEMENT.md 标注
+# [2026-11-07 R1] 保留单字「约」但误伤场景（约束/约定/节约/条约）交由 CONTEXT_EXEMPT
+# 上下文窗口豁免处理（D7-3：此前靠清洗层巧合兜底，现为设计保障）
 forbidden_phrases:
   - estimated|约|估计|大约
 

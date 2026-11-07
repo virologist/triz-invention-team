@@ -18,11 +18,12 @@ contract_owner: P0-S1-1
 verified_at: 2026-10-15
 
 # 禁止触发词——唯一真源（contract_enforce.py 启动时解析本表；docs/CONTRACT_ENFORCEMENT.md 仅作展示）
-# [2026-11-07 单源化] 采用脚本已验证模式（豁免词机制防"基本设计常识"类假阳性）+ 文档并集；
-# 「应当」经 a04 历史产出实测为法条引用高频误伤，收窄移除（留痕见 CONTRACT_ENFORCEMENT.md）
+# [2026-11-07 R1] 删除 2 条 .*?(?!...) 前瞻豁免（实测死代码：.*? 匹配空串时前瞻恒成立，
+# 豁免从未生效——triz-team-diagnosis-independent-20261107-r3.md D7-1）。
+# 豁免职能统一收敛到 contract_enforce.py 的 CONTEXT_EXEMPT 上下文窗口豁免（命中后查前后文）。
+# 「应当」经 a04 历史产出实测为法条引用高频误伤，保持移除。
 forbidden_phrases:
-  - approximately|基本.*?(?!设计|物理|常)|整体上.*?可以
-  - 建议.*?考虑.*?(?!附法条号|附证据)
+  - approximately|基本|整体上.{0,12}可以
 
 # 强制机械验证项（CI gate 解析+实测；详见 docs/CONTRACT_ENFORCEMENT.md）
 must_verify: 详见同包 docs/CONTRACT_ENFORCEMENT.md（按 member_id 查表）

@@ -105,6 +105,7 @@ python3 scripts/contract_enforce.py \
 ## 维护
 
 - **禁词唯一真源 = 各成员 frontmatter `forbidden_phrases`**（2026-11-07 单源化）：改禁词只改 frontmatter，本文件展示镜像与脚本解析自动跟随；`--self-test` 自测1会校验 6 成员表可解析非空
+- **豁免机制重建（R1 · 2026-11-07）**：frontmatter 禁词**纯净化**——禁写 `.*?(?!...)` 前瞻豁免（实测死代码：`.*?` 匹配空串时前瞻恒成立，豁免从未生效）。豁免职能统一收敛到 `contract_enforce.py` 的 `CONTEXT_EXEMPT` 上下文窗口豁免表（命中后查前后 30 字符窗口含豁免词即放行）+ 既有清洗层 + EXEMPT_WORDS + 反例标记；`--self-test` 自测3做双向断言（豁免样本放行 ∧ 违规样本命中）
 - 验证项实现状态标注：新增验证项时必须同步标 `[机械已实现]`（进 contract_enforce.py VERIFICATIONS）或 `[暂缓·人工执行]`（写明人工执行点）——禁止无标注幽灵项（S-Q2 教训）
 - 禁止触发词与 failure-006/007 教训同步：所有新失败都回灌到**对应成员 frontmatter** 的 `forbidden_phrases` 段
 ---
