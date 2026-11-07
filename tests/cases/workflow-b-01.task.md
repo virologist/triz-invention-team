@@ -28,3 +28,43 @@ result_envelope（置于正文最前，JSON 代码块，含 6 必填字段 + met
 ## task_boundary
 属于本任务：矛盾建模、矩阵查询、原理求解、方向生成、五级水平判定、方案对比。
 不属于：专利撰写、查新检索、交底书、三性审查。越界需求在 next_agent_hint 指出后停止。
+
+
+## task_package_json（B21 结构化校验源 · 机器可读）
+
+```json
+{
+  "objective": "对「冷链运输箱体保温层厚重导致装载容积不足」做 TRIZ 矛盾建模与发明原理求解，产出 >=3 个候选方向（详见 md 正文 objective 段）",
+  "output_format": "markdown 落盘文件（正文最前置 result_envelope JSON 信封，6 必填字段）",
+  "constraints": [
+    "原理编号必须来自 scripts/query_triz_matrix.py 实跑，注明命令与退出码",
+    "矩阵无推荐必须如实说明，禁止编造",
+    "方向 >= 3，每个标注原理编号",
+    "禁用模糊词（大约/左右/等/优选/若干/高效/快速/大幅）",
+    "不得撰写专利申请文件（越界）"
+  ],
+  "task_boundary": "属于：矛盾建模、矩阵查询、原理求解、方向生成、五级判定、方案对比；不属于：专利撰写、查新检索、交底书、三性审查",
+  "acceptance_criteria": [
+    {
+      "check": "directions >= 3",
+      "judge_mode": "机",
+      "threshold": ">= 3，源 tests/cases/workflow-b-01.expected.json#A4"
+    },
+    {
+      "check": "禁用模糊词零命中",
+      "judge_mode": "机",
+      "threshold": "= 0，源 tests/cases/workflow-b-01.expected.json#A5"
+    },
+    {
+      "check": "原理编号实跑（query_triz_matrix + 退出码）",
+      "judge_mode": "机",
+      "threshold": "required_regex 命中，源 tests/cases/workflow-b-01.expected.json#A6"
+    },
+    {
+      "check": "信封 6 必填齐全",
+      "judge_mode": "机",
+      "threshold": "schema required，源 skills/agent-protocol/result_envelope.schema.json"
+    }
+  ]
+}
+```

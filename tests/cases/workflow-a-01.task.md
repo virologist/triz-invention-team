@@ -23,3 +23,42 @@
 
 ## task_boundary
 见各成员 MD 的能力/禁止边界；跨 Phase 交接必须经主理人中转（禁止横直连）。
+
+
+## task_package_json（B21 结构化校验源 · 机器可读）
+
+```json
+{
+  "objective": "L2 全链路：发明想法 -> TRIZ建模 -> 三轮查新 -> 对抗审查+二审 -> 交底书 -> 申请文件草稿（详见 md 正文各阶段定义）",
+  "output_format": "markdown 落盘文件（正文最前置 result_envelope JSON 信封，6 必填字段）",
+  "constraints": [
+    "未完成3轮查新禁止撰写申请文件",
+    "X级威胁出现须走 C3 检查点确认",
+    "摘要须附 python len() 机械验证证据",
+    "全程走主理人装配链派单，禁止成员直连"
+  ],
+  "task_boundary": "属于 Workflow A 全部 6 阶段编排；不属于：成员自发跳阶段、绕过门禁推进",
+  "acceptance_criteria": [
+    {
+      "check": "6 成员全部落盘",
+      "judge_mode": "机",
+      "threshold": "all landed，源 tests/cases/workflow-a-01.expected.json#A2"
+    },
+    {
+      "check": "G1-G5 门禁登记",
+      "judge_mode": "机+人",
+      "threshold": "gates 语义匹配，源 tests/cases/workflow-a-01.expected.json#A3"
+    },
+    {
+      "check": "摘要 <= 300 字符（机械计量）",
+      "judge_mode": "机",
+      "threshold": "<= 300，源 tests/cases/workflow-a-01.expected.json#A4"
+    },
+    {
+      "check": "二审条件逐条兑现对账",
+      "judge_mode": "机",
+      "threshold": "conditions_closed，源 tests/cases/workflow-a-01.expected.json#A7"
+    }
+  ]
+}
+```
