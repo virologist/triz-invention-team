@@ -7,7 +7,7 @@
 
 | 症状 | 处置 |
 |---|---|
-| ~~`validate_expert.py` 报 `Team type must have settings.json`~~ | **已失效症状**：现行宿主 `validate_expert.py` 已移除该判据（2026-11-04 核验）。若仍遇到，属旧版缓存脚本，见 §二「禁止恢复」 |
+| `validate_expert.py` 报 `Team type must have settings.json` | **误报 · 不处置**（2026-11-08 重新核验并订正 11-04 结论）：宿主**运行时**从不读 settings.json（§二取证仍成立），但 `plugins/cache/` 下 5.9.3 缓存版 validate_expert.py **仍带该判据**——校验报此错可直接忽略（本包 settings.json 已移除且 register_expert 照常成功）。**禁止**为消除此报错重建 settings.json（§二「禁止恢复」不变）。根治待宿主更新缓存脚本 |
 | `assemble_spawn_prompt.py --list-members` 退出码 3 | shared-core 不可达 → 检查 `vendor/shared-core/` 兜底是否存在（`tests/test_vendor_core.py` 可自检） |
 | `token_budget_check.py --meter` 输出 0 行 | 落盘文件 task_id 不符合 `T-YYYYMMDD-{NNN或字母数字}` 契约 → 见 failure-008 |
 | 回归断言 FAIL 但成员自评 success | 先核对文件是否仍在写入（cksum 两次一致性），再查 `regression_report__*.json` 明细 |
@@ -82,7 +82,7 @@
 2. `python3 scripts/verify_triz_data.py --strict` → 全通过
 3. `python3 tests/test_vendor_core.py` → V1-V6 全 PASS
 4. `git status` → working tree clean
-5. `validate_expert.py` + `register_expert.py` → 通过
+5. `register_expert.py` → 注册成功（validate_expert 若报 settings.json 判据＝5.9.3 缓存版误报，见 §一症状表——以 register 成功为准）
 
 ## 七、相关 failure 索引
 
