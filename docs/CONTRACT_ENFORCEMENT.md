@@ -113,7 +113,11 @@ python3 scripts/contract_enforce.py --member <id> --output <file> --llm-review
 ## 维护
 
 - **禁词唯一真源 = 各成员 frontmatter `forbidden_phrases`**（2026-11-07 单源化）：改禁词只改 frontmatter，本文件展示镜像与脚本解析自动跟随；`--self-test` 自测1会校验 6 成员表可解析非空
+- **三源一致性已兑现为真校验（CYCLE-1 · S-E06/S-E17 · 2026-11-08）**：此前 `DOCS` 变量定义却从不读取，「三源一致性」是幽灵验证项；现自测1 真读取本文件镜像段与 frontmatter 逐条比对，任一漂移即 FAIL（反向验证：注入 `DRIFT_PROBE` → exit 1）
+- **frontmatter 契约字段完整性 `[机械已实现]`（CYCLE-1 · S-E07 · 2026-11-08）**：6 成员必须含 `schema_version / contract_owner / verified_at / forbidden_phrases / must_verify / declared_skills` 六字段，缺任一 → 自测 FAIL；此前这 6 字段零机械消费者（声明与机械能力脱钩）
+- **失败即失败（CYCLE-1 · S-E15 · 2026-11-08）**：违规默认即 `exit 1`，无需 `--exit-on-fail`；此前无该开关时违规也返回 0（fail-open），与本文件「0=全过 · 1=至少一个成员违反」的契约相悖
 - **豁免机制重建（R1 · 2026-11-07）**：frontmatter 禁词**纯净化**——禁写 `.*?(?!...)` 前瞻豁免（实测死代码：`.*?` 匹配空串时前瞻恒成立，豁免从未生效）。豁免职能统一收敛到 `contract_enforce.py` 的 `CONTEXT_EXEMPT` 上下文窗口豁免表（命中后查前后 30 字符窗口含豁免词即放行）+ 既有清洗层 + EXEMPT_WORDS + 反例标记；`--self-test` 自测3做双向断言（豁免样本放行 ∧ 违规样本命中）
+- **禁词单字误伤修复（CYCLE-1 · S-E20 · 2026-11-08）**：`可能` / `估计` 等单字在否定与风险语境（"不可能结垢" / "可能出现的可靠性损失" / "估计.{0,6}字"）会误伤合法技术表述 → 豁免词限定为明确的非猜测语境搭配，与 R1 修单字「约」同机制
 - 验证项实现状态标注：新增验证项时必须同步标 `[机械已实现]`（进 contract_enforce.py VERIFICATIONS）或 `[暂缓·人工执行]`（写明人工执行点）——禁止无标注幽灵项（S-Q2 教训）
 - 禁止触发词与 failure-006/007 教训同步：所有新失败都回灌到**对应成员 frontmatter** 的 `forbidden_phrases` 段
 ---

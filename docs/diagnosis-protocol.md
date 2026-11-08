@@ -5,6 +5,10 @@
 
 ## 一、触发条件（满足任一即执行一次诊断）
 
+> **CYCLE-1 · S-E04 脚本化**：T1/T2/T3 已有机械判定 `scripts/diagnosis_trigger.py`，
+> 由 `preflight_check.py` 第9项建队前自动执行（warn 级，不阻断）；T4 为用户手动，无需脚本。
+> 「是否真的执行诊断」的语义裁决仍归管家节点（三件事分工宪法）。
+
 | 触发器 | 阈值 | 说明 |
 |---|---|---|
 | T1 同类失败复发 | `~/.workbuddy/expert-failures/` 30 天内同 fail_type ≥2 条新记录 | 失败索引复利路径的主动形态 |
@@ -57,10 +61,15 @@
 | 2026-10-15 | T4 手动 | 24 项（S1-1…S5-4） | P0 三项 + P1+P2 九项（v2.5.x） | —（本列 2026-11-07 R4 增设，历史批次未回检；其中 v2.4.0 联邦下沉事后被证实丢失路由提醒——正是缺回检的代价） | V6 设计缺陷（联邦层）· spawn_watchdog |
 | 2026-11-07 | T4 手动 | 17 项（S-Q1…S-D1） | Batch1-5 全部（v2.6.0+2.7.0） | Batch5A 联邦修复引入 D2-1（路由提醒丢失）——已由第三轮诊断捕获并修复（R2） | 见下方"已知残留" |
 | 2026-11-07（第三轮） | T4 手动 | 14 项（D2-1…D10-1 + U1-U3 升维） | R1-R5 全部 + U1-U3（v2.8.0） | **回检完成（2026-11-08）**：窗口内多轮全套门禁复跑全绿（vendor V1-V6 / 契约自测 / 三用例回归），唯一新发现=benchmark 目录级传参混扫（示例修正 7d9742d，非修复引入）；D4-2 himmpat 登录态探测评估：**不实施**（运行时状态不可预判，scout L2→L3 降档规则已覆盖，preflight 加探测反造假信号） | 残留 8 项已全部清偿（见 2026-11-08 行） |
-
 | 2026-11-08（残留清偿） | T1 同类失败复发（member_files 覆盖误判同型） | C01 法25 / U3 outdated / D3-1+D1 / OPERATIONS 订正 / vendor 核验 / spawn_watchdog / D4-2 / 回检登记 | 8 项全部清偿（d4bee57→e47a525） | 48h 后复检 | 无遗留 |
+| 2026-11-08（CYCLE-1 · 墨衡） | T4 手动 + T3 架构变更（门禁状态机改动） | 19 项（S-E01…S-E19） | P0-1（3812043）+ P1-1（a8633ba）+ P1-2（台账单源化补录） | 见下方「CYCLE-1 已知残留」 | 见下方「CYCLE-1 已知残留」 |
 
 **已知残留（2026-11-07 第三轮交接）**：
 - ~~spawn_watchdog（P2-15）~~ → **简版已落地**（2026-11-08，e47a525+）：scripts/spawn_watchdog.py 四态判定（OK/WATCH/STALL/TIMEOUT）+ H4 处置建议；桌面通知通道仍未建（等待窗口手动调用够用）
-- workflow-c-01 用例对紧凑模式产出的「法25」断言 FAIL——历史基线问题（断言按三轮独立产出设计，a01 为紧凑模式单文件），待用例适配或新跑三轮独立产出后关闭
-- 联邦 3 包（viral-evo-lab/research-orchestration-team/smart-textbook-team）vendor 已同步至新真源（含 R2 路由提醒）但**各自仓库未提交**——提交权留给各包活跃会话
+- ~~workflow-c-01「法25」断言 FAIL~~ → **已修复**（2026-11-08 `d4bee57`）：根因实为 member_files 最后文件覆盖，新增 any_member 断言模式；实测 8/8 PASS
+- ~~联邦 3 包 vendor 未提交~~ → **已核验清偿**（2026-11-08）：viral-evo-lab / research-orchestration-team 工作树干净（活跃会话已提交），smart-textbook-team vendor 已在 HEAD `20c6f5a` 内；vet-med-ppt-team 有活跃改动，留权不动
+
+**CYCLE-1 已知残留（2026-11-08 · 墨衡第三轮诊断 S-E01…S-E19）**：
+- **本轮已清偿**：S-E01 门禁键名双轨（GATE_ALIASES 归一 + G2 落点 + check_gates 精确读取 + `reset_for_rework`）· S-E02 Workflow D 前置闸 · S-E03 H4 代执行例外边界 · S-E04 T1-T3 触发器脚本化（`diagnosis_trigger.py`）· S-E05 登记表断表 · S-E06/S-E17 三源自测兑现 · S-E07 frontmatter 契约字段完整性 · S-E08 台账单源化（`evolution_log.py`）· S-E10 loopback_count 机械终止 · S-E15 契约 fail-open 修复 · S-E16 preflight 假绿修复 · S-E18 退回 Phase2 强制重跑 R1-R3 · S-E19 Phase 2.5 状态节点 · S-E20 单字禁词误伤修复
+- **待清偿（本轮未做，见 C4 再诊断）**：S-E09 README 结构图/失效引用 · S-E11 `forbidden_boundary` 契约字段 · S-E12 墙钟 WARN · S-E13 成员数口径 · S-E14 W1 前提
+- **本轮新增待登记（实测发现）**：`marketplace.json` 的 `source` 指向 `./plugins/triz-invention-team`，但本仓 git 根为**平铺布局**（无 `plugins/` 嵌套层）；该路径相对**市场根**解析，本地安装（`my-experts` 市场根含 `plugins/`）正常，但**单仓 GitHub 安装**（`/plugin marketplace add virologist/triz-invention-team`）会指向不存在的目录 —— 已登记为 C4 增量项

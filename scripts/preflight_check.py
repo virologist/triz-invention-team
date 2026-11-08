@@ -130,6 +130,60 @@ def check_routing_log():
         wrn("2. routing-log 表头未含「结果」列——派单后无法回填，可复盘性受损")
 
 
+def check_diagnosis_registry():
+    """10. 诊断登记表结构完整性（CYCLE-1 · S-E05 断表修复的复发检测）
+    判据：§六 登记表内数据行不得夹空行（断表 = 表格被空行切断，Markdown 渲染断裂），
+    且每行列数须与表头一致。"""
+    p = os.path.join(PKG, "docs", "diagnosis-protocol.md")
+    if not os.path.isfile(p):
+        wrn("10. docs/diagnosis-protocol.md 不存在——跳过登记表结构校验")
+        return
+    lines = open(p, encoding="utf-8").read().split("\n")
+    # 定位 §六 登记表区间
+    start = None
+    for i, ln in enumerate(lines):
+        if ln.strip().startswith("## 六"):
+            start = i
+            break
+    if start is None:
+        wrn("10. 未找到 §六 诊断登记表小节——跳过结构校验")
+        return
+    # 表头行 = 区间内第一条含「日期」且以 | 开头的行
+    header_idx = None
+    for i in range(start, len(lines)):
+        s = lines[i].strip()
+        if s.startswith("|") and "日期" in s and "触发器" in s:
+            header_idx = i
+            break
+    if header_idx is None:
+        wrn("10. §六 未找到登记表表头行——跳过结构校验")
+        return
+    ncol = lines[header_idx].strip().strip("|").count("|") + 1
+    problems = []
+    data_rows = 0
+    for i in range(header_idx + 2, len(lines)):
+        s = lines[i].strip()
+        if not s:
+            # 空行：允许在表格末尾之后（遇到非表格内容即止），表格内部空行 = 断表
+            # 判定方式：向下找下一条非空行，若仍是表行 → 中间断表
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines) and lines[j].strip().startswith("|"):
+                problems.append(f"L{i+1}: 表内空行（表格断裂）")
+            break
+        if s.startswith("|"):
+            data_rows += 1
+            c = s.strip("|").count("|") + 1
+            if c != ncol:
+                problems.append(f"L{i+1}: 列数 {c} ≠ 表头 {ncol}")
+    if problems:
+        for pr in problems:
+            blk(f"10. 诊断登记表结构异常——{pr}")
+    else:
+        ok(f"10. 诊断登记表结构完整（{data_rows} 行数据·{ncol} 列）")
+
+
 def check_budget(members):
     """3. 预算估算"""
     if not members:
@@ -298,6 +352,7 @@ def main():
     check_authoritative_data()
     check_assembler()
     check_declared_skills()
+    check_diagnosis_registry()
 
     # CYCLE-1 · S-E04：诊断触发器 T1-T3 机械判定（散文条款脚本化，原则①）
     try:

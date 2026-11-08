@@ -7,3 +7,9 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode	gate
 2026-09-30T08:30	d1a31c6	triz-matrix	82.3	89.1	keep	数据层	权威矩阵1521交叉点+查询器（速查表0/12→82.1%覆盖）	real	-
 2026-10-14T22:55	3954a54	patent-law	73.6	88.7	keep	全面	darwin优化（P1-7·v2.0.0）	real	-
 2026-10-14T23:00	3954a54	claims-drafting	76.1	89.3	keep	全面	darwin优化（P1-7·v2.0.0）	real	-
+2026-11-07T07:18:43	fd247e5	system	-	Batch1-3落地(state持久化/检索降档/质量闭环)	keep	全面	v2.6.0 契约单源化+状态持久化+检索源改造+S-M1/R1/Q3/Q4/X1/A1/J2	real	全套门禁
+2026-11-07T10:18:43	9f54bb1	system	-	Batch5A联邦修复+benchmark接入	keep	全面	v2.7.0 shared-core V6修复(联邦层)+A-Evolve benchmark接入	real	全套门禁
+2026-11-07T18:13:07	1b8f0bd	system	-	第三轮诊断R1-R5全落地+U1-U3升维(三项脚本)	keep	全面	v2.8.0 R1-R5批次+U1-U3升维+版本收口(双plugin.json/双marketplace.json同步)	real	register_expert
+2026-11-08T15:33:29	57f52c0	system	-	三用例回归A01-7/7+B01-7/8+C01-8/8全PASS	keep	工作区整理	outputs基线迁入tests/baselines+全量引用同步+残留8项清偿	real	全套门禁
+2026-11-08T18:00:30	3812043	system	-	state_store self-test 11断言全过+三用例全PASS	keep	门禁状态机	CYCLE1-P0-1 GATE_ALIASES归一+G2落点+reset_for_rework+Phase2.5节点	real	全套门禁
+2026-11-08T18:06:34	a8633ba	system	-	5门禁exit0+preflight exit0+契约自测exit0+三用例全PASS	keep	元层脚本化	CYCLE1-P1-1 diagnosis_trigger+contract fail-open修复+三源自测兑现+preflight假绿修复	real	全套门禁

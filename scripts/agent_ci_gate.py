@@ -204,16 +204,36 @@ def self_test_schemas(schema: dict) -> bool:
     return True
 
 
+def resolve_results_dir(root: Path, explicit: str | None) -> Path:
+    """解析 results 目录（CYCLE-1 · S-E09 失效引用修复）
+
+    历史：默认写死 root/outputs，但 2026-11-08 基线资产化后回归产物已迁至
+    tests/baselines/，outputs/ 不复存在 → pre-commit hook 的 agent_ci_gate --strict
+    因「results目录不存在」直接 exit 1，阻断一切提交（实测 2026-11-09）。
+
+    策略：显式指定 > baselines 优先 > outputs 兼容 > root（保证目录存在语义）。
+    """
+    if explicit:
+        return Path(explicit)
+    baselines = root / "tests" / "baselines"
+    if baselines.is_dir():
+        return baselines
+    legacy = root / "outputs"
+    if legacy.is_dir():
+        return legacy
+    return root
+
+
 def main():
     ap = argparse.ArgumentParser(description="TRIZ专家团CI门禁：自动校验所有归档test结果的上行信封")
     ap.add_argument("root", nargs="?", default=str(SCRIPT_DIR.parent))
-    ap.add_argument("--results-dir", default=None, help="results目录路径（默认用root/outputs）")
+    ap.add_argument("--results-dir", default=None, help="results目录路径（默认 tests/baselines/，兼容 outputs/）")
     ap.add_argument("--strict", action="store_true", help="严格模式：有FAIL则exit 1")
     ap.add_argument("--self-test", action="store_true", help="只跑schema自测")
     args = ap.parse_args()
 
     root = Path(args.root).resolve()
-    results_dir = Path(args.results_dir) if args.results_dir else root / "outputs"
+    results_dir = resolve_results_dir(root, args.results_dir)
     schema_path = SKILL_DIR / "result_envelope.schema.json"
 
     if not schema_path.exists():
