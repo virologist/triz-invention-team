@@ -315,20 +315,22 @@ def check_gates(exp, task_text, run_dir, files, a):
          已知假阴性；现改为：字面 Gn 或 state gates 键名 或 语义关键词（三轮查新/裁决/条件/缺口/摘要字符）任一命中
     """
     # 1) state.json 路径（权威）
+    # CYCLE-1 · S-E01：改为按 GATE_ALIASES 精确读取，取消「按 dict 插入序取前 N 值」的
+    # 脆弱映射（实测键名漂移时前5值=[false×4,true] → 必然假阴性，且回归基线无 state.json
+    # 导致该路径零覆盖）。别名表唯一真源 = state_store.GATE_ALIASES。
     sp = os.path.join(run_dir, "state.json")
     if os.path.isfile(sp):
         try:
+            import state_store as SS
             state = json.load(open(sp, encoding="utf-8"))
             gkeys = state.get("gates") or {}
             if gkeys:
-                missing = [g for g in a["expect"] if not gkeys.get(g)]
-                # 宽松映射：a["expect"] 用 "G1" 形态，state 用描述键名 → 按序对齐也认
-                if missing and len(gkeys) >= len(a["expect"]):
-                    vals = list(gkeys.values())
-                    missing = [g for i, g in enumerate(a["expect"]) if i < len(vals) and not vals[i]]
-                return (not missing), ("state.json 门禁全关" if not missing else f"state 未关: {missing}")
-        except Exception:  # noqa
-            pass
+                missing = [g for g in a["expect"]
+                           if not gkeys.get(SS.GATE_ALIASES.get(g, g))]
+                return (not missing), ("state.json 门禁全关（别名精确读取）" if not missing
+                                       else f"state 未关: {missing}")
+        except Exception as e:  # noqa
+            return False, f"state.json 门禁读取失败: {e}"
     # 2) _VERIFY.md 文本路径
     vf = os.path.join(run_dir, "_VERIFY.md")
     txt = read(vf)

@@ -97,17 +97,26 @@ Context = 角色MD + 声明skills references + task_payload
 ### H2 · State Store 状态存储
 维护全局唯一状态对象，随每次调度下发快照：`task_id / phase / domain / search_rounds / verdicts{examiner,second_opinion} / gates{search_3rounds_complete, c1_c8_confirmed, ...} / retry_counts / confirmed_items / conflicts / metrics`。
 
-> 🔴 **状态持久化硬规则（2026-11-07 Batch2 · 修 S-X3）**：内存态不可靠——主理会话中断即丢失。
+> 🔴 **状态持久化硬规则（2026-11-07 Batch2 · 修 S-X3；2026-11-08 CYCLE1 门禁归一）**：内存态不可靠——主理会话中断即丢失。
 > 每次 VERIFY 后**必须**把状态落盘到运行目录（一行命令，确定性）：
 > ```bash
 > python3 scripts/state_store.py update --run-dir <RUN_DIR> \
 >   --set phase=<N> --set gates.G1=true --set verdicts.examiner.result=<green|yellow|red> \
 >   --set verdicts.examiner.score=<N> --set conditions.K1=true
 > ```
+> - **门禁别名表（S-E01 唯一真源 = `state_store.GATE_ALIASES`）**：`G1→search_3rounds_complete` ·
+>   `G2→trinity_verdict_pass` · `G3→c1_c8_confirmed` · `G4→disclosure_gap_scan` · `G5→g5_format_compliant`。
+>   写 `gates.Gn` 会自动归一到语义标准键（**禁止**在 state.json 里出现编号野键）；`resume` 逐项显示 G1-G5 真值。
 > - scaffold（`run_regression.py --scaffold`）已自动初始化 `state.json`
 > - **会话中断/恢复时第一动作**：`python3 scripts/state_store.py resume --run-dir <RUN_DIR>`——
 >   输出"当前阶段/未关门禁/二审条件未关闭项/下一动作"，据此续接，**禁止**靠重读全部产出人工重建
 > - 二审条件（K/M 表）在 update 时逐键登记 `conditions.Kn=true/false`，为 Phase 5 兑现对账提供数据源（J2）
+> - **🔴 退回重做硬闸门（S-E18）**：查新裁决红/审查红 → 退回 Phase 2 时**必须**先跑
+>   `python3 scripts/state_store.py reset_for_rework --run-dir <RUN_DIR> --reason "<原因>"`——
+>   机械重置 `phase=2 / search_rounds=0 / G1-G5 全 false / loopback_count+1`，随后**强制重跑 Phase 3 三轮查新 R1-R3**
+>   再入 Phase 4（改后方案未重新查新即撰写 = 违反凭记忆红线）。`loopback_count ≥ 2` 时脚本 exit 2，
+>   按 H3 升级 L4 用户裁决，禁止无限回流。
+> - **Phase 2.5 状态锚点（S-E19）**：R1 回传后设 `phase=2.5`（resume 有对应下一动作），校准完成再设 `phase=3` 进 R2。
 > - Reviewer 类成员的信封 `verdicts` 字段（schema v1.2.0）直接机械消费进 state，不再从正文抽取（J1）
 
 ### H3 · Loop Controller 循环控制
@@ -341,7 +350,14 @@ Phase 3第1轮检索结果回传后，主理人**立即与Phase 1-2产出做汇�
 
 ### Workflow D · 交底书/申请文件代写
 - 触发条件："帮我写交底书""出一份申请文件草稿"（用户已有明确方案）
-- 编排：主理人按五要素清单验收方案完整性 → 谭无隐固化交底书 → 权要达撰写申请文件。若方案信息不足，强制先走Phase 0补齐
+- **🔴 入口前置闸（S-E02 · CYCLE1 修 Workflow D 绕过查新红线）**：派单前主理人必须核验
+  `state.json` 中 `G1(search_3rounds_complete) ∧ G2(trinity_verdict_pass) ∧ G3(c1_c8_confirmed)` 全为 true，
+  且能给出三轮查新报告与三性裁决的**落盘文件路径**（文件缺失 = 视为未查新）。
+  - 不满足 → **禁止**直接进 Phase 5：转 Workflow C（查新+授权前景）或升级用户裁决（L4），
+    并把结果写入 routing-log；用户明示"仅排版代写、不用于提交"时仍须在交付物首行标注
+    `[未经查新与三性确认·不得作为申请文件提交]`。
+  - 此闸与「红线：未完成3轮查新前禁止撰写申请文件草稿」一致，由 `preflight_check.py` 第9项机械校验（CYCLE1 P1-1）。
+- 编排（前置闸通过后）：主理人按五要素清单验收方案完整性 → 谭无隐固化交底书 → 权要达撰写申请文件。若方案信息不足，强制先走Phase 0补齐
 
 ## 单agent直调路由表（置信度分层 · 2026-09-30升级）
 
@@ -382,6 +398,10 @@ Phase 3第1轮检索结果回传后，主理人**立即与Phase 1-2产出做汇�
 ### 严禁行为
 - ❌ 禁止跳过 TeamCreate，直接自己模拟成员发言或并行写出多角色内容
 - ❌ 禁止自己代写任何团队成员的专业产出
+  - **例外边界（S-E03 · 消解与 H4 降级路径的互斥）**：仅限 H4「平台级错误 / Loop 降级路径」中
+    **检索·撰写类的机械性汇总**（整理已有落盘产出的结论与清单），**不得**替代成员的专业判断、
+    TRIZ 建模、三性裁决或权项设计；产出首行必须标 `[主理人代执行·未经成员契约校验]`，
+    并在 routing-log 登记降级原因 + 残余风险，交用户复核。终评类（examiner/reviewer）**一律不代执行**。
 - ❌ 禁止未完成前序阶段就跳到后续阶段（尤其禁止跳过3轮查新直接撰写）
 - ❌ 禁止跨阶段绕过主理人中转
 - ❌ 禁止 spawn 主理人自己

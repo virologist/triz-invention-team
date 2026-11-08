@@ -36,9 +36,22 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(HERE)
 
+# 门禁别名表（CYCLE-1 · S-E01/S-E02 修复，唯一真源）
+# 历史缺陷：SOP（主理人 MD H2 示例）让主理人写 gates.G1..G5，而本模板用语义键 →
+# 实测写入后 state.json 出现 9 键（4 语义 false + 5 编号 true），run_regression.check_gates
+# 按 dict 插入序取前 5 值 = [false×4,true] → 门禁断言必然 FAIL，Phase5 永远卡死。
+# 修复：G1-G5 作为别名，在 set_nested 时归一到语义键；G2 补齐三性通过落点。
+GATE_ALIASES = {
+    "G1": "search_3rounds_complete",
+    "G2": "trinity_verdict_pass",
+    "G3": "c1_c8_confirmed",
+    "G4": "disclosure_gap_scan",
+    "G5": "g5_format_compliant",
+}
+
 # 与 architecture.md §3.2 对齐的 state 模板（单一权威；v2.6.0 字段补齐版）
 STATE_TEMPLATE = {
-    "schema_version": "1.1.0",
+    "schema_version": "1.2.0",
     "task_id": "",
     "phase": 0,
     "domain": "",
@@ -50,6 +63,7 @@ STATE_TEMPLATE = {
     },
     "gates": {
         "search_3rounds_complete": False,
+        "trinity_verdict_pass": False,     # G2：examiner∈{green,yellow} ∧ second_opinion≠disagree
         "c1_c8_confirmed": False,
         "disclosure_gap_scan": False,
         "g5_format_compliant": False,
@@ -63,15 +77,19 @@ STATE_TEMPLATE = {
         "total_duration_ms_wall": 0,   # 权威墙钟累计（H5 双轨制）
         "agent_calls": 0,
         "duration_source": "lead_measured",
+        "loopback_count": 0,          # S-E10/S-E18：Phase2↔3/4 回流累计，上限 2
     },
     "history": [],             # 每次 update 的追加轨迹（断点续接的时间线）
     "updated_at": None,
 }
 
+LOOPBACK_MAX = 2               # S-E10：全局回流上限，超限升级 L4 用户裁决
+
 PHASE_NEXT = {
     0: "Phase 1: TRIZ问题建模（contradiction-analyst）",
     1: "Phase 2: 原理引导与创意生成（contradiction-analyst）",
     2: "Phase 3: 三轮查新（patent-search-scout，≥3轮）",
+    2.5: "Phase 2.5: 汇聚校准（R1结果×Phase1-2方向比对，主理人亲执）",  # S-E19
     3: "Phase 4: 对抗式三性确认（examiner → second-opinion 串行）",
     4: "Phase 5: 专利文件撰写（disclosure → attorney 串行）",
     5: "最终交付：主理人汇编打包",
@@ -103,7 +121,11 @@ def save_state(run_dir, state, note=""):
 
 
 def set_nested(state, dotted_key, raw_value):
-    """支持点路径赋值：phase / gates.G1 / verdicts.examiner.result / conditions.K1"""
+    """支持点路径赋值：phase / gates.G1 / verdicts.examiner.result / conditions.K1
+
+    CYCLE-1 · S-E01：gates.G1..G5 为别名，自动归一到语义标准键（唯一真源 GATE_ALIASES），
+    防止编号键与语义键双轨并存导致门禁永远关不掉。
+    """
     # 布尔/整数/浮点/JSON 自动转型
     v = raw_value
     if isinstance(v, str):
@@ -120,6 +142,9 @@ def set_nested(state, dotted_key, raw_value):
                 except ValueError:
                     pass  # 保持字符串
     keys = dotted_key.split(".")
+    # 门禁别名归一（仅 gates.Gn 形态）
+    if len(keys) == 2 and keys[0] == "gates" and keys[1] in GATE_ALIASES:
+        keys[1] = GATE_ALIASES[keys[1]]
     cur = state
     for k in keys[:-1]:
         if k not in cur or not isinstance(cur[k], dict):
@@ -193,6 +218,16 @@ def cmd_resume(args):
         print("   下一动作：汇编交付包")
     print(f"   查新进度：{state.get('search_rounds', 0)}/3 轮")
     print(f"   未关门禁：{open_gates or '无'}")
+    # CYCLE-1 · S-E01/S-E02：门禁按 G1-G5 契约逐项显示标准键真值（含 G2 三性通过）
+    g = state.get("gates", {})
+    gate_line = " | ".join(
+        f"{gn}={'✅' if g.get(sem) else '⛔'}" for gn, sem in GATE_ALIASES.items())
+    print(f"   G1-G5：{gate_line}")
+    print(f"   回流计数：{state.get('metrics', {}).get('loopback_count', 0)}/{LOOPBACK_MAX}"
+          + (" ⛔ 已达上限→升级 L4 用户裁决" if state.get('metrics', {}).get('loopback_count', 0) >= LOOPBACK_MAX else ""))
+    # S-E18：查新未完成时禁止推进 Phase 4/5（机械拦截，非散文）
+    if phase >= 3 and not g.get("search_3rounds_complete"):
+        print("   ⛔ 阻断：三轮查新未完成（G1=false），禁止进入 Phase 4/5；须重跑 R1-R3")
     print(f"   一审裁决：{v.get('examiner', {}).get('result') or '未产出'}"
           f"（score={v.get('examiner', {}).get('score')}）")
     print(f"   二审表态：{v.get('second_opinion', {}).get('result') or '未产出'}"
@@ -207,6 +242,37 @@ def cmd_resume(args):
     return 0
 
 
+def cmd_reset_for_rework(args):
+    """CYCLE-1 · S-E18 硬闸门：Phase 3/4 裁决→退回 Phase 2 二次改进时，
+    机械重置查新进度与全部门禁（防止改后方案未经重新三轮查新即进 Phase4/5），
+    并累计 loopback_count；超 LOOPBACK_MAX 时 exit 2 要求升级 L4 用户裁决。
+
+    用法：python3 scripts/state_store.py reset_for_rework --run-dir <RUN_DIR> --reason "查新红/4条X级"
+    """
+    state, err = load_state(args.run_dir)
+    if err:
+        print(f"❌ {err}")
+        return 1
+    n = state.get("metrics", {}).get("loopback_count", 0)
+    if n >= LOOPBACK_MAX:
+        print(f"⛔ 回流已达上限 {n}/{LOOPBACK_MAX}——按 H3/S-E10 升级 L4 用户裁决，"
+              f"禁止再次退回 Phase 2（防无限循环与预算耗尽）")
+        return 2
+    state["phase"] = 2
+    state["search_rounds"] = 0
+    for sem in GATE_ALIASES.values():
+        state["gates"][sem] = False
+    state["metrics"]["loopback_count"] = n + 1
+    state["conflicts"].append({
+        "type": "rework_reset", "reason": args.reason, "loopback": n + 1,
+        "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+    })
+    save_state(args.run_dir, state, note=f"reset_for_rework（{args.reason}）→ 重跑 R1-R3")
+    print(f"✅ 已重置：phase=2 / search_rounds=0 / G1-G5 全 false / loopback={n+1}/{LOOPBACK_MAX}")
+    print("   ⚠ 下一动作强制：Phase 2 二次改进 → **重跑 Phase 3 三轮查新（R1-R3）** → 重新 Phase 4")
+    return 0
+
+
 def cmd_self_test(args):
     import tempfile
     ok = True
@@ -216,7 +282,7 @@ def cmd_self_test(args):
                             "--run-dir", td, "--task-id", "T-20261107-TEST",
                             "--members", "contradiction-analyst,patent-search-scout"])
         ok &= (r == 0)
-        # 2) update 嵌套键
+        # 2) update 嵌套键（用 G1 别名，验证归一）
         r = subprocess_run([sys.executable, os.path.abspath(__file__), "update",
                             "--run-dir", td, "--set", "phase=3",
                             "--set", "gates.G1=true",
@@ -232,7 +298,10 @@ def cmd_self_test(args):
         checks = [
             ("task_id", state["task_id"] == "T-20261107-TEST"),
             ("phase=3", state["phase"] == 3),
-            ("gates.G1", state["gates"]["G1"] is True),
+            ("G1别名归一→标准键", state["gates"]["search_3rounds_complete"] is True),
+            ("无G1野键", "G1" not in state["gates"]),
+            ("G2落点存在", "trinity_verdict_pass" in state["gates"]),
+            ("loopback_count=0", state["metrics"]["loopback_count"] == 0),
             ("examiner.result", state["verdicts"]["examiner"]["result"] == "yellow"),
             ("examiner.score(int)", state["verdicts"]["examiner"]["score"] == 4),
             ("conditions.K1", state["conditions"]["K1"] is True),
@@ -244,6 +313,26 @@ def cmd_self_test(args):
         # 4) resume 可执行
         r = subprocess_run([sys.executable, os.path.abspath(__file__), "resume", "--run-dir", td])
         ok &= (r == 0)
+        # 5) CYCLE-1：G1-G5 全别名写入 → 标准键全 true（S-E01 回归防线）
+        r = subprocess_run([sys.executable, os.path.abspath(__file__), "update",
+                            "--run-dir", td] + sum([["--set", f"gates.G{i}=true"] for i in range(1, 6)], []))
+        ok &= (r == 0)
+        state, _ = load_state(td)
+        all_closed = all(state["gates"].get(sem) is True for sem in GATE_ALIASES.values())
+        no_wild = not any(k in state["gates"] for k in GATE_ALIASES)
+        print(f"  {'✅' if all_closed else '❌'} G1-G5 别名写入→5 标准键全 true")
+        print(f"  {'✅' if no_wild else '❌'} 无编号野键")
+        ok &= all_closed and no_wild
+        # 6) CYCLE-1：reset_for_rework 机械重置（S-E18）
+        r = subprocess_run([sys.executable, os.path.abspath(__file__), "reset_for_rework",
+                            "--run-dir", td, "--reason", "self-test 探针"])
+        ok &= (r == 0)
+        state, _ = load_state(td)
+        reset_ok = (state["phase"] == 2 and state["search_rounds"] == 0
+                    and all(not state["gates"].get(sem) for sem in GATE_ALIASES.values())
+                    and state["metrics"]["loopback_count"] == 1)
+        print(f"  {'✅' if reset_ok else '❌'} reset_for_rework：phase=2/查新清零/G全false/回流+1")
+        ok &= reset_ok
     print("self-test ✅" if ok else "self-test ❌")
     return 0 if ok else 1
 
@@ -275,6 +364,10 @@ def main():
     p5 = sub.add_parser("self-test")
     p5.add_argument("--run-dir", default="")
 
+    p6 = sub.add_parser("reset_for_rework", help="退回Phase2二次改进：机械重置查新与门禁（S-E18）")
+    p6.add_argument("--run-dir", required=True)
+    p6.add_argument("--reason", required=True, help="退回原因（如 查新红/4条X级/审查红）")
+
     args = ap.parse_args()
     if args.cmd == "init":
         return cmd_init(args)
@@ -286,6 +379,8 @@ def main():
         return cmd_resume(args)
     if args.cmd == "self-test":
         return cmd_self_test(args)
+    if args.cmd == "reset_for_rework":
+        return cmd_reset_for_rework(args)
     ap.print_help()
     return 2
 
