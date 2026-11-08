@@ -46,6 +46,8 @@
 ## 五、诊断产出归档
 
 - 诊断报告：写工作区 `outputs/triz-team-diagnosis-independent-<date>.md`（不入包，包只收修复）
+  - 报告实际存放位置 = 会话工作区 `<workspace>/outputs/`（非包内 outputs/ 回归产物目录）；
+    示例：triz-team-diagnosis-independent-20261107-r3.md 存于 2026-11-07 会话工作区 outputs/ 下
 - 修复后：本文件 §六登记表追加一行（诊断日期/触发器/短板块数/已修复/残留）
 
 ## 六、诊断登记表
