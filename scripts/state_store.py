@@ -69,6 +69,12 @@ STATE_TEMPLATE = {
         "g5_format_compliant": False,
     },
     "conditions": {},          # 二审条件清单（K1..K7/M1..M7 → closed/open）· J2 对账数据源
+    # S-E02（Workflow D 前置闸证据源）：查新报告 / 三性裁决的落盘文件路径。
+    # 文件缺失 = 视为未查新（主理人 MD:353-359）。preflight 第12项机械校验读取本键。
+    "evidence": {
+        "search_report": "",    # 三轮查新报告落盘路径
+        "verdict_report": "",   # 三性裁决（examiner + second_opinion）落盘路径
+    },
     "retry_counts": {},
     "confirmed_items": {},
     "conflicts": [],           # L3 仲裁记录

@@ -40,11 +40,11 @@
 **不要写死版本号**。若某处仍报「Team 型必需 settings.json」，那是旧版缓存脚本，先核对脚本版本，
 而不是把文件加回来。
 
-## 三、工具清单（v2.6.0 · 10 个脚本）
+## 三、工具清单（v2.9.0 · 18 个脚本）
 
 | 脚本 | 用途 | 何时跑 |
 |---|---|---|
-| `scripts/preflight_check.py` | 建队前 8 项检查（失败索引/路由可写/预算/Phase0五参数/权威数据/装配器/skills路径/C3检查点） | **每次建队前（强制）** |
+| `scripts/preflight_check.py` | 建队前 12 项检查（失败索引/路由可写/预算/Phase0五参数/权威数据/装配器/skills路径/C3检查点/诊断触发器/登记表结构/README结构图/**Workflow D 前置闸**） | **每次建队前（强制）** |
 | `scripts/assemble_spawn_prompt.py` | spawn 文案装配（shared-core shim + vendor 兜底） | 每次派单（强制） |
 | `scripts/failure_memory.py` | 失败记忆摘要注入（按成员/关键词筛 expert-failures） | 每次派单第2步（强制） |
 | `scripts/token_budget_check.py` | 预算估算（默认）/ 产出机械计量（`--meter --ledger`） | 建队前 + 每次交付后 |
@@ -60,6 +60,8 @@
 | `scripts/cost_profile.py` | 成员成本画像（metrics.jsonl 聚合 → tokens/墙钟 P90 + 成功率） | 建队前（U1）+ 每次交付后台账累积 |
 | `scripts/patent_knowledge.py` | 专利族谱记忆（scout 产出的 X/Y 威胁沉淀 + 按域召回） | Phase 3 前查询（U3）+ 查新完成后沉淀 |
 | `scripts/spawn_watchdog.py` | 成员停滞看门狗（四态判定 OK/WATCH/STALL/TIMEOUT + H4 处置建议） | 每次派单等待窗口（P2-15 简版） |
+| `scripts/diagnosis_trigger.py` | 诊断触发器 T1/T2/T3 机械判定（preflight 第9项自动调用） | 每次建队前（preflight 内自动） |
+| `scripts/evolution_log.py` | 自进化台账唯一写入口（append/backfill/verify/tail/self-test） | 每次批次收口（C5 登记收敛） |
 
 ## 四、Git 钩子（双层门禁）
 
@@ -82,6 +84,9 @@
 ## 六、验证清单（5条全过才算系统可加载）
 
 1. `python3 scripts/agent_ci_gate.py --results-dir tests/baselines/ --self-test` → 合规样本通过
+   > ⚠️ `--self-test` 走**内置 schema 自测**分支（`agent_ci_gate.py:294-296`），`--results-dir` 在该分支**不生效**（仅在非 self-test 扫描真实信封时使用）。要真实扫描基线信封，去掉 `--self-test`：
+   > `python3 scripts/agent_ci_gate.py --results-dir tests/baselines/` → 扫 `*-results.json`
+   > （注：基线目录当前无该类文件，实测扫描数 0 → 脚本会提示「未发现 \*-results.json 文件」）
 2. `python3 scripts/verify_triz_data.py --strict` → 全通过
 3. `python3 tests/test_vendor_core.py` → V1-V6 全 PASS
 4. `git status` → working tree clean

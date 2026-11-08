@@ -118,8 +118,6 @@ triz-invention-team/                          # ← 仓库根 = 插件本体（�
 ├── .codebuddy-plugin/
 │   ├── marketplace.json                      # WorkBuddy 市场描述
 │   └── plugin.json                           # WorkBuddy 插件清单（version）
-├── .claude-plugin/
-│   └── marketplace.json                      # Claude Code / Copilot CLI 市场描述
 ├── agents/                                   # 7 个代理角色定义（Markdown）
 ├── skills/                                   # 4 个技能包
 │   ├── triz-matrix/  patent-law/  claims-drafting/  agent-protocol/
@@ -134,15 +132,20 @@ triz-invention-team/                          # ← 仓库根 = 插件本体（�
 │   └── shared-core/                          # 装配脚本 + 版本锁（VENDOR.json）
 ├── .learnings/                               # 自进化经验层（LEARNINGS/ERRORS/FEATURE_REQUESTS）
 ├── avatars/                                  # 512×512 代理头像
-├── .gitignore                                # 排除 .claude-plugin/ 与 __pycache__
+├── .gitignore                                # 排除 .claude-plugin/ 与 __pycache__ 与 outputs/
 ├── README.md                                 # 英文版
 ├── README.zh.md                              # ← 中文版（当前文件）
 ├── CHANGELOG.md                              # 发布历史
 └── LICENSE                                   # Apache-2.0
 ```
 
-> **注**：`.claude-plugin/plugin.json` 被 `.gitignore` 排除（宿主启动时会 `unlink` 单键
-> agent 型文件，见 `docs/OPERATIONS.md` §二）；Claude Code 侧清单由市场描述文件承载。
+> **注 1（本地生成·不入库）**：`.claude-plugin/` 整个目录被 `.gitignore` 排除（宿主启动时会
+> `unlink` 单键 agent 型文件，见 `docs/OPERATIONS.md` §二），本地存在但**不在上方结构图**内——
+> 结构图对齐的是 git 实际入库内容（preflight 第11项按 `.gitignore` 解析后比对）。
+> Claude Code 侧清单由市场描述文件承载。
+>
+> **注 2（本地生成·不入库）**：`outputs/` 为门禁派生报告目录（`agent_ci_gate_report.json` 等），
+> 同样被 `.gitignore` 排除，不在结构图内。
 
 ---
 

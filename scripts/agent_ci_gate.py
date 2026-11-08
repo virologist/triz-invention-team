@@ -146,11 +146,62 @@ def check_wall_clock(envelope: dict) -> list:
     return warnings
 
 
+def _process_baseline_markdown(md_path: Path, schema: dict) -> dict:
+    """CYCLE-1 · S-E22：基线 markdown 信封校验（fallback 扫描路径）。
+
+    基线成员产出（T-*__<member>.md）把上行信封以 ```json 代码块直接埋在正文，
+    与 results.json 的 []{from,text} 消息数组结构不同。本函数复用 extract_envelopes
+    + validate_envelope，对每个信封逐条判定，产出与 process_results_file 同构的报告。
+    """
+    report = {"file": md_path.name, "messages": [], "total": 0, "valid": 0, "partial": 0,
+              "failed": 0, "legacy": 0, "details": []}
+    try:
+        text = md_path.read_text(encoding="utf-8")
+    except Exception as e:
+        report["messages"].append(f"read error: {e}")
+        return report
+    envelopes = extract_envelopes(text)
+    if not envelopes:
+        report["failed"] = 1
+        report["details"].append({"sender": md_path.stem, "result": "no_envelope_found",
+                                  "issue": "基线 markdown 中未发现上行信封"})
+        return report
+    for env, _ok in envelopes:
+        report["total"] += 1
+        errors = validate_envelope(env, schema)
+        agent_id = env.get("agent_id", "?")
+        sender = agent_id
+        agent_mismatch = (agent_id != sender) and (agent_id not in KNOWN_AGENTS)
+        wall_warn = check_wall_clock(env)
+        if not errors and not agent_mismatch:
+            report["valid"] += 1
+            detail = {"sender": sender, "agent_id": agent_id, "result": "PASS"}
+            if wall_warn:
+                detail["warnings"] = wall_warn
+            report["details"].append(detail)
+        elif errors:
+            if env.get("status") == "partial":
+                report["partial"] += 1
+            else:
+                report["failed"] += 1
+            report["details"].append({"sender": sender, "agent_id": agent_id,
+                                      "result": "FAIL", "errors": errors[:3]})
+        elif agent_mismatch:
+            report["failed"] += 1
+            report["details"].append({"sender": sender, "agent_id": agent_id, "result": "FAIL",
+                                      "errors": [f"agent_id '{agent_id}' unknown"]})
+    return report
+
+
 def process_results_file(results_path: Path, schema: dict) -> dict:
     """处理单个*-results.json文件，返回校验报告。"""
     report = {"file": results_path.name, "messages": [], "total": 0, "valid": 0, "partial": 0, "failed": 0, "legacy": 0, "details": []}
     # legacy判定：文件名以arch/integration/e2e/tiebreak/search-r2等开头且时间早于cutoff视为legacy
     is_legacy = any(prefix in results_path.name for prefix in ("arch-", "tiebreak-", "search-r2-", "integration-")) or "search-r2" in results_path.name
+    # CYCLE-1 · S-E22：基线 markdown 形态（fallback 扫描）——信封直接埋在正文里，
+    # 不是 results.json 的 []{from,text} 消息数组。走独立分支解析。
+    if results_path.suffix == ".md":
+        return _process_baseline_markdown(results_path, schema)
     try:
         with open(results_path) as f:
             data = json.load(f)
@@ -300,8 +351,35 @@ def main():
         return 1
 
     results_files = sorted(glob.glob(str(results_dir / "*-results.json")))
+    # CYCLE-1 第2轮交叉验证 · S-E22（幽灵门禁清偿）：此前本脚本只扫 *-results.json，
+    # 而全仓该类文件实测为 **0** → 扫描恒为空、门禁恒返回 0、**从未真正校验过任何信封**
+    # （S-E16「假绿」同型）。pre-commit hook 的 ① 信封门禁因此是空转。
+    # 现补 fallback：results.json 为 0 时，改扫基线 markdown 中的成员产出信封
+    # （T-*__<member>.md 形态，extract_envelopes 已支持从任意文本提取栈平衡 JSON）。
+    scan_mode = "results-json"
     if not results_files:
-        print(f"⚠️ 未发现 *-results.json 文件")
+        md_candidates = []
+        # 排除已知**故意违规**的历史归档（负例基线，非合规产出）：
+        #   _pre-fix-b01/ —— task_id 违约束格式的预修复归档（见该目录 NOTE.md）
+        #   _archive/    —— spawn 提示词压缩包（非成员产出）
+        for md in sorted(results_dir.rglob("T-*__*.md")):
+            rel_parts = md.relative_to(results_dir).parts
+            if any(p.startswith("_") for p in rel_parts[:-1]):
+                continue  # 下划线前缀目录 = 预修复/归档区，不参与合规扫描
+            try:
+                txt = md.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            if "agent_id" in txt and "deliverable_summary" in txt:
+                md_candidates.append(md)
+        if md_candidates:
+            scan_mode = "baseline-markdown(fallback)"
+            results_files = md_candidates
+            print(f"ℹ️  未发现 *-results.json（实测该形态文件数为 0）→ "
+                  f"回退扫描基线 markdown 信封 {len(results_files)} 个")
+    if not results_files:
+        print(f"⚠️ 未发现 *-results.json 文件，且回退扫描也无含信封的基线 markdown")
+        print(f"    （results_dir={results_dir}）——本门禁本轮**零覆盖**")
         return 0
 
     print(f"\n=== 校验 {len(results_files)} 个测试结果文件 ===")
@@ -335,10 +413,20 @@ def main():
         print(f"  ⚠️ 墙钟 WARN: {grand_warn} 处（有 metrics 缺 duration_ms_wall / duration_source 非法）——不阻断，供主理人回填")
 
     # 写入报告
-    report_path = results_dir / "ci_gate_report.json"
+    # CYCLE-1 · S-E22：报告不写进 tests/baselines/（基线目录是只读基线真源，
+    # 门禁产物属派生数据，写入会污染基线并触发 preflight README 结构校验漂移）。
+    # 改为写入包根 outputs/ 派生目录。
+    report_dir = root / "outputs"
+    try:
+        report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = report_dir / "ci_gate_report.json"
+    except Exception:
+        report_path = results_dir / "ci_gate_report.json"
     summary = {
         "timestamp": datetime.datetime.now().isoformat(),
         "schema_version": schema.get("version"),
+        "scan_mode": scan_mode,
+        "results_dir": str(results_dir),
         "grand_total": grand_total,
         "grand_valid": grand_valid,
         "grand_partial": grand_partial,

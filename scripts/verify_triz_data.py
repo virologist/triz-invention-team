@@ -20,7 +20,12 @@ verify_triz_data.py — TRIZ 权威数据自检（2026-10-14 建立，防 failur
 
 用法：
   python3 scripts/verify_triz_data.py [--expert-dir DIR] [--strict]
-退出码：0=全通过  1=存在错误（--strict 时才非 0；默认 warn-only 也返回 1 以便 CI 判定）
+退出码：0=全通过  1=存在错误
+
+CYCLE-1 第2轮交叉验证发现：--strict 此前是**死参数**（解析后从未被读取，存在错误时
+无论是否 strict 都返回 1）。现明确其语义：
+  - 默认模式：errors → exit 1；仅有 warns → exit 0（warn 不阻断）
+  - --strict：errors 或 warns 任一非空 → exit 1（warn 也阻断·CI 口径）
 """
 
 import argparse
@@ -180,6 +185,11 @@ def main():
         for e in errors:
             print("     - %s" % e)
         print("\n结论：权威数据不通过。改动数据表后必须修复到 0 错误再提交。")
+        return 1
+    # CYCLE-1 第2轮交叉验证：--strict 此前是死参数（从未被读取）。现赋予明确语义——
+    # strict 下 warn 也阻断（CI 口径），默认模式 warn 不阻断。
+    if args.strict and warns:
+        print("\n结论：--strict 严格模式——无错误但有 %d 项警告，按严格口径拒绝放行。" % len(warns))
         return 1
     print("  ✅ A 矩阵1521行 / B 参数39行 / C 中文表编号+译名一致无重复 / D 权威锚点复算通过")
     print("结论：权威数据全部通过。")

@@ -184,6 +184,94 @@ def check_diagnosis_registry():
         ok(f"10. 诊断登记表结构完整（{data_rows} 行数据·{ncol} 列）")
 
 
+def check_workflow_d_gate(state_path):
+    """12. Workflow D 入口前置闸（S-E02 · CYCLE-1 第2轮交叉验证落地）
+
+    主理人 MD:359 声称「由 preflight_check.py 第9项机械校验」——CYCLE-1 第2轮交叉验证
+    实测 preflight 全文不含 G1/G2/G3/search_3rounds/trinity 任一字符串，即该机械校验
+    **从未存在**（幽灵验证项 · 违反哲学④）。本项落地真实校验代码。
+
+    判据（Workflow D 派单前置闸，主理人 MD:353-359）：
+      G1(search_3rounds_complete) ∧ G2(trinity_verdict_pass) ∧ G3(c1_c8_confirmed) 全为 true
+      且能给出三轮查新报告与三性裁决的**落盘文件路径**（文件缺失 = 视为未查新）。
+
+    真源：state_store.GATE_ALIASES（别名表唯一真源，S-E01）。
+    语义：
+      - 未提供 --state-path → WARN（无 state 可校验；不得据此判定闸通过）
+      - state 存在但门禁未全关 → BLOCK（Workflow D 禁止派单）
+      - state 门禁全关但落盘证据缺失 → BLOCK（文件缺失 = 视为未查新）
+    """
+    if not state_path:
+        wrn("12. 未传 --state-path，跳过 Workflow D 前置闸校验"
+            "（Workflow D 派单前必须提供 state.json 路径）")
+        return
+    p = os.path.abspath(state_path)
+    if not os.path.isfile(p):
+        blk("12. Workflow D 前置闸：state 文件不存在 %s——无法证明已查新/已裁决，"
+            "禁止直接进 Phase 5" % p)
+        return
+    try:
+        state = json.load(open(p, encoding="utf-8"))
+    except Exception as e:
+        blk("12. Workflow D 前置闸：state 文件解析失败 %s：%s" % (p, e))
+        return
+    try:
+        sys.path.insert(0, HERE)
+        from state_store import GATE_ALIASES
+    except Exception as e:
+        blk("12. Workflow D 前置闸：无法载入门禁别名真源（state_store.GATE_ALIASES）：%s" % e)
+        return
+
+    # D 闸只校验 G1/G2/G3（G4/G5 是 Phase5 内的门禁，D 入口不要求）
+    d_gates = ["G1", "G2", "G3"]
+    g = state.get("gates") or {}
+    closed, open_g = [], []
+    for gn in d_gates:
+        sem = GATE_ALIASES.get(gn, gn)
+        (closed if g.get(sem) else open_g).append(gn)
+    if open_g:
+        blk("12. Workflow D 前置闸未通过：%s 未关闭（state=%s）——"
+            "禁止直接进 Phase 5，须转 Workflow C 或升级用户裁决（L4）"
+            % ("、".join(open_g), p))
+        return
+    # 门禁全关 → 校验落盘证据（文件缺失 = 视为未查新）
+    ev = state.get("evidence") or {}
+    missing_ev = [k for k in ("search_report", "verdict_report") if not ev.get(k)]
+    if missing_ev:
+        blk("12. Workflow D 前置闸：门禁已全关但落盘证据缺失 %s"
+            "（state.evidence 键；文件缺失 = 视为未查新）" % "、".join(missing_ev))
+        return
+    # 证据路径必须真实存在（防登记了假路径）
+    fake = []
+    for k in ("search_report", "verdict_report"):
+        fp = ev.get(k)
+        if fp and not os.path.isfile(os.path.abspath(fp)):
+            fake.append(f"{k}={fp}")
+    if fake:
+        blk("12. Workflow D 前置闸：证据路径不存在 %s" % "；".join(fake))
+        return
+    ok("12. Workflow D 前置闸通过：G1/G2/G3 全关 + 查新与裁决证据均已落盘")
+
+
+def _gitignore_dirs(root):
+    """解析 .gitignore 中的目录型排除项（CYCLE-1 · S-E23）。
+
+    只取形如 `name/` 的行（目录递归排除）与 `*.ext`（文件型，不影响目录集）。
+    返回 set。.gitignore 不存在 → 空集。
+    """
+    gi = os.path.join(root, ".gitignore")
+    if not os.path.isfile(gi):
+        return set()
+    dirs = set()
+    for ln in open(gi, encoding="utf-8"):
+        s = ln.strip()
+        if not s or s.startswith("#") or s.startswith("!"):
+            continue
+        if s.endswith("/"):
+            dirs.add(s.rstrip("/"))
+    return dirs
+
+
 def check_readme_structure():
     """11. README 结构图与实际目录一致（CYCLE-1 · S-E09 失效引用修复的复发检测）
     判据：README.zh.md 结构图代码块中的一级目录/文件项 与 实际 ls -1 的差集必须为空。
@@ -209,8 +297,14 @@ def check_readme_structure():
         if item:
             documented.add(item)
     actual = set()
+    # CYCLE-1 · S-E23：实际集应与 **git 实际入库内容** 对齐，而非磁盘全部条目——
+    # .gitignore 排除的项（.claude-plugin/ / outputs/ / __pycache__/）本地存在但不入库，
+    # 不应要求 README 结构图收录。判据：解析 .gitignore 的目录型条目（前缀匹配）。
+    ignored_dirs = _gitignore_dirs(PKG)
     for name in os.listdir(PKG):
         if name in (".git", "__pycache__"):
+            continue
+        if name in ignored_dirs:
             continue
         actual.add(name)
     # README 结构图是「精选视图」：允许 README 自身多出 .gitignore/.learnings 之外的
@@ -269,7 +363,7 @@ def check_authoritative_data():
     if not os.path.isfile(v):
         wrn("5. verify_triz_data.py 缺失，权威数据未校验")
         return
-    r = subprocess.run([sys.executable, v, "--expert-dir", PKG],
+    r = subprocess.run([sys.executable, v, "--expert-dir", PKG, "--strict"],
                        capture_output=True, text=True)
     if r.returncode == 0:
         ok("5. 权威数据自检通过（矩阵1521 / 参数39 / 中文表一致无重复 / 锚点复算）")
@@ -377,6 +471,8 @@ def main():
     ap.add_argument("--after-search", help="[P0-S3-1] 上一阶段查新成员的 member_id（默认 patent-search-scout）")
     ap.add_argument("--outputs-dir", default="", help="[P0-S3-1] 查新产出所在目录")
     ap.add_argument("--c3-confirmation-path", default="", help="[P0-S3-1] C3 确认文件路径（X 级出现时强制要求）")
+    ap.add_argument("--state-path", default="",
+                    help="[CYCLE-1/S-E02] state.json 路径——启用第12项 Workflow D 前置闸机械校验")
     args = ap.parse_args()
 
     PKG = os.path.abspath(args.expert_dir)
@@ -395,6 +491,7 @@ def main():
     check_declared_skills()
     check_diagnosis_registry()
     check_readme_structure()
+    check_workflow_d_gate(args.state_path)
 
     # CYCLE-1 · S-E04：诊断触发器 T1-T3 机械判定（散文条款脚本化，原则①）
     try:

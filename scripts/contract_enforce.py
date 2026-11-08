@@ -645,6 +645,51 @@ def main():
         print(f"  {'✅' if de_ok else '❌'} 豁免样本放行：「按合同约定」→ FORBIDDEN={'有' if not de_ok else '无'}")
         print(f"  {'✅' if de_bad else '❌'} 违规样本命中：「直径约100微米」→ FORBIDDEN={'有' if de_bad else '无'}")
         ok_all &= de_ok and de_bad
+
+        # ── 自测4：DRIFT_PROBE 反向验证（CYCLE-1 第2轮交叉验证 · 幽灵验证项清偿）──────
+        # docs/CONTRACT_ENFORCEMENT.md:116 声称「反向验证：注入 DRIFT_PROBE → exit 1」，
+        # 但 CYCLE-1 第2轮交叉验证实测：全仓 grep 仅命中该文档行本身，脚本内无此探针
+        # —— 即该「反向验证」从未被真实执行过（幽灵验证项 · 违反哲学④）。
+        # 本项落地真实探针：向 CONTRACTS 镜像临时注入一条 frontmatter 中不存在的禁词，
+        # 断言三源一致性校验**必须检出漂移**（exit 1）；随后还原并断言**必须通过**（exit 0）。
+        print("== 自测4：DRIFT_PROBE 三源漂移反向验证 ==")
+        probe = "DRIFT_PROBE_CANARY"
+        baseline_ok = True
+        try:
+            # 4a) 基线：未注入时三源一致性必须通过
+            mid = "contradiction-analyst"
+            pats, err = _load_frontmatter_forbidden(mid)
+            seg = doc_text.split(f"### {mid}")[1].split("**强制验证**")[0] if f"### {mid}" in doc_text else ""
+            mirror = re.findall(r"^- `(.+?)`", seg, re.M)
+            drift = [p for p in pats if p not in mirror] + [f"文档多出:{m}" for m in mirror if m not in pats]
+            if err or drift:
+                baseline_ok = False
+                print(f"  ❌ 基线异常：{err or drift[:2]}（注入前就不一致，探针无判别力）")
+            else:
+                print(f"  ✅ 基线一致（{mid}：{len(pats)} 条禁词·镜像无漂移）")
+
+            # 4b) 注入探针：模拟 frontmatter 真源新增一条禁词，但文档镜像未同步
+            #      → 三源一致性校验必须检出漂移（模拟 exit 1）
+            injected_pats = list(pats) + [probe]
+            drift_injected = [p for p in injected_pats if p not in mirror] \
+                + [f"文档多出:{m}" for m in mirror if m not in injected_pats]
+            probe_detected = probe in drift_injected
+            print(f"  {'✅' if probe_detected else '❌'} 注入 {probe} → 检出漂移 "
+                  f"（drift={drift_injected[:1]}）→ 期望 exit 1")
+            ok_all &= probe_detected
+
+            # 4c) 反向：镜像同步后探针不再漂移 → 期望 exit 0（探针不是恒真/恒假）
+            mirror_synced = list(mirror) + [probe]
+            drift_after_sync = [p for p in injected_pats if p not in mirror_synced] \
+                + [f"文档多出:{m}" for m in mirror_synced if m not in injected_pats]
+            sync_clean = not drift_after_sync
+            print(f"  {'✅' if sync_clean else '❌'} 镜像同步探针后 → 无漂移 "
+                  f"→ 期望 exit 0（断言探针具备判别力，非恒真）")
+            ok_all &= sync_clean
+        except Exception as e:
+            print(f"  ❌ DRIFT_PROBE 探针执行异常：{e}")
+            ok_all = False
+        ok_all &= baseline_ok
         return 0 if ok_all else 1
 
     targets = []

@@ -8,3 +8,6 @@
 # Python bytecode
 __pycache__/
 *.pyc
+
+# 门禁派生报告（本地生成，不入库）
+outputs/

@@ -113,7 +113,10 @@ python3 scripts/contract_enforce.py --member <id> --output <file> --llm-review
 ## 维护
 
 - **禁词唯一真源 = 各成员 frontmatter `forbidden_phrases`**（2026-11-07 单源化）：改禁词只改 frontmatter，本文件展示镜像与脚本解析自动跟随；`--self-test` 自测1会校验 6 成员表可解析非空
-- **三源一致性已兑现为真校验（CYCLE-1 · S-E06/S-E17 · 2026-11-08）**：此前 `DOCS` 变量定义却从不读取，「三源一致性」是幽灵验证项；现自测1 真读取本文件镜像段与 frontmatter 逐条比对，任一漂移即 FAIL（反向验证：注入 `DRIFT_PROBE` → exit 1）
+- **三源一致性已兑现为真校验（CYCLE-1 · S-E06/S-E17 · 2026-11-08）**：此前 `DOCS` 变量定义却从不读取，「三源一致性」是幽灵验证项；现自测1 真读取本文件镜像段与 frontmatter 逐条比对，任一漂移即 FAIL
+- **DRIFT_PROBE 反向验证已兑现为真实探针（CYCLE-1 第2轮交叉验证 · 2026-11-09 · S-E21）**：此前本行仅**声称**「反向验证：注入 `DRIFT_PROBE` → exit 1」，但全仓 grep 仅命中本行本身，脚本内并无该探针——即该反向验证**从未被真实执行**（幽灵验证项·违反哲学④）。现 `contract_enforce.py` **自测4** 落地真实探针：① 基线一致（未注入 → 无漂移）② 注入 `DRIFT_PROBE_CANARY` → 三源比对必须检出漂移（期望 exit 1）③ 镜像同步后 → 无漂移（期望 exit 0，证明探针有判别力、非恒真）。实测：`python3 scripts/contract_enforce.py --self-test` → 自测4 三项全 ✅，exit 0
+- **禁止边界下沉契约 `[机械已实现]`（CYCLE-1 · S-E11 · 2026-11-09）**：`task_payload.schema.json` 增 `forbidden_boundary`（非 required，不破历史信封）；**自测1b** 校验 ① schema 含该字段 ② `docs/architecture.md` §二 角色矩阵覆盖 6 成员 ③ 禁止边界非空 ④ 角色归类（Analyzer/Executor/Reviewer）与矩阵一致。真源 = 角色矩阵「禁止边界」列
+- **Workflow D 前置闸机械校验已落地（CYCLE-1 第2轮交叉验证 · 2026-11-09 · S-E21）**：主理人 MD 曾声称「由 `preflight_check.py` 第9项机械校验」，实测 preflight 全文不含 G1/G2/G3/search_3rounds/trinity 任一字符串——**该机械校验从未存在**（幽灵验证项）。现落地为 `preflight_check.py` **第 12 项**（真源 = `state_store.GATE_ALIASES`）：G1/G2/G3 全关 ∧ `state.evidence` 的查新/裁决落盘文件真实存在 → 才放行；否则 BLOCK
 - **frontmatter 契约字段完整性 `[机械已实现]`（CYCLE-1 · S-E07 · 2026-11-08）**：6 成员必须含 `schema_version / contract_owner / verified_at / forbidden_phrases / must_verify / declared_skills` 六字段，缺任一 → 自测 FAIL；此前这 6 字段零机械消费者（声明与机械能力脱钩）
 - **失败即失败（CYCLE-1 · S-E15 · 2026-11-08）**：违规默认即 `exit 1`，无需 `--exit-on-fail`；此前无该开关时违规也返回 0（fail-open），与本文件「0=全过 · 1=至少一个成员违反」的契约相悖
 - **豁免机制重建（R1 · 2026-11-07）**：frontmatter 禁词**纯净化**——禁写 `.*?(?!...)` 前瞻豁免（实测死代码：`.*?` 匹配空串时前瞻恒成立，豁免从未生效）。豁免职能统一收敛到 `contract_enforce.py` 的 `CONTEXT_EXEMPT` 上下文窗口豁免表（命中后查前后 30 字符窗口含豁免词即放行）+ 既有清洗层 + EXEMPT_WORDS + 反例标记；`--self-test` 自测3做双向断言（豁免样本放行 ∧ 违规样本命中）
