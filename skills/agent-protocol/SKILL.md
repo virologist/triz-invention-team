@@ -47,18 +47,38 @@ description: "团队智能体通信契约的形式化规范 — JSON Schema形�
 
 可选字段：`evidence`（推荐，证据链数组）、`issues`（自评问题）、`next_agent_hint`、`metrics`（duration_ms/retry_count）
 
+### 墙钟双轨制（S-E12 · 2026-11-09）
+
+`metrics` 内含两个**独立口径**，禁止互相覆盖：
+
+| 字段 | 含义 | 由谁回填 |
+|------|------|---------|
+| `duration_ms` | 成员自报：收到任务→产出完成的自身执行耗时（不含调度排队与回传链路） | 成员 |
+| `duration_ms_wall` | 主理人实测墙钟：spawn→回传 | 主理人 |
+| `duration_source` | `duration_ms` 的口径来源（`self_report` / `lead_measured` / `estimated`） | 随对应字段 |
+
+**端到端延迟与预算消耗一律以 `duration_ms_wall` 为准。**
+
+`agent_ci_gate.py` 的判定（`check_wall_clock()`，单一真源实现）：
+- 有 `metrics` 但缺 `duration_ms_wall` → **WARN**（主理人未回填墙钟，预算熔断依据缺失）
+- `duration_source` 取值不在枚举内 → **WARN**
+- **不升级为 FAIL**：墙钟缺失是流程瑕疵而非信封结构性违规，且 schema 的 `required` 保持不变
+  （避免破坏 9 个历史 failure 归档与 3 个回归基线）
+
+`--self-test` 对该逻辑做三组双向断言（缺墙钟→检出 / 完整→放行 / 非法口径→检出）。
+
 ## 使用方法
 
 ### 1. 本地CI门禁
 
 ```bash
-# 校验outputs目录下所有*-results.json的信封合规率
-python3 scripts/agent_ci_gate.py --results-dir outputs/
+# 校验归档基线目录下所有*-results.json的信封合规率（默认目录 = tests/baselines/）
+python3 scripts/agent_ci_gate.py --results-dir tests/baselines/
 
 # 严格模式（任何FAIL则exit 1，阻断git push）
 python3 scripts/agent_ci_gate.py --strict
 
-# Schema自测
+# Schema自测（含墙钟 WARN 双向断言）
 python3 scripts/agent_ci_gate.py --self-test
 ```
 

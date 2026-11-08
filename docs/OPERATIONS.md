@@ -76,10 +76,12 @@
 - 用例：`tests/cases/`（workflow-a-01 L2 全链路 / b-01 analyst L1 / c-01 scout L1）
 - 用法与断言表：`tests/README.md`
 - 运行产物落 `outputs/regression-<date>/<case>/`（含 `_VERIFY.md` + `metrics.jsonl` + `regression_report__*.json`）
+  > 注：历史基线已资产化归档于 `tests/baselines/`（`l2-full-a01` / `l1-analyst-b01` /
+  > `20261014-p0-2` / `_pre-fix-b01`）；`outputs/` 仅用于**新跑**的临时产物，不是基线真源。
 
 ## 六、验证清单（5条全过才算系统可加载）
 
-1. `python3 scripts/agent_ci_gate.py --results-dir outputs/ --self-test` → 合规样本通过
+1. `python3 scripts/agent_ci_gate.py --results-dir tests/baselines/ --self-test` → 合规样本通过
 2. `python3 scripts/verify_triz_data.py --strict` → 全通过
 3. `python3 tests/test_vendor_core.py` → V1-V6 全 PASS
 4. `git status` → working tree clean

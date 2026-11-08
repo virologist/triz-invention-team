@@ -124,6 +124,28 @@ def extract_envelopes(text: str) -> list:
     return results
 
 
+def check_wall_clock(envelope: dict) -> list:
+    """CYCLE-1 · S-E12：墙钟（duration_ms_wall）口径校验 —— 单一真源实现。
+
+    判据（返回 WARN 列表，空 = 通过）：
+      · 有 metrics 但缺 duration_ms_wall → 主理人未回填墙钟，预算熔断依据缺失
+      · duration_source 取值不在 {self_report, lead_measured, estimated} → 口径非法
+
+    设计约束：不改 schema 的 required（避免破 9 个历史 failure 归档 + 3 用例基线），
+    仅 WARN 不 FAIL——墙钟缺失是流程瑕疵，不是信封结构性违规。
+    """
+    warnings = []
+    m = envelope.get("metrics")
+    if not isinstance(m, dict) or not m:
+        return warnings
+    if "duration_ms_wall" not in m:
+        warnings.append("metrics 存在但缺 duration_ms_wall（主理人未回填墙钟·预算熔断依据缺失）")
+    src = m.get("duration_source")
+    if src is not None and src not in ("self_report", "lead_measured", "estimated"):
+        warnings.append(f"duration_source 取值非法：{src}")
+    return warnings
+
+
 def process_results_file(results_path: Path, schema: dict) -> dict:
     """处理单个*-results.json文件，返回校验报告。"""
     report = {"file": results_path.name, "messages": [], "total": 0, "valid": 0, "partial": 0, "failed": 0, "legacy": 0, "details": []}
@@ -165,11 +187,15 @@ def process_results_file(results_path: Path, schema: dict) -> dict:
         # schema校验
         errors = validate_envelope(parsed_env, schema)
         agent_id = parsed_env.get("agent_id", "?")
+        # CYCLE-1 · S-E12：墙钟缺失 WARN（不阻断）。判据实现见 check_wall_clock()。
+        wall_warn = check_wall_clock(parsed_env)
         # agent_id一致性检查（应与产出from一致或为已知agent）— 探针/测试agent放宽为warn
         agent_mismatch = (agent_id != sender) and (agent_id not in KNOWN_AGENTS)
         if not errors and not agent_mismatch:
             report["valid"] += 1
-            report["details"].append({"sender": sender, "agent_id": agent_id, "result": "PASS"})
+            report["details"].append({"sender": sender, "agent_id": agent_id, "result": "PASS",
+                                      "warnings": wall_warn} if wall_warn else
+                                      {"sender": sender, "agent_id": agent_id, "result": "PASS"})
         elif errors:
             if parsed_env.get("status") == "partial":
                 report["partial"] += 1
@@ -201,6 +227,27 @@ def self_test_schemas(schema: dict) -> bool:
         print(f"  ❌ self-test: 不合规样本被误判为合规")
         return False
     print(f"  ✅ self-test: 合规样本通过，不合规样本检出{len(errs_bad)}条错误")
+
+    # ── S-E12 墙钟 WARN 双向断言（2026-11-09）────────────────────────────────────
+    # 有 metrics 但缺 duration_ms_wall → 必须产出 WARN（预算熔断依据缺失），
+    # 但不得升级为 FAIL（不改 schema required，避免破历史归档与回归基线）。
+    m_wall = dict(good)
+    m_wall["metrics"] = {"duration_ms": 1000}
+    r1 = check_wall_clock(m_wall)
+    if not r1:
+        print("  ❌ self-test: metrics 缺 duration_ms_wall 未被检出 WARN")
+        return False
+    m_ok = dict(good)
+    m_ok["metrics"] = {"duration_ms": 1000, "duration_ms_wall": 1200, "duration_source": "lead_measured"}
+    if check_wall_clock(m_ok):
+        print("  ❌ self-test: 完整墙钟信封被误报 WARN")
+        return False
+    m_bad = dict(good)
+    m_bad["metrics"] = {"duration_ms": 1000, "duration_ms_wall": 1200, "duration_source": "bogus"}
+    if not check_wall_clock(m_bad):
+        print("  ❌ self-test: duration_source 非法值未被检出")
+        return False
+    print("  ✅ self-test: 墙钟 WARN 双向断言通过（缺墙钟→WARN / 完整→放行 / 非法口径→WARN）")
     return True
 
 
@@ -259,6 +306,7 @@ def main():
 
     print(f"\n=== 校验 {len(results_files)} 个测试结果文件 ===")
     grand_total = grand_valid = grand_partial = grand_failed = grand_legacy = 0
+    grand_warn = 0
     file_reports = []
     for rf in results_files:
         rp = process_results_file(Path(rf), schema)
@@ -268,10 +316,13 @@ def main():
         grand_partial += rp["partial"]
         grand_failed += rp["failed"]
         grand_legacy += rp["legacy"]
+        file_warn = sum(1 for d in rp["details"] if d.get("warnings"))
+        grand_warn += file_warn
         status_icon = "✅" if rp["failed"] == 0 and rp["partial"] == 0 else ("⚠️" if rp["valid"] > 0 else "❌")
-        print(f"  {status_icon} {rp['file']}: total={rp['total']} valid={rp['valid']} partial={rp['partial']} failed={rp['failed']} legacy={rp['legacy']}")
+        warn_suffix = f" warn={file_warn}" if file_warn else ""
+        print(f"  {status_icon} {rp['file']}: total={rp['total']} valid={rp['valid']} partial={rp['partial']} failed={rp['failed']} legacy={rp['legacy']}{warn_suffix}")
         for d in rp["details"]:
-            if d["result"] != "PASS":
+            if d["result"] != "PASS" or d.get("warnings"):
                 print(f"      {d}")
 
     # 合规率分母扣除legacy
@@ -280,6 +331,8 @@ def main():
     print(f"\n═══ 总计 ═══")
     print(f"  总信封: {grand_total}, 完整合规: {grand_valid}, partial: {grand_partial}, failed: {grand_failed}, legacy(扣除): {grand_legacy}")
     print(f"  合规率(扣除legacy后): {pass_rate:.1f}%")
+    if grand_warn:
+        print(f"  ⚠️ 墙钟 WARN: {grand_warn} 处（有 metrics 缺 duration_ms_wall / duration_source 非法）——不阻断，供主理人回填")
 
     # 写入报告
     report_path = results_dir / "ci_gate_report.json"
@@ -291,6 +344,7 @@ def main():
         "grand_partial": grand_partial,
         "grand_failed": grand_failed,
         "grand_legacy": grand_legacy,
+        "grand_wall_warn": grand_warn,
         "pass_rate": pass_rate,
         "files": file_reports,
     }

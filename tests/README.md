@@ -44,6 +44,14 @@ python3 scripts/run_regression.py --case workflow-b-01 --dir outputs/regression-
 退出码：`0`=全过 · `1`=有 FAIL · `2`=用法错误。报告自动落盘
 `outputs/<run>/regression_report__<case>.json`（可跨轮对比）。
 
+> **已归档基线**：历史实测产出已资产化于 `tests/baselines/`（`l2-full-a01` / `l1-analyst-b01` /
+> `20261014-p0-2` / `_pre-fix-b01`）。直接对基线复跑断言用 `--dir` 指向基线目录：
+> ```bash
+> python3 scripts/run_regression.py --case workflow-a-01 --dir tests/baselines/l2-full-a01
+> python3 scripts/run_regression.py --case workflow-b-01 --dir tests/baselines/l1-analyst-b01
+> python3 scripts/run_regression.py --case workflow-c-01 --dir tests/baselines/l2-full-a01
+> ```
+
 ## 断言类型速查
 
 | type | 检查内容 |
