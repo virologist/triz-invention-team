@@ -271,6 +271,19 @@ def _load_frontmatter_patterns(member_id):
 
 def check_required_regex(exp, task_text, run_dir, files, a):
     mid = exp.get("target_member")
+    # any_member 模式（2026-11-08 C01 A6 清偿）：成员多轮产出（如 scout A01 首轮 + A03 复检）
+    # 同目录并存时，member_files 只保留最后一个文件——首轮专有段落（客体预审/法25）会被复检
+    # 报告覆盖而误判缺失。any_member=true 时扫该成员全部落盘产出，任一命中即过。
+    if a.get("any_member"):
+        pats = a["patterns"]
+        # 直接从 run_dir glob 该成员全部落盘产出（files dict 会被同名成员多轮文件覆盖，不可靠）
+        cand = sorted(glob.glob(os.path.join(run_dir, f"T-*__{mid}.md")))
+        if not cand:
+            return False, f"any_member 模式：run_dir 内无 {mid} 落盘产出"
+        missing = [pat for pat in pats
+                   if not any(re.search(pat, read(p)) for p in cand)]
+        return (not missing), ("全部命中（any_member 扫 %d 份产出）" % len(cand)
+                               if not missing else f"缺: {missing}（扫 {len(cand)} 份该成员产出）")
     p = files.get(mid) or (list(files.values())[0] if files else None)
     if not p:
         return False, "无落盘文件"
