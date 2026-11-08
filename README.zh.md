@@ -1,16 +1,16 @@
-# TRIZ 通用发明专家团（v2.2）
+# TRIZ 通用发明专家团（v2.8）
 
 > **跨领域 TRIZ 发明团队**：从矛盾建模 → 三轮专利查新 → 模拟审查 → 交底书与申请文件撰写，**陪跑至中国发明专利申请草稿**。
 
 一个像真实发明团队一样协作的多代理系统——主理人调度全局，矛盾分析师应用 39×39 TRIZ 矩阵，查新员跑三轮专利查新，模拟审查员攻击新颖性/创造性/实用性，二审员做独立复审（自动捕捉确认偏误），交底书架构师把发明结构化为五要素，专利代理师撰写权项、说明书与摘要。
 
-v2.2 版本把代理间契约形式化为 JSON Schema（`agent-protocol`），并附带 CI gate 脚本——在产出进入下游核验前自动校验所有代理输出。
+v2.2 起把代理间契约形式化为 JSON Schema（`agent-protocol`），并附带 CI gate 脚本——在产出进入下游核验前自动校验所有代理输出。v2.8 补齐门禁状态机（元层触发器 / 台账单源化 / 契约 fail-open 修复）。
 
 ---
 
 ## ✨ 亮点
 
-- **7 名专家 + 1 名主理人**：每个代理都有明确的角色边界（ANALYZER / EXECUTOR / REVIEWER），并设有"禁止越界产出"的强制规则
+- **7 名智能体（1 主理人 + 6 成员）**：每个代理都有明确的角色边界（ANALYZER / EXECUTOR / REVIEWER），并设有"禁止越界产出"的强制规则
 - **TRIZ 39×39 矛盾矩阵 + 40 发明原理**（含越表矛盾对的降级路径）
 - **三轮专利查新**（关键词 → 分类号 → 差异化验证），附 X / Y / A / R / P 威胁分级
 - **模拟审查 + 独立二审**：自动捕捉确认偏误
@@ -39,8 +39,10 @@ v2.2 版本把代理间契约形式化为 JSON Schema（`agent-protocol`），�
 
 ```bash
 gh repo clone virologist/triz-invention-team ~/claude-plugins/triz-invention-team
-claude --plugin-dir ~/claude-plugins/triz-invention-team/plugins/triz-invention-team
+claude --plugin-dir ~/claude-plugins/triz-invention-team
 ```
+
+> 仓库根即插件本体（无 `plugins/` 嵌套层）——克隆后直接指向仓库根即可。
 
 ### 方式 B — WorkBuddy
 
@@ -61,10 +63,10 @@ gh repo clone virologist/triz-invention-team \
 
 ### 方式 C — 手工 / 其他 agent 宿主
 
-插件在 `plugins/triz-invention-team/` 下**完全自包含**。把该目录放到宿主 agent 的插件发现路径即可：
+插件在**仓库根**完全自包含。把仓库根目录放到宿主 agent 的插件发现路径即可：
 
 ```bash
-cp -R plugins/triz-invention-team <你的agent插件目录>/
+cp -R <克隆下来的仓库根> <你的agent插件目录>/triz-invention-team
 ```
 
 ---
@@ -108,37 +110,47 @@ cp -R plugins/triz-invention-team <你的agent插件目录>/
 
 ## 🛠️ 仓库结构
 
+> 以下结构为**实测**（2026-11-09，git 根 = 插件本体，无 `plugins/` 嵌套层）。
+> 判据：`git ls-files` 顶层条目 + 各目录实际条目数。
+
 ```
-triz-invention-team/                          # ← 市场根目录
+triz-invention-team/                          # ← 仓库根 = 插件本体（单仓自包含）
+├── .codebuddy-plugin/
+│   ├── marketplace.json                      # WorkBuddy 市场描述
+│   └── plugin.json                           # WorkBuddy 插件清单（version）
 ├── .claude-plugin/
 │   └── marketplace.json                      # Claude Code / Copilot CLI 市场描述
-├── .codebuddy-plugin/
-│   └── marketplace.json                      # WorkBuddy 市场描述
-├── plugins/
-│   └── triz-invention-team/                  # ← 自包含插件本体
-│       ├── .claude-plugin/plugin.json        # Claude Code / Copilot CLI 清单
-│       ├── .codebuddy-plugin/plugin.json     # WorkBuddy 清单
-│       ├── agents/                           # 7 个代理角色定义（Markdown）
-│       ├── skills/                           # 4 个技能包
-│       ├── scripts/                          # CI gate + token 预算校验
-│       ├── docs/                             # architecture · OPERATIONS · evolution-log
-│       ├── avatars/                          # 512×512 代理头像
-│       └── （无 settings.json）               # 宿主会删单键 agent 型文件，见 docs/OPERATIONS.md §二
+├── agents/                                   # 7 个代理角色定义（Markdown）
+├── skills/                                   # 4 个技能包
+│   ├── triz-matrix/  patent-law/  claims-drafting/  agent-protocol/
+├── scripts/                                  # 18 个脚本（CI gate + 门禁 + 工具链）
+├── docs/                                     # architecture · OPERATIONS · diagnosis-protocol
+│                                              # · CONTRACT_ENFORCEMENT · routing-log · evolution-log.tsv
+├── tests/                                    # 回归用例 + 基线 + 联邦一致性测试
+│   ├── cases/        # 3 个用例（A/B/C workflow）
+│   └── baselines/    # L1/L2 实测基线归档
+├── knowledge/                                # 跨任务知识沉淀（专利族谱 patent-family.jsonl）
+├── vendor/                                   # 联邦兜底
+│   └── shared-core/                          # 装配脚本 + 版本锁（VENDOR.json）
+├── .learnings/                               # 自进化经验层（LEARNINGS/ERRORS/FEATURE_REQUESTS）
+├── avatars/                                  # 512×512 代理头像
+├── .gitignore                                # 排除 .claude-plugin/ 与 __pycache__
 ├── README.md                                 # 英文版
 ├── README.zh.md                              # ← 中文版（当前文件）
 ├── CHANGELOG.md                              # 发布历史
 └── LICENSE                                   # Apache-2.0
 ```
 
+> **注**：`.claude-plugin/plugin.json` 被 `.gitignore` 排除（宿主启动时会 `unlink` 单键
+> agent 型文件，见 `docs/OPERATIONS.md` §二）；Claude Code 侧清单由市场描述文件承载。
+
 ---
 
 ## 🧪 质量门禁
 
 ```bash
-cd plugins/triz-invention-team
-
 python3 scripts/agent_ci_gate.py --self-test              # schema 自测
-python3 scripts/agent_ci_gate.py --results-dir outputs/   # CI gate 校验所有归档测试
+python3 scripts/agent_ci_gate.py --results-dir tests/baselines/   # CI gate 校验归档基线
 python3 scripts/token_budget_check.py --conservative      # H1 上下文装配预算
 ```
 
@@ -148,14 +160,16 @@ CI gate 当前对所有 v2.2 后归档报告 **100% 合规率**（legacy 早期�
 
 ## 🔄 发布流程
 
-1. 更新 `plugins/triz-invention-team/` 下的 agents / skills / scripts
-2. 跑 `python3 plugins/triz-invention-team/scripts/agent_ci_gate.py --strict` 把守 commit 门禁
-3. 同时 bump `plugins/triz-invention-team/.claude-plugin/plugin.json` 和 `plugins/triz-invention-team/.codebuddy-plugin/plugin.json` 的版本号（semver）
+1. 更新仓库根下的 agents / skills / scripts
+2. 跑 `python3 scripts/agent_ci_gate.py --strict` 把守 commit 门禁（pre-commit hook 亦自动执行）
+3. 同时 bump `.codebuddy-plugin/plugin.json` 的版本号（semver）
+   > `.claude-plugin/plugin.json` 已被 `.gitignore` 排除（宿主启动会 `unlink` 单键 agent 型文件，
+   > 见 `docs/OPERATIONS.md` §二），故只需 bump WorkBuddy 侧清单 + 两份 `marketplace.json`
 4. 保持两个市场描述文件同步：`.claude-plugin/marketplace.json`、`.codebuddy-plugin/marketplace.json`
 5. 打 tag：`git tag v2.x.y`
 6. 推送：`git push origin main --tags`
 
-完整跨会话恢复剧本见 [`docs/OPERATIONS.md`](plugins/triz-invention-team/docs/OPERATIONS.md)。
+完整跨会话恢复剧本见 [`docs/OPERATIONS.md`](docs/OPERATIONS.md)。
 
 ---
 
@@ -163,7 +177,7 @@ CI gate 当前对所有 v2.2 后归档报告 **100% 合规率**（legacy 早期�
 
 欢迎 issue 和 PR。请确保：
 
-1. 新代理 prompt 含 `result_envelope` JSON 块（参照 [`agent-protocol` schema](plugins/triz-invention-team/skills/agent-protocol/result_envelope.schema.json)）
+1. 新代理 prompt 含 `result_envelope` JSON 块（参照 [`agent-protocol` schema](skills/agent-protocol/result_envelope.schema.json)）
 2. CI gate `--strict` 通过
 3. 单代理 token 预算不超过 20K（用 `scripts/token_budget_check.py` 验证）
 
@@ -175,4 +189,4 @@ Apache-2.0 — 见 [`LICENSE`](LICENSE)。专利授权明示，允许商用，�
 
 ---
 
-— 作者：TZUVet · v2.2 · 为中国发明专利工业化质量而建。
+— 作者：TZUVet · v2.8 · 为中国发明专利工业化质量而建。

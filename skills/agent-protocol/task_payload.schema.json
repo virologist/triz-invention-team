@@ -69,6 +69,12 @@
       "items": {"type": "string"},
       "description": "硬约束清单（推荐）"
     },
+    "forbidden_boundary": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 1,
+      "description": "CYCLE-1 · S-E11：下行任务的禁止边界清单（来自 docs/architecture.md §二 角色矩阵「禁止边界」列，按成员角色取值）。使禁止边界从架构文档下沉到运行时任务契约——此前禁止边界只存在于文档，成员运行时上下文不含它，越权产出无机械拦截（原则①违背实例）。非 required：避免破坏历史信封；一致性由 scripts/contract_enforce.py --self-test 校验（真源=architecture.md 角色矩阵）"
+    },
     "state_snapshot": {
       "type": "object",
       "additionalProperties": true,

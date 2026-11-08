@@ -522,6 +522,79 @@ def main():
             ok_all = False
         else:
             print(f"  ✅ 6 成员 frontmatter 契约字段 6/6 齐全 [机械已实现]")
+
+        # ── 自测1b：forbidden_boundary 契约字段与角色矩阵一致性（S-E11 · 2026-11-09）────
+        # 真源 = docs/architecture.md §二 角色矩阵「禁止边界」列；schema 增 forbidden_boundary
+        # （非 required，避免破历史信封）。本项确保「禁止边界下沉到运行时任务契约」有机械锚点，
+        # 而不是只写在文档里（原则①：散文条款不会被自觉执行）。
+        print("== 自测1b：forbidden_boundary 与角色矩阵一致性 ==")
+        arch_path = PKG / "docs" / "architecture.md"
+        payload_path = PKG / "skills" / "agent-protocol" / "task_payload.schema.json"
+        boundary_members = {
+            "contradiction-analyst": "Analyzer", "patent-search-scout": "Analyzer",
+            "disclosure-architect": "Executor", "patent-attorney-writer": "Executor",
+            "patent-examiner-sim": "Reviewer", "second-opinion-reviewer": "Reviewer",
+        }
+        if not arch_path.is_file():
+            print("  ❌ docs/architecture.md 不存在——角色矩阵真源缺失")
+            ok_all = False
+        elif not payload_path.is_file():
+            print("  ❌ task_payload.schema.json 不存在")
+            ok_all = False
+        else:
+            import json as _json
+            schema_obj = _json.loads(payload_path.read_text(encoding="utf-8"))
+            props = schema_obj.get("properties", {})
+            if "forbidden_boundary" not in props:
+                print("  ❌ task_payload.schema.json 缺 forbidden_boundary 字段（S-E11 未落地）")
+                ok_all = False
+            else:
+                print("  ✅ task_payload.schema.json 含 forbidden_boundary 字段（非 required）")
+            arch_text = arch_path.read_text(encoding="utf-8")
+            # 抽取角色矩阵行：| **Role**<br>标签 | 成员 | 能力边界 | 禁止边界 | 输入 | 输出 |
+            # 判据：第 1 列为「**Role**<br>标签」形态且第 4 列含 ❌（排除 L1-L4 仲裁表——
+            # 那类行第 1 列是 **L1** 形态，且第 4 列无 ❌）
+            role_rows = {}
+            for ln in arch_text.split("\n"):
+                if not (ln.strip().startswith("|") and "**" in ln and "<br>" in ln):
+                    continue
+                cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+                if len(cells) < 6:
+                    continue
+                role = cells[0].replace("**", "").split("<br>")[0].strip()
+                if role not in ("Orchestrator", "Analyzer", "Executor", "Reviewer"):
+                    continue
+                members_cell, forbids = cells[1], cells[3]
+                if "❌" not in forbids:
+                    continue
+                items = [x.strip().lstrip("❌").strip()
+                         for x in forbids.replace("<br>", "\n").split("\n") if x.strip()]
+                for m in members_cell.replace("<br>", "\n").split("\n"):
+                    m = m.strip()
+                    if m:
+                        role_rows[m] = {"role": role, "forbids": items}
+            missing_map = [m for m in boundary_members if m not in role_rows]
+            if missing_map:
+                print(f"  ❌ 角色矩阵未覆盖成员：{missing_map}")
+                ok_all = False
+            else:
+                print("  ✅ 角色矩阵覆盖 6 成员（真源=architecture.md §二）")
+                empty = [m for m, v in role_rows.items() if not v["forbids"]]
+                if empty:
+                    print(f"  ❌ 成员禁止边界为空：{empty}")
+                    ok_all = False
+                else:
+                    print("  ✅ 6 成员禁止边界均非空（下沉契约有内容来源）")
+                role_mismatch = []
+                for mid, expect_role in boundary_members.items():
+                    got = role_rows[mid]["role"]
+                    if got != expect_role:
+                        role_mismatch.append(f"{mid}: 矩阵={got} 期望={expect_role}")
+                if role_mismatch:
+                    print(f"  ❌ 成员角色归类不一致：{role_mismatch}")
+                    ok_all = False
+                else:
+                    print("  ✅ 6 成员角色归类与矩阵一致（Analyzer/Executor/Reviewer）")
         test_file = PKG / "tests" / "baselines" / "l2-full-a01" / "T-20261015-A07__patent-attorney-writer.md"
         if test_file.exists():
             text = test_file.read_text(encoding="utf-8")

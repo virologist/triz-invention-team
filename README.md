@@ -8,24 +8,41 @@ Team 型（多角色协作团队）
 
 ## 团队构成
 
+7 名智能体 = 1 主理人 + 6 成员。
+
 | 成员 | ID | 职责 |
 |------|-----|------|
 | 齐创见（主理人） | triz-invention-team-team-lead | 阶段0需求锁定+领域坍缩+全流程调度 |
 | 解其纷 | contradiction-analyst | TRIZ矛盾建模+40发明原理引导，≥3创意方向 |
 | 甄无遗 | patent-search-scout | 三轮查新（关键词→分类号→差异化），X/Y/A/R/P分级 |
 | 严三性 | patent-examiner-sim | 对抗式三性攻击，绿/黄/红裁决 |
+| 审外审 | second-opinion-reviewer | 独立二审复核（含利益冲突边界，自动捕捉确认偏误） |
 | 谭无隐 | disclosure-architect | 技术交底书五要素结构化 |
 | 权要达 | patent-attorney-writer | 权利要求书+说明书+摘要撰写 |
 
 ## 工作流程（6阶段SOP）
 
-阶段0需求锁定（苏格拉底≤5轮×≤5问）→ 阶段1 TRIZ问题建模 → 阶段2 原理引导（≥3方向）→ 阶段3 三轮查新（硬性）→ 阶段4 对抗式三性确认+用户C1-C8确认 → 阶段5 交底书→申请文件撰写 → 最终交付。
+阶段0需求锁定（苏格拉底≤5轮×≤5问）→ 阶段1 TRIZ问题建模 → 阶段2 原理引导（≥3方向）→ 阶段2.5 汇聚校准 → 阶段3 三轮查新（硬性）→ 阶段4 对抗式三性确认+独立二审+用户C1-C8确认 → 阶段5 交底书→申请文件撰写 → 最终交付。
 
-预设Workflow：A全流程陪跑 / B单点TRIZ突破 / C查新+授权前景评估 / D交底书与申请文件代写。
+预设Workflow：A全流程陪跑 / B单点TRIZ突破 / C查新+授权前景评估 / D交底书与申请文件代写（D 入口设前置闸：无三轮查新与 G2/G3 证据时不得直出草稿）。
 
 ## 附带技能
 
-`triz-patent-toolkit`：40发明原理全表、39工程参数、矛盾矩阵用法、分离原理、ARIZ概要、专利法条速查、交底书模板、权利要求撰写指南。
+4 个技能包：
+- `triz-matrix`：40发明原理全表、39工程参数、1521 交叉点矛盾矩阵、ARIZ概要
+- `patent-law`：中国专利法第 22.2 / 22.3 / 22.4 条（新颖性 / 创造性 / 实用性）
+- `claims-drafting`：权利要求撰写指南 + 交底书模板
+- `agent-protocol`：`result_envelope` + `task_payload` 的 JSON Schema + CI gate
+
+## 质量门禁
+
+```bash
+python3 scripts/agent_ci_gate.py --strict                  # 信封 schema 门禁
+python3 scripts/contract_enforce.py --self-test            # 契约自测（三源一致性 + 豁免双向断言）
+python3 scripts/state_store.py self-test                   # 门禁状态机（G1-G5 别名归一 + 回流重置）
+python3 scripts/preflight_check.py                         # 建队前 10 项 preflight
+python3 scripts/run_regression.py --list                   # 3 个回归用例
+```
 
 ## 使用示例
 
@@ -46,16 +63,18 @@ Team 型（多角色协作团队）
 
 ## 安装
 
-将专家包目录放到专家目录下：
-
-```
-/Users/biodog/.workbuddy/plugins/marketplaces/my-experts/plugins/triz-invention-team/
-```
-
-然后运行注册命令使其可见：
+WorkBuddy 支持 git 型市场，直接添加即可：
 
 ```bash
-python3 scripts/register_expert.py <expert-dir>
+/plugin marketplace add virologist/triz-invention-team
+/plugin install triz-invention-team@triz-invention-team-marketplace
+```
+
+或克隆到本地市场目录（仓库根即插件本体，无 `plugins/` 嵌套层）：
+
+```bash
+gh repo clone virologist/triz-invention-team \
+  ~/.workbuddy/plugins/marketplaces/triz-invention-team-marketplace
 ```
 
 ## 打包分享

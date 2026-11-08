@@ -184,6 +184,47 @@ def check_diagnosis_registry():
         ok(f"10. 诊断登记表结构完整（{data_rows} 行数据·{ncol} 列）")
 
 
+def check_readme_structure():
+    """11. README 结构图与实际目录一致（CYCLE-1 · S-E09 失效引用修复的复发检测）
+    判据：README.zh.md 结构图代码块中的一级目录/文件项 与 实际 ls -1 的差集必须为空。
+    只校验一级项（子目录内部结构不展开，避免过度约束文档排版）。"""
+    import re
+    p = os.path.join(PKG, "README.zh.md")
+    if not os.path.isfile(p):
+        wrn("11. README.zh.md 不存在——跳过结构图一致性校验")
+        return
+    text = open(p, encoding="utf-8").read()
+    m = re.search(r"```\n(triz-invention-team/.*?)```", text, re.S)
+    if not m:
+        wrn("11. README.zh.md 未找到结构图代码块——跳过结构图一致性校验")
+        return
+    block = m.group(1)
+    documented = set()
+    for ln in block.split("\n"):
+        s = ln.strip()
+        # 一级项行：以 ├── 或 └── 开头（前面可能有 │ 或空格）
+        if not (s.startswith("├── ") or s.startswith("└── ")):
+            continue
+        item = s[4:].split("#")[0].strip().rstrip("/")
+        if item:
+            documented.add(item)
+    actual = set()
+    for name in os.listdir(PKG):
+        if name in (".git", "__pycache__"):
+            continue
+        actual.add(name)
+    # README 结构图是「精选视图」：允许 README 自身多出 .gitignore/.learnings 之外的
+    # 未列项 → 实际多出的项记为文档缺失（需在图中补齐）
+    missing_in_doc = sorted(actual - documented)
+    extra_in_doc = sorted(documented - actual)
+    if missing_in_doc:
+        blk(f"11. README 结构图缺失实际存在的顶层项：{missing_in_doc}")
+    if extra_in_doc:
+        blk(f"11. README 结构图列出了不存在的顶层项：{extra_in_doc}")
+    if not missing_in_doc and not extra_in_doc:
+        ok(f"11. README 结构图与实际目录一致（{len(actual)} 项·diff=0）")
+
+
 def check_budget(members):
     """3. 预算估算"""
     if not members:
@@ -353,6 +394,7 @@ def main():
     check_assembler()
     check_declared_skills()
     check_diagnosis_registry()
+    check_readme_structure()
 
     # CYCLE-1 · S-E04：诊断触发器 T1-T3 机械判定（散文条款脚本化，原则①）
     try:
