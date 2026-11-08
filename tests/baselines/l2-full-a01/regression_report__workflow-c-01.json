@@ -1,10 +1,10 @@
 {
   "case_id": "workflow-c-01",
-  "run_dir": "outputs/regression-20261015/a01",
-  "checked_at": "2026-11-07T17:50:35.725707",
+  "run_dir": "tests/baselines/l2-full-a01",
+  "checked_at": "2026-11-09T04:12:09.751895",
   "total": 8,
-  "passed": 7,
-  "failed": 1,
+  "passed": 8,
+  "failed": 0,
   "info": 0,
   "results": [
     {
@@ -40,8 +40,8 @@
     {
       "id": "A6",
       "type": "required_regex",
-      "pass": false,
-      "detail": "缺: ['法\\\\s?25|法25']"
+      "pass": true,
+      "detail": "全部命中（any_member 扫 2 份产出）"
     },
     {
       "id": "A7",
@@ -56,5 +56,5 @@
       "detail": "11064 字符（≥3000）"
     }
   ],
-  "verdict": "FAIL"
+  "verdict": "PASS"
 }
