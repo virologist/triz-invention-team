@@ -1,7 +1,7 @@
 {
   "name": "triz-invention-team",
   "version": "2.9.0",
-  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.8: R1-R5 diagnosis fixes + U1-U3 upgrades (context-exempt rebuild, routing reminder rechain, cost profile, LLM two-tier gate, patent-family memory).",
+  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.9: CYCLE-1 diagnosis rebuild (Workflow D pre-gate mechanical check, real three-source drift probe, wall-clock dual-track metrics, single-source gate state machine).",
   "author": {
     "name": "TZUVet",
     "email": "tzuvet@example.com"

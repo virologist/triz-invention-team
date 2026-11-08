@@ -2,9 +2,12 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-08
+## [Unreleased]
 
-> 工作区整理 + 残留全清偿（11 个 commit：8285208…b43d2de）。第三轮诊断残留 8 项全部闭环。
+> 本段内容为 **2026-11-08 工作区整理 + 残留全清偿**（11 个 commit：8285208…b43d2de），
+> 时间早于 `[2.9.0]`（2026-11-09），但当时未单独 bump 版本号，故滞留于 Unreleased。
+> 版本号待下次统一 bump 时归并（S-E41：原标题带日期 `2026-11-08`，与下方 2026-11-09
+> 形成日期倒序，已按 Keep a Changelog 规范改为不带日期的 `[Unreleased]`）。
 
 ### Changed（工作区整理）
 - **基线资产归位**：包根游离 `darwin-results.tsv` 按 CHANGELOG 2.2.0 声明补迁移至 `docs/evolution-log.tsv`（该声明当时未实际执行，README.zh.md 引用悬空至今）
@@ -55,6 +58,16 @@ All notable changes to the **TRIZ Invention Team** will be documented here. The 
   （非 required，不破历史信封；凡下发即须填）。
 
 ### Fixed（缺陷清偿）
+- **C4 再诊断新增 4 条 🔴（S-E28…S-E31）**：C4 派独立子智能体从零视角审计本轮全部改动，
+  产出 14 条新增问题（🔴4 · 🟡6 · 🟢4），4 条 🔴 已全部清偿——
+  S-E28 `contract_enforce` 自测4 改为调用**真实三源判定函数**（抽出 `check_three_source_drift()`
+  单一真源，自测1/自测4 共用）并新增**变异测试**（短路真实判定 → 探针必须失去判别力，
+  证明非自指模拟）· S-E29 `verify_triz_data` 的 `warn()` 零调用 → `--strict` 语义空转（第二个死参数），
+  新增 `check_soft_invariants()` 落地 3 个真实 warn 产出点 · S-E30 `agent_ci_gate` fallback 路径
+  `sender = agent_id` → `agent_mismatch` 恒 False → 未知 agent_id 直接 PASS（假绿），
+  改为 sender 由**文件名** `T-*__<member>.md` 推导，与 agent_id 独立可比 ·
+  S-E31 主理人 MD「phase=3 进 R2」与 `state_store.PHASE_NEXT[3]` 互斥（双语义），
+  订正为「phase 是阶段号不是轮次号，R2/R3 轮次由 `search_rounds` 记录」。
 - **幽灵验证项 3 处（S-E21）**：preflight 第9项「门禁机械校验」· CONTRACT_ENFORCEMENT 的
   `DRIFT_PROBE` 反向验证 · `verify_triz_data.py --strict` 死参数（解析后从未被读取；现显式语义：
   strict 下 warn 也阻断，默认 warn 不阻断）。
@@ -83,6 +96,24 @@ All notable changes to the **TRIZ Invention Team** will be documented here. The 
 - **失效引用修正**：`outputs/` → `tests/baselines/`；`plugins/triz-invention-team/*` → 仓库根相对路径；
   删除不存在的 `scripts/register_expert.py` 与技能包名 `triz-patent-toolkit`（实际 4 个技能包）。
 - **双 marketplace.json description 版本同步**：v2.6 / v2.7 → v2.9（version 字段本已是 2.8.0）。
+
+### Changed（口径同步 · C4 再诊断 S-E32…S-E41）
+- **S-E32 版本收口**：README.zh.md 三处 v2.8 → v2.9 + `plugin.json` description 版本文案同步。
+- **S-E33 OPERATIONS 失效引用**：`agent_ci_gate.py:294-296` 行号引用失效 → 订正为 `351-353`；
+  同条 L89「基线目录无该类文件」描述已过期（fallback 落地后实测扫 10 个信封）→ 同步订正。
+- **S-E34 preflight docstring**：检查项清单仍只列 7 项 → 补全至**实际 12 项**（含第 10/11/12 项）。
+- **S-E35 幽灵门禁残留入口**：`agent_ci_gate` 零覆盖时 `--strict` 仍 exit 0（假绿）→
+  strict 模式下零覆盖**阻断**（exit 1），默认 warn-only 保持 exit 0。实测：空目录 strict → rc=1 / 默认 → rc=0。
+- **S-E36 诊断登记表**：`diagnosis-protocol.md` §六「已修复」列仍写「P1-5（待提交）」→ 补全至实际 commit hash。
+- **S-E37 自进化台账**：`docs/evolution-log.tsv` 补录本轮 CYCLE-1 全部批次 commit。
+- **S-E38 报告名不符**：README.zh.md 注2 写 `agent_ci_gate_report.json` → 实际产物名 `ci_gate_report.json`。
+- **S-E39 成员数口径**：preflight 第 6 项「成员白名单 6 个」显式标注「= 6 执行成员，不含主理人；
+  全仓 7 = 1 主理人 + 6 成员」，消除并列歧义。
+- **S-E40 死代码**：`LEGACY_CUTOFF` / `is_legacy` 仅在 results.json 路径生效（该路径实测扫描数为 0）
+  → 死代码。抽出 `_is_legacy_name()` 单一真源函数，results.json 与 markdown fallback 两路径共用，
+  并真正用上 `LEGACY_CUTOFF`（fallback 路径此前完全无 legacy 概念）。
+- **S-E41 CHANGELOG 排序**：`[Unreleased]` 段带日期 `2026-11-08` 排在 `[2.9.0]`（2026-11-09）之前形成日期倒序
+  → 按 Keep a Changelog 规范改为不带日期的 `[Unreleased]`。
 
 ### Evaluated（评估后不实施）
 - `marketplace.json` 的 `source: "./plugins/triz-invention-team"`：本仓 git 根为平铺布局（无 `plugins/`

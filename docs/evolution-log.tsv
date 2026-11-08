@@ -13,3 +13,10 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode	gate
 2026-11-08T15:33:29	57f52c0	system	-	三用例回归A01-7/7+B01-7/8+C01-8/8全PASS	keep	工作区整理	outputs基线迁入tests/baselines+全量引用同步+残留8项清偿	real	全套门禁
 2026-11-08T18:00:30	3812043	system	-	state_store self-test 11断言全过+三用例全PASS	keep	门禁状态机	CYCLE1-P0-1 GATE_ALIASES归一+G2落点+reset_for_rework+Phase2.5节点	real	全套门禁
 2026-11-08T18:06:34	a8633ba	system	-	5门禁exit0+preflight exit0+契约自测exit0+三用例全PASS	keep	元层脚本化	CYCLE1-P1-1 diagnosis_trigger+contract fail-open修复+三源自测兑现+preflight假绿修复	real	全套门禁
+2026-11-09T03:59:41	1a747b5	system	-	P1-2：诊断登记表结构机械校验+台账单源化（preflight 第10项通过）	keep	元层脚本化	CYCLE1-P1-2/S-E05,S-E08：diagnosis登记表结构校验 + evolution_log.py 单源写入口	real	preflight+evolution_log verify
+2026-11-09T04:07:16	3a51ce1	system	-	P1-3：README结构图与git入库口径diff=0	keep	文档口径	CYCLE1-P1-3/S-E09,S-E11：README结构图实测重绘 + forbidden_boundary 下沉任务契约	real	preflight 第11项
+2026-11-09T04:12:20	ad96ee9	system	-	P2-1：墙钟WARN可产出+成员数口径7统一	keep	门禁状态机	CYCLE1-P2-1/S-E12,S-E13,S-E14：墙钟 WARN 机械校验 + 成员数口径 + W1 校准前提	real	agent_ci_gate+preflight
+2026-11-09T04:14:41	69c9813	system	-	C3：三用例回归 A7/7+B7/8+C8/8 零回退	keep	回归基线	CYCLE1-C3：回归基线报告同步为最新实测	real	全套门禁
+2026-11-09T05:56:45	764b1dd	system	-	P1-4：幽灵验证项清偿+门禁实测覆盖10信封合规率100%	keep	幽灵验证项	CYCLE1-P1-4/S-E21,S-E22,S-E23：DRIFT_PROBE 真实探针落地 + agent_ci_gate fallback 扫基线 markdown + 结构校验对齐 git 入库口径	real	preflight+contract+agent_ci_gate
+2026-11-09T06:04:39	b871989	system	-	P1-5/P1-6：架构文档四方对齐+19条第2轮交叉验证问题全清偿+版本2.9.0	keep	架构文档	CYCLE1-P1-5/P1-6/S-E24..S-E27：state模板补全5gates+4metrics+evidence / 墙钟双轨制 / L3仲裁confidence降末位 / task_payload补forbidden_boundary	real	全套门禁
+2026-11-09T06:50:54	fdf1a95	system	-	C4：4条🔴清偿+变异测试全过（自测4判别力/warn可产出/未知agent检出）	keep	再诊断清偿	CYCLE1-C4/S-E28..S-E31：三源漂移单一真源+变异测试 / verify_triz_data warn零调用修复 / agent_ci_gate sender恒假修复 / phase=3双语义订正	real	全套门禁

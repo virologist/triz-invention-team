@@ -83,10 +83,10 @@
 
 ## 六、验证清单（5条全过才算系统可加载）
 
-1. `python3 scripts/agent_ci_gate.py --results-dir tests/baselines/ --self-test` → 合规样本通过
-   > ⚠️ `--self-test` 走**内置 schema 自测**分支（`agent_ci_gate.py:294-296`），`--results-dir` 在该分支**不生效**（仅在非 self-test 扫描真实信封时使用）。要真实扫描基线信封，去掉 `--self-test`：
-   > `python3 scripts/agent_ci_gate.py --results-dir tests/baselines/` → 扫 `*-results.json`
-   > （注：基线目录当前无该类文件，实测扫描数 0 → 脚本会提示「未发现 \*-results.json 文件」）
+1. `python3 scripts/agent_ci_gate.py --self-test` → schema 自测通过（内置正/负样本）
+   > ⚠️ `--self-test` 走**内置 schema 自测**分支（`agent_ci_gate.py:351-353`），`--results-dir` 在该分支**不生效**（仅在非 self-test 扫描真实信封时使用）。要真实扫描基线信封，去掉 `--self-test`：
+   > `python3 scripts/agent_ci_gate.py --results-dir tests/baselines/` → 优先扫 `*-results.json`；**该形态实测为 0** → 自动回退扫基线 markdown 信封（S-E22 fallback）
+   > （实测：回退扫描 10 个信封，合规率 100%；报告落 `outputs/ci_gate_report.json`）
 2. `python3 scripts/verify_triz_data.py --strict` → 全通过
 3. `python3 tests/test_vendor_core.py` → V1-V6 全 PASS
 4. `git status` → working tree clean

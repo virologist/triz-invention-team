@@ -8,7 +8,7 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
 同一失效模式）。本脚本把 4 项里**可机械判定**的部分变成一次命令，
 并把 failure-007 教训（权威数据未经校验就注入上下文）也纳入必检。
 
-检查项：
+检查项（共 12 项，S-E34 补全至与实现一致）：
   1. 失败索引可查（expert-failures 目录 + index.md 可读 + 按关键词命中相关记录）
   2. docs/routing-log.md 可写（路由决策落盘点）
   3. 预算估算：成员数 × 单成员预估 token ≤ 全局预算 120K
@@ -16,10 +16,16 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
   5. 权威数据自检：调 scripts/verify_triz_data.py（防 failure-001/007 复发）
   6. 装配器可用：scripts/assemble_spawn_prompt.py 存在且可执行（shared-core 可达）
   7. 成员声明的预加载 skills 在磁盘上确实存在（防"声明了但路径是编的"）
+  8. 成员信封 schema 契约版本可解析（agent-protocol / result_envelope）
+  9. 成员数口径核对（6 成员 + 1 主理人 = 7，防派单漏人/多派人）
+  10. docs/diagnosis-protocol.md §六 诊断登记表结构完整（表头 + 数据行列数一致）
+  11. README.zh.md 结构图与 git 实际入库顶层项一致（按 .gitignore 解析后比对）
+  12. Workflow D 入口前置闸：G1/G2/G3 全关 + 查新与裁决证据文件真实落盘
 
 用法：
   python3 scripts/preflight_check.py [--expert-dir DIR] [--members a,b,c] [--task-file F] [--keywords 词1,词2]
   python3 scripts/preflight_check.py --members contradiction-analyst,patent-search-scout --task-file /tmp/task.md
+  python3 scripts/preflight_check.py --state-path outputs/moheng-state-<task_id>.json   # 派 Workflow D 前必传
 
 退出码：0=可启动（含 warn）  1=存在阻断项（BLOCK）  2=用法/环境错误
 """
@@ -385,7 +391,10 @@ def check_assembler():
             % (r.stderr or r.stdout).strip()[:200])
         return
     n = len([x for x in r.stdout.split("\n") if x.strip()])
-    ok("6. 装配器可用，成员白名单 %d 个" % n)
+    # S-E39：明确口径——白名单 = 6 个**执行成员**（不含主理人）。
+    # 全仓「7」口径 = 1 主理人 + 6 成员，两者并列易生歧义，此处显式标注。
+    ok("6. 装配器可用，成员白名单 %d 个（= 6 执行成员，不含主理人；"
+       "全仓 7 = 1 主理人 + 6 成员）" % n)
 
 
 def check_declared_skills():

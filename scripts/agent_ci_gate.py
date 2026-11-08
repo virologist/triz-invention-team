@@ -43,6 +43,30 @@ KNOWN_AGENTS = {
 # 历史归档边界：2026-09-03前归档标记为legacy（pre-v2.0无信封）
 LEGACY_CUTOFF = "2026-09-03"
 
+
+def _is_legacy_name(name: str) -> bool:
+    """legacy 文件名判定（S-E40 · CYCLE-1 第2轮再诊断）。
+
+    此前 `LEGACY_CUTOFF` 与 `is_legacy` 判定**只在 results.json 路径生效**，
+    而该路径实测扫描数为 0 → 常量成了**死代码**（定义了从不参与判定）。
+    现把判定抽成**单一真源函数**，results.json 与 markdown fallback
+    两条路径共用，并真正用上 LEGACY_CUTOFF。
+
+    判据：文件名含 legacy 归档前缀，或文件名内嵌日期早于 LEGACY_CUTOFF。
+    """
+    legacy_prefixes = ("arch-", "tiebreak-", "search-r2-", "integration-")
+    if any(p in name for p in legacy_prefixes) or "search-r2" in name:
+        return True
+    m = re.search(r"(20\d{2})(\d{2})(\d{2})", name)
+    if m:
+        y, mo, d = m.groups()
+        try:
+            stamp = "%s-%s-%s" % (y, mo, d)
+        except Exception:
+            return False
+        return stamp < LEGACY_CUTOFF
+    return False
+
 def manual_validate(instance: dict, schema: dict) -> list:
     """无jsonschema依赖的手动校验：必填+枚举+pattern。返回错误列表（空=通过）。"""
     errors = []
@@ -162,6 +186,14 @@ def _process_baseline_markdown(md_path: Path, schema: dict) -> dict:
         return report
     envelopes = extract_envelopes(text)
     if not envelopes:
+        # S-E40：fallback 路径补 legacy 判定——旧基线无信封属预期归档，
+        # 计 legacy（不计入合规率分母）而非 failed，否则 pre-commit hook 会
+        # 被历史归档误伤阻断。
+        if _is_legacy_name(md_path.name):
+            report["legacy"] += 1
+            report["details"].append({"sender": md_path.stem, "result": "LEGACY",
+                                      "issue": "pre-v2.0归档，不计入合规率分母"})
+            return report
         report["failed"] = 1
         report["details"].append({"sender": md_path.stem, "result": "no_envelope_found",
                                   "issue": "基线 markdown 中未发现上行信封"})
@@ -201,8 +233,8 @@ def _process_baseline_markdown(md_path: Path, schema: dict) -> dict:
 def process_results_file(results_path: Path, schema: dict) -> dict:
     """处理单个*-results.json文件，返回校验报告。"""
     report = {"file": results_path.name, "messages": [], "total": 0, "valid": 0, "partial": 0, "failed": 0, "legacy": 0, "details": []}
-    # legacy判定：文件名以arch/integration/e2e/tiebreak/search-r2等开头且时间早于cutoff视为legacy
-    is_legacy = any(prefix in results_path.name for prefix in ("arch-", "tiebreak-", "search-r2-", "integration-")) or "search-r2" in results_path.name
+    # legacy判定（S-E40）：走单一真源函数，与 markdown fallback 路径共用
+    is_legacy = _is_legacy_name(results_path.name)
     # CYCLE-1 · S-E22：基线 markdown 形态（fallback 扫描）——信封直接埋在正文里，
     # 不是 results.json 的 []{from,text} 消息数组。走独立分支解析。
     if results_path.suffix == ".md":
@@ -385,6 +417,14 @@ def main():
     if not results_files:
         print(f"⚠️ 未发现 *-results.json 文件，且回退扫描也无含信封的基线 markdown")
         print(f"    （results_dir={results_dir}）——本门禁本轮**零覆盖**")
+        # S-E35：零覆盖 = 门禁**从未校验任何信封**（幽灵门禁同型假绿）。
+        # 默认 warn-only 保持 exit 0（首次部署不阻断）；但 --strict 模式
+        # 必须阻断——strict 的语义是「本轮必须真的校验到东西」，
+        # 否则 pre-commit hook 的 ① 信封门禁在目录被清空时静默放行。
+        if args.strict:
+            print(f"❌ --strict 模式下零覆盖属于阻断项：门禁未校验任何信封，"
+                  f"无法证明契约合规。请确认 --results-dir 指向正确的基线目录。")
+            return 1
         return 0
 
     print(f"\n=== 校验 {len(results_files)} 个测试结果文件 ===")
