@@ -20,7 +20,7 @@ Team 型（多角色协作团队）
 | 谭无隐 | disclosure-architect | 技术交底书五要素结构化 |
 | 权要达 | patent-attorney-writer | 权利要求书+说明书+摘要撰写 |
 
-## 工作流程（6阶段SOP）
+## 工作流程（7 阶段节点 SOP）
 
 阶段0需求锁定（苏格拉底≤5轮×≤5问）→ 阶段1 TRIZ问题建模 → 阶段2 原理引导（≥3方向）→ 阶段2.5 汇聚校准 → 阶段3 三轮查新（硬性）→ 阶段4 对抗式三性确认+独立二审+用户C1-C8确认 → 阶段5 交底书→申请文件撰写 → 最终交付。
 
@@ -40,7 +40,7 @@ Team 型（多角色协作团队）
 python3 scripts/agent_ci_gate.py --strict                  # 信封 schema 门禁
 python3 scripts/contract_enforce.py --self-test            # 契约自测（三源一致性 + 豁免双向断言）
 python3 scripts/state_store.py self-test                   # 门禁状态机（G1-G5 别名归一 + 回流重置）
-python3 scripts/preflight_check.py                         # 建队前 10 项 preflight
+python3 scripts/preflight_check.py                         # 建队前 12 项 preflight
 python3 scripts/run_regression.py --list                   # 3 个回归用例
 ```
 

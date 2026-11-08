@@ -84,15 +84,45 @@ Context = 角色MD(自身)
   },
   "gates": {
     "search_3rounds_complete": false,
+    "trinity_verdict_pass": false,
     "c1_c8_confirmed": false,
-    "disclosure_gap_scan": false
+    "disclosure_gap_scan": false,
+    "g5_format_compliant": false
+  },
+  "conditions": {},
+  "evidence": {
+    "search_report": "",
+    "verdict_report": ""
   },
   "retry_counts": {"contradiction-analyst": 0, "patent-attorney-writer": 0},
   "confirmed_items": {"C1": false, "C2": false, "...": false},
   "conflicts": [],
-  "metrics": {"total_duration_ms": 0, "agent_calls": 0}
+  "metrics": {
+    "total_duration_ms": 0,
+    "total_duration_ms_wall": 0,
+    "agent_calls": 0,
+    "duration_source": "lead_measured",
+    "loopback_count": 0
+  }
 }
 ```
+
+> **CYCLE-1 · S-E24（2026-11-09）**：本节此前只列 3 个 gates 键（缺 G2 `trinity_verdict_pass`
+> 与 G5 `g5_format_compliant`），且 metrics 缺墙钟双轨字段——与 `scripts/state_store.py:64-81`
+> 的实际模板（5 键 + 4 metrics 字段）不一致。现按**脚本为单一权威**对齐。
+>
+> **门禁别名表（唯一真源 = `state_store.GATE_ALIASES`）**：
+> `G1→search_3rounds_complete` · `G2→trinity_verdict_pass` · `G3→c1_c8_confirmed` ·
+> `G4→disclosure_gap_scan` · `G5→g5_format_compliant`。
+> 写入 `gates.G1` 等编号形态会被**自动归一**到上述语义键，防止编号键与语义键双轨并存
+> 导致门禁永远关不掉（S-E01 修复）。
+>
+> **evidence 键**（S-E02 修复）：Workflow D 入口前置闸的落盘证据路径——
+> `search_report`（三轮查新报告）+ `verdict_report`（三性裁决）。
+> **文件缺失 = 视为未查新**；`preflight_check.py` 第 12 项机械校验本键。
+>
+> **loopback_count**：Phase 2↔3/4 回流累计，上限 2（`state_store.LOOPBACK_MAX`），
+> 超限升级 L4 用户裁决（S-E10/S-E18）。
 
 ### 3.3 Loop Controller（循环控制器）
 
@@ -127,12 +157,19 @@ VERIFY  门禁校验（格式/约束/前置条件/质量）
 
 ### 3.5 Observability（可观测性）
 
-每次调度记录：
-- `duration_ms`：spawn到回传耗时
+每次调度记录（**墙钟双轨制** · CYCLE-1 · S-E25）：
+- `duration_ms`：**成员自报**耗时（不含调度排队；自报口径，仅作参考）
+- `duration_ms_wall`：**主理人实测**墙钟（spawn 到回传的完整墙钟耗时；**权威口径**，
+  预算熔断与端到端延迟一律用它）
+- `duration_source`：`self_report` / `lead_measured` / `estimated`（标明该次 `duration_ms` 的来源）
 - `tokens_in/out`：上下文与产出规模
 - `status`：success/partial/failed/blocked
-- `confidence`：agent自评置信度0-100
+- `confidence`：agent自评置信度0-100（**仅为末位参考信号**，failure-006 已证自评不可靠）
 - `retry_count`：重试次数
+
+> **两轨禁止互相覆盖**：`duration_ms` 与 `duration_ms_wall` 是两个独立字段，不得用其一改写另一。
+> `agent_ci_gate.check_wall_clock()` 对「有 metrics 但缺 `duration_ms_wall`」出 WARN（不阻断，
+> 供主理人回填）——这是 S-E12 落地的机械锚点。
 
 **质量指标**：
 - 一次通过率 = 首次VERIFY即PASS的Phase数 / 总Phase数
@@ -162,9 +199,19 @@ VERIFY  门禁校验（格式/约束/前置条件/质量）
     "format": "markdown"
   },
   "constraints": ["禁止评估新颖性", "禁止凭记忆补全矛盾矩阵"],
+  "forbidden_boundary": [
+    "禁止代写交底书或申请文件正文（属 disclosure-architect / patent-attorney-writer 职责）",
+    "禁止提前给出授权前景结论（属 patent-examiner-sim 职责）"
+  ],
   "deadline_hint": "控制在800字内"
 }
 ```
+
+> **CYCLE-1 · S-E27（2026-11-09 · S-E11 下沉）**：本示例此前缺 `forbidden_boundary` 字段，
+> 而 `task_payload.schema.json` 的 `additionalProperties` 为 **false** —— 按本示例原样下发
+> 会被 schema 拒绝。`forbidden_boundary` 取值来自 §二 角色矩阵「禁止边界」列，按成员角色取值
+> （真源 = `docs/architecture.md` §二；`contract_enforce.py` 自测1b 校验二者一致性）。
+> 注：该字段为**非 required**（不破历史信封），但**凡下发即须填**。
 
 ### 4.2 上行契约：成员 → 编排者（result_envelope）
 
@@ -238,8 +285,14 @@ VERIFY  门禁校验（格式/约束/前置条件/质量）
 **优先级链**（高→低）：
 1. **Reviewer > Executor**（审查者判断优于执行者自述）
 2. **专业对口 > 通用**（领域专属agent优于跨领域判断）
-3. **高置信度 > 低置信度**（confidence字段量化比较，差距>15分则高者胜）
-4. **证据充分 > 推理**（有外部证据支撑的结论优于纯推理）
+3. **证据充分 > 推理**（有外部证据支撑的结论优于纯推理）
+4. **高置信度 > 低置信度**——**confidence 仅为末位参考信号，不单独裁定**
+
+> **CYCLE-1 · S-E26（2026-11-09 · D3-1 同步）**：本节此前把 confidence 排在第 3 位且写
+> 「差距>15分则高者胜」，与主理人 MD:271 的 D3-1 订正（2026-11-08）**直接冲突**——
+> failure-006 已证成员自评置信度不可靠，单字段落有被滥用风险。现按主理人 MD 口径对齐：
+> confidence 降为**第 4 位**（末位），且**不得单独裁定**；裁定必须给出双方 evidence 质量
+> 对比的具体理由，confidence 只在其余三项打平时作最后 tie-break 参考。
 
 **仲裁流程**：
 ```
@@ -250,8 +303,11 @@ VERIFY  门禁校验（格式/约束/前置条件/质量）
 按优先级链裁定
   ↓
   ├─ 可裁定 → 记录裁定理由至 state.conflicts，推进
-  ├─ 不可裁定（confidence差距≤15且证据同级）→ 触发tie-break：
+  ├─ 不可裁定（证据同级且 confidence 差距≤15）→ 触发tie-break：
   │     调度 third-party（second-opinion-reviewer）做最终裁决
+  │     ※ 若 second-opinion 自身为冲突方（无第三方可用）→ 跳过tie-break，
+  │        直接升级L4用户裁决，并提交「条件性合并方案」
+  │        （黄牌+补充实验证据+权项场景限定）——见主理人 MD:273
   └─ tie-break仍僵持 → 升级用户（L4）
 ```
 

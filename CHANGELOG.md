@@ -23,6 +23,81 @@ All notable changes to the **TRIZ Invention Team** will be documented here. The 
 - D4-2 himmpat 登录态探测：运行时状态不可预判，scout L2→L3 降档规则已覆盖——不实施
 - 48h 回检窗口关闭：窗口内多轮门禁复跑全绿，唯一新发现（benchmark 传参混扫）非修复引入
 
+## [2.9.0] - 2026-11-09
+
+> **CYCLE-1 · 可持续迭代引擎（墨衡）**——针对本专家团的独立诊断 → 构建 → 测试&debug → 再诊断循环。
+> 共 7 个批次 commit（3812043 → P1-4），19 项 S-E01…S-E19 首诊短板 + 第2轮交叉验证 19 条确证问题全部清偿。
+
+### Added（新增机械能力）
+- **`preflight_check.py` 第 12 项 · Workflow D 入口前置闸机械校验（S-E02）**：主理人 MD:359 曾声称
+  「由 preflight 第9项机械校验」，实测 preflight 全文不含 G1/G2/G3/search_3rounds/trinity 任一字符串——
+  该校验**从未存在**（幽灵验证项）。现落地真实实现：真源 = `state_store.GATE_ALIASES`，
+  G1/G2/G3 全关 ∧ `state.evidence` 的查新/裁决落盘文件真实存在才放行，否则 BLOCK。新增 `--state-path` 参数。
+- **`contract_enforce.py` 自测4 · DRIFT_PROBE 三源漂移反向验证（S-E21）**：CONTRACT_ENFORCEMENT.md:116
+  曾声称「注入 DRIFT_PROBE → exit 1」，实测全仓仅该文档行命中、脚本内无此探针。落地真实探针：
+  基线一致 → 注入 `DRIFT_PROBE_CANARY` 检出漂移（期望 exit 1）→ 镜像同步后无漂移（期望 exit 0，
+  证明探针有判别力、非恒真）。
+- **`agent_ci_gate.py` fallback 扫描（S-E22）**：此前只扫 `*-results.json`，全仓该类文件实测为 **0**
+  → 扫描恒空、门禁恒返回 0、**从未真正校验过任何信封**（pre-commit hook ① 因此空转）。
+  现回退扫基线 markdown 中的成员产出信封（`T-*__<member>.md`，排除下划线前缀的负例/归档区）。
+  实测：扫描 10 个信封，合规率 100%。
+- **`preflight_check.py` 第 10/11 项（S-E05/S-E09）**：诊断登记表结构完整性（断表/列数检测）·
+  README 结构图与实际目录一致（按 `.gitignore` 解析后比对，对齐 git 实际入库口径）。
+- **`contract_enforce.py` 自测1b（S-E11）**：`forbidden_boundary` 契约字段与角色矩阵一致性
+  （schema 含该字段 · 矩阵覆盖 6 成员 · 禁止边界非空 · 角色归类一致）。
+- **`agent_ci_gate.check_wall_clock()`（S-E12）**：墙钟双轨制 WARN 校验（metrics 缺
+  `duration_ms_wall` / `duration_source` 非法）——不阻断，供主理人回填。
+- **`evolution_log.py` 台账单源化（S-E08）**：自进化台账唯一写入口，含
+  `append / backfill / verify / tail / self-test` 五子命令 + commit 确定性校验（禁 HEAD 等非确定标识）。
+- **`state_store.py` `evidence` 键（S-E02）**：Workflow D 前置闸的落盘证据路径
+  （`search_report` + `verdict_report`）——文件缺失 = 视为未查新。
+- **`task_payload.schema.json` `forbidden_boundary` 字段（S-E11）**：下行任务的禁止边界清单
+  （非 required，不破历史信封；凡下发即须填）。
+
+### Fixed（缺陷清偿）
+- **幽灵验证项 3 处（S-E21）**：preflight 第9项「门禁机械校验」· CONTRACT_ENFORCEMENT 的
+  `DRIFT_PROBE` 反向验证 · `verify_triz_data.py --strict` 死参数（解析后从未被读取；现显式语义：
+  strict 下 warn 也阻断，默认 warn 不阻断）。
+- **门禁键名双轨（S-E01）**：`GATE_ALIASES` 别名归一（写入 `gates.G1` 自动落语义键）+ G2
+  `trinity_verdict_pass` 补齐 + `run_regression.check_gates` 改精确读取（原按 dict 插入序取前 N 值
+  → 假阴性 → Phase5 永远卡死）。
+- **契约 fail-open（S-E15）**：违规默认即 `exit 1`，无需 `--exit-on-fail`。
+- **preflight 假绿（S-E16）**：`checked=0` 时不再输出「全部存在」。
+- **单字禁词误伤（S-E20）**：`可能` / `估计` 等单字在否定与风险语境误伤合法技术表述 → 豁免词限定。
+- **回流硬闸（S-E10/S-E18）**：`reset_for_rework` 重置门禁 + `loopback_count` 累计（上限 2，超限升级 L4）。
+- **Phase 2.5 状态节点（S-E19）**：汇聚校准纳入 `PHASE_NEXT` 状态机。
+
+### Changed（口径同步）
+- **架构文档四方位对齐（S-E24/S-E25/S-E26/S-E27）**：§3.2 state 模板补全至 5 gates +
+  4 metrics 字段 + `evidence` 键（对齐 `state_store.py` 单一权威）；§3.5 改为墙钟双轨制
+  （`duration_ms` 成员自报 / `duration_ms_wall` 主理人实测，禁止互相覆盖）；§6.2 L3 仲裁链
+  confidence 降为末位参考信号（同步 D3-1 订正，2026-11-08 只落到 MD 未同步架构文档）；
+  §4.1 task_payload 示例补 `forbidden_boundary`（schema `additionalProperties:false` → 按原示例
+  下发会被拒）。
+- **工具清单口径**：OPERATIONS §三 10 → 18 个脚本（补 `diagnosis_trigger.py` / `evolution_log.py`
+  两行）；preflight 项数 8 → 10 → **12**（README.md 与 OPERATIONS.md 曾互相矛盾且都落后）。
+- **门禁报告输出位置**：`agent_ci_gate` 报告从 `tests/baselines/` 迁至 `outputs/`
+  （基线目录是只读真源，门禁产物属派生数据）。
+- **README 口径**：阶段标题 6 阶段 → **7 阶段节点**；成员数统一「7 名智能体 = 1 主理人 + 6 成员」；
+  结构图按实测重绘（补 `.gitignore` / `knowledge/` / `vendor/` / `.learnings/` / `tests/{cases,baselines}`）。
+- **失效引用修正**：`outputs/` → `tests/baselines/`；`plugins/triz-invention-team/*` → 仓库根相对路径；
+  删除不存在的 `scripts/register_expert.py` 与技能包名 `triz-patent-toolkit`（实际 4 个技能包）。
+- **双 marketplace.json description 版本同步**：v2.6 / v2.7 → v2.9（version 字段本已是 2.8.0）。
+
+### Evaluated（评估后不实施）
+- `marketplace.json` 的 `source: "./plugins/triz-invention-team"`：本仓 git 根为平铺布局（无 `plugins/`
+  嵌套层）。本地安装（`my-experts` 市场根含 `plugins/`）正常；**单仓 GitHub 安装**会指向不存在目录。
+  C4 再诊断登记为待办项，本轮不擅自改动发布路径语义。
+
+### 验收证据（机械实测）
+- 9 项门禁全绿：`verify_triz_data --strict` · `agent_ci_gate --strict` · `agent_ci_gate --self-test` ·
+  `contract_enforce --self-test` · `state_store self-test` · `test_vendor_core` · `preflight_check` ·
+  `skill_test_runner` · `evolution_log verify`
+- 三用例回归零回退：A 7/7 PASS · B 7/8 PASS + 1 INFO · C 8/8 PASS
+- preflight 第 12 项三分支实测：门禁未关 → BLOCK(exit 1) · 证据缺失 → BLOCK · 全关+证据齐 → PASS(exit 0)
+- 交叉验证 2 轮：第 1 轮 18 脚本 `--help` 无崩溃 + 13 JSON 合法；第 2 轮从零视角复读产出 19 条确证问题
+  （🔴 8 · 🟡 7 · 🟢 4），本轮全部清偿
+
 ## [2.8.0] - 2026-11-07
 
 > 第三轮独立诊断（triz-team-diagnosis-independent-20261107-r3.md · 11 维度从零基准）R1-R5 修复 + U1-U3 升维（用户 11-07 确认全量执行）。

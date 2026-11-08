@@ -62,7 +62,7 @@
 | 2026-11-07 | T4 手动 | 17 项（S-Q1…S-D1） | Batch1-5 全部（v2.6.0+2.7.0） | Batch5A 联邦修复引入 D2-1（路由提醒丢失）——已由第三轮诊断捕获并修复（R2） | 见下方"已知残留" |
 | 2026-11-07（第三轮） | T4 手动 | 14 项（D2-1…D10-1 + U1-U3 升维） | R1-R5 全部 + U1-U3（v2.8.0） | **回检完成（2026-11-08）**：窗口内多轮全套门禁复跑全绿（vendor V1-V6 / 契约自测 / 三用例回归），唯一新发现=benchmark 目录级传参混扫（示例修正 7d9742d，非修复引入）；D4-2 himmpat 登录态探测评估：**不实施**（运行时状态不可预判，scout L2→L3 降档规则已覆盖，preflight 加探测反造假信号） | 残留 8 项已全部清偿（见 2026-11-08 行） |
 | 2026-11-08（残留清偿） | T1 同类失败复发（member_files 覆盖误判同型） | C01 法25 / U3 outdated / D3-1+D1 / OPERATIONS 订正 / vendor 核验 / spawn_watchdog / D4-2 / 回检登记 | 8 项全部清偿（d4bee57→e47a525） | 48h 后复检 | 无遗留 |
-| 2026-11-08（CYCLE-1 · 墨衡） | T4 手动 + T3 架构变更（门禁状态机改动） | 19 项（S-E01…S-E19） | P0-1（3812043）+ P1-1（a8633ba）+ P1-2（台账单源化补录） | 见下方「CYCLE-1 已知残留」 | 见下方「CYCLE-1 已知残留」 |
+| 2026-11-08（CYCLE-1 · 墨衡） | T4 手动 + T3 架构变更（门禁状态机改动） | 19 项（S-E01…S-E19） | P0-1（3812043）+ P1-1（a8633ba）+ P1-2（1a747b5）+ P1-3（3a51ce1）+ P2-1（ad96ee9）+ P1-4（764b1dd）+ P1-5（待提交） | 见下方「CYCLE-1 已知残留」 | 见下方「CYCLE-1 已知残留」 |
 
 **已知残留（2026-11-07 第三轮交接）**：
 - ~~spawn_watchdog（P2-15）~~ → **简版已落地**（2026-11-08，e47a525+）：scripts/spawn_watchdog.py 四态判定（OK/WATCH/STALL/TIMEOUT）+ H4 处置建议；桌面通知通道仍未建（等待窗口手动调用够用）
@@ -70,6 +70,7 @@
 - ~~联邦 3 包 vendor 未提交~~ → **已核验清偿**（2026-11-08）：viral-evo-lab / research-orchestration-team 工作树干净（活跃会话已提交），smart-textbook-team vendor 已在 HEAD `20c6f5a` 内；vet-med-ppt-team 有活跃改动，留权不动
 
 **CYCLE-1 已知残留（2026-11-08 · 墨衡第三轮诊断 S-E01…S-E19）**：
-- **本轮已清偿**：S-E01 门禁键名双轨（GATE_ALIASES 归一 + G2 落点 + check_gates 精确读取 + `reset_for_rework`）· S-E02 Workflow D 前置闸 · S-E03 H4 代执行例外边界 · S-E04 T1-T3 触发器脚本化（`diagnosis_trigger.py`）· S-E05 登记表断表 · S-E06/S-E17 三源自测兑现 · S-E07 frontmatter 契约字段完整性 · S-E08 台账单源化（`evolution_log.py`）· S-E10 loopback_count 机械终止 · S-E15 契约 fail-open 修复 · S-E16 preflight 假绿修复 · S-E18 退回 Phase2 强制重跑 R1-R3 · S-E19 Phase 2.5 状态节点 · S-E20 单字禁词误伤修复
-- **待清偿（本轮未做，见 C4 再诊断）**：S-E09 README 结构图/失效引用 · S-E11 `forbidden_boundary` 契约字段 · S-E12 墙钟 WARN · S-E13 成员数口径 · S-E14 W1 前提
+- **本轮已清偿（P0-1 + P1-1 + P1-2 + P1-3 + P2-1 + P1-4）**：S-E01 门禁键名双轨（GATE_ALIASES 归一 + G2 落点 + check_gates 精确读取 + `reset_for_rework`）· S-E02 Workflow D 前置闸（**P1-4 落地为 preflight 第12项机械校验**）· S-E03 H4 代执行例外边界 · S-E04 T1-T3 触发器脚本化（`diagnosis_trigger.py`）· S-E05 登记表断表 · S-E06/S-E17 三源自测兑现 · S-E07 frontmatter 契约字段完整性 · S-E08 台账单源化（`evolution_log.py`）· **S-E09 README 结构图/失效引用**（P1-3）· **S-E11 forbidden_boundary 契约字段**（P1-3）· **S-E12 墙钟 WARN**（P2-1）· **S-E13 成员数口径**（P2-1）· **S-E14 W1 前提**（P2-1）· S-E10 loopback_count 机械终止 · S-E15 契约 fail-open 修复 · S-E16 preflight 假绿修复 · S-E18 退回 Phase2 强制重跑 R1-R3 · S-E19 Phase 2.5 状态节点 · S-E20 单字禁词误伤修复 · **S-E21 幽灵验证项清偿**（P1-4：DRIFT_PROBE 探针落地 + --strict 死参数修复）· **S-E22 幽灵门禁清偿**（P1-4：agent_ci_gate fallback 扫基线 markdown 信封）· **S-E23 结构校验对齐 git 入库口径**（P1-4）· **S-E24 state 模板补全**（P1-5：architecture §3.2 对齐 5 gates + 4 metrics）· **S-E25 墙钟双轨制**（P1-5：architecture §3.5）· **S-E26 L3 仲裁口径同步**（P1-5：D3-1 订正同步至架构文档）· **S-E27 task_payload 示例补 forbidden_boundary**（P1-5）
+- **待清偿（截至 2026-11-09 · P1-4/P1-5 收口后）**：原 5 项（S-E09/S-E11/S-E12/S-E13/S-E14）已于 P1-3 与 P2-1 批次清偿完毕，**本清单已空**；新增增量项（S-E21…S-E27）亦已在 P1-4/P1-5 落地。
+- **C4 再诊断新增待登记**：`marketplace.json` 的 `source` 字段指向 `./plugins/triz-invention-team`，但本仓 git 根为**平铺布局**（无 `plugins/` 嵌套层）——本地安装（`my-experts` 市场根含 `plugins/`）正常，但**单仓 GitHub 安装**（`/plugin marketplace add virologist/triz-invention-team`）会指向不存在的目录
 - **本轮新增待登记（实测发现）**：`marketplace.json` 的 `source` 指向 `./plugins/triz-invention-team`，但本仓 git 根为**平铺布局**（无 `plugins/` 嵌套层）；该路径相对**市场根**解析，本地安装（`my-experts` 市场根含 `plugins/`）正常，但**单仓 GitHub 安装**（`/plugin marketplace add virologist/triz-invention-team`）会指向不存在的目录 —— 已登记为 C4 增量项

@@ -1,7 +1,7 @@
 {
   "case_id": "workflow-a-01",
   "run_dir": "tests/baselines/l2-full-a01",
-  "checked_at": "2026-11-09T05:55:31.493568",
+  "checked_at": "2026-11-09T06:02:04.693987",
   "total": 7,
   "passed": 7,
   "failed": 0,
