@@ -491,7 +491,7 @@ def main():
                 ok_all = False
             else:
                 print(f"  ✅ {mid}: {len(pats)} 条禁词模式（真源=frontmatter）")
-        test_file = PKG / "outputs" / "regression-20261015" / "a01" / "T-20261015-A07__patent-attorney-writer.md"
+        test_file = PKG / "tests" / "baselines" / "l2-full-a01" / "T-20261015-A07__patent-attorney-writer.md"
         if test_file.exists():
             text = test_file.read_text(encoding="utf-8")
             passed, issues, info = check_member("patent-attorney-writer", text)

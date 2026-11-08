@@ -15,7 +15,7 @@ run_regression.py — 回归测试集执行器（P2-9 · 2026-10-15 建立）
 用法：
   python3 scripts/run_regression.py --list
   python3 scripts/run_regression.py --case workflow-b-01 --scaffold
-  python3 scripts/run_regression.py --case workflow-b-01 --dir outputs/regression-20261015
+  python3 scripts/run_regression.py --case workflow-b-01 --dir tests/baselines
   python3 scripts/run_regression.py --case workflow-b-01 --dir <dir> --json
 
 退出码：0=全部断言通过（INFO 不影响）  1=存在 FAIL  2=用法/环境错误

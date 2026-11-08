@@ -20,7 +20,7 @@ triz_benchmark.py — A-Evolve BenchmarkAdapter 适配器（v2.6.0 Batch5B · S-
   results = evolver.run(cycles=5)
 
   # 2) 独立求值（不依赖 a-evolve，直接算分）
-  python3 scripts/triz_benchmark.py --level L1 --run-dir outputs/regression-20261015
+  python3 scripts/triz_benchmark.py --level L1 --run-dir tests/baselines
   python3 scripts/triz_benchmark.py --case workflow-b-01 --run-dir <dir> --json
 
 评分映射：PASS 断言数 / 总断言数（0.0-1.0）；INFO 断言计 PASS；SKIP 不计分母。

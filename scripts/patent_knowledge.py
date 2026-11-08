@@ -14,9 +14,9 @@ patent_knowledge.py — 专利族谱记忆（U3 · 2026-11-07 升维）
   - 去重键 = patent_no + domain（同专利跨域分别记——暴露特征可能不同）
 
 用法：
-  python3 scripts/patent_knowledge.py ingest outputs/regression-20261015/a01/T-...__patent-search-scout.md \
+  python3 scripts/patent_knowledge.py ingest tests/baselines/l2-full-a01/T-...__patent-search-scout.md \
       --domain 畜牧养殖/粪污处理            # 从 scout 产出沉淀
-  python3 scripts/patent_knowledge.py ingest outputs/regression-20261015/a01/ --domain 畜牧养殖/粪污处理
+  python3 scripts/patent_knowledge.py ingest tests/baselines/l2-full-a01/ --domain 畜牧养殖/粪污处理
                                                     # 目录模式：自动找 *__patent-search-scout.md
   python3 scripts/patent_knowledge.py query 粪污 刮粪      # 按关键词召回
   python3 scripts/patent_knowledge.py query --domain 畜牧养殖

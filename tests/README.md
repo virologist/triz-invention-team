@@ -75,6 +75,6 @@ python3 scripts/run_regression.py --case workflow-b-01 --dir outputs/regression-
 - **2026-09-11 · T1-T7 生产就绪测试**（v2.2.0）：兼容性/边界角色/异常路径/并发/幂等/资源限制/恢复性 7 维全 PASS。
   记录原文见 git 历史 `docs/test-matrix.md`（已于 v2.5.1 合并归档，不再独立维护）。
 - **2026-10-14 · P0-2 定向回归**：装配链（shared-core 下沉后）+ 双轨制指标 + 门禁四要素校验全通过（产出见
-  `outputs/regression-20261014/`）。
+  `tests/baselines/20261014-p0-2/`）。
 - **2026-10-15 · L1 首跑（b-01）**：7/8 PASS；发现 3 处契约一致性缺陷（failure-008）已修复。
   **2026-10-15 · L1 重跑（b-01）**：7/8 PASS（1 INFO），机械计量 20,018 字符 / ≈10.8k tokens / 321s。

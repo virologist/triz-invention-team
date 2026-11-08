@@ -85,11 +85,11 @@
 # 对单成员产出验证
 python3 scripts/contract_enforce.py \
   --member contradiction-analyst \
-  --output outputs/regression-20261015/a01/T-20261015-A01__contradiction-analyst.md
+  --output tests/baselines/l2-full-a01/T-20261015-A01__contradiction-analyst.md
 
 # 全员 L1/L2 回归时一起跑
 python3 scripts/contract_enforce.py \
-  --output-dir outputs/regression-20261015/ \
+  --output-dir tests/baselines/ \
   --exit-on-fail
 
 # U2 两级门禁：机械命中 + LLM 语义复核清单（主理人 VERIFY 用）

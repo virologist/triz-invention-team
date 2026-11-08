@@ -138,9 +138,9 @@ All notable changes to the **TRIZ Invention Team** will be documented here. The 
 - **`agent_ci_gate.py` 重复 `extract_envelopes` 定义**：删除死代码（1505 字符），保留版加来源注释；`--self-test` 复验通过
 
 ### Added
-- **L1 回归首跑通过**（`outputs/regression-20261015/b01/`）：7/8 断言 PASS（1 INFO）；机械计量
+- **L1 回归首跑通过**（`tests/baselines/l1-analyst-b01/`）：7/8 断言 PASS（1 INFO）；机械计量
   20,018 字符 / ≈10.8k out-tokens / 墙钟 321s（lead_measured）；`_VERIFY.md` 含完整证据链
-- `outputs/regression-20261015/_pre-fix-b01/`：首跑违约 ID 产物归档 + NOTE 说明（缺陷发现即价值）
+- `tests/baselines/_pre-fix-b01/`：首跑违约 ID 产物归档 + NOTE 说明（缺陷发现即价值）
 
 ## [2.5.0] - 2026-10-15
 

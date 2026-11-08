@@ -14,7 +14,7 @@ cost_profile.py — 成本画像：聚合 metrics.jsonl → 成员×阶段经验
 
 用法：
   python3 scripts/cost_profile.py                     # 聚合全部 outputs/**/metrics.jsonl
-  python3 scripts/cost_profile.py --run-dir outputs/regression-20261015
+  python3 scripts/cost_profile.py --run-dir tests/baselines
   python3 scripts/cost_profile.py --json              # 机器可读（preflight 可消费）
   python3 scripts/cost_profile.py --member patent-search-scout   # 单成员明细
 

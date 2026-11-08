@@ -49,7 +49,7 @@ def main():
     ap.add_argument("--threshold", type=int, default=12)
     args = ap.parse_args()
     if args.l2:
-        base = Path(__file__).parent.parent / "outputs/regression-20261015/a01"
+        base = Path(__file__).parent.parent / "tests/baselines/l2-full-a01"
         args.disclosure = args.disclosure or str(base / "T-20261015-A06__disclosure-architect.md")
         args.claims = args.claims or str(base / "T-20261015-A07__patent-attorney-writer.md")
     if not (args.disclosure and args.claims):

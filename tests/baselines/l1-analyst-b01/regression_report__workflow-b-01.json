@@ -1,7 +1,7 @@
 {
   "case_id": "workflow-b-01",
-  "run_dir": "outputs/regression-20261015/b01",
-  "checked_at": "2026-11-07T17:50:09.185954",
+  "run_dir": "tests/baselines/l1-analyst-b01",
+  "checked_at": "2026-11-08T10:38:29.688843",
   "total": 8,
   "passed": 7,
   "failed": 0,

@@ -37,7 +37,7 @@ PKG = os.path.dirname(HERE)
 
 GLOBAL_TOKEN_BUDGET = 120_000          # H3.5 全流程 token 上限
 # 经验值（2026-11-07 Batch3 · 修 S-R1）：按 L2 实测 83.8K 校准（原值偏差 ~1.3×，
-# 6 成员常态触 92% 预警，信噪比下降）。校准口径：outputs/regression-20261015/a01 metrics.jsonl 汇总。
+# 6 成员常态触 92% 预警，信噪比下降）。校准口径：tests/baselines/l2-full-a01 metrics.jsonl 汇总。
 DEFAULT_MEMBER_TOKENS = {
     # 与成员 MD 的 maxTurns 量级对应（L2 实测均值·仅用于预算估算，非计量）
     "patent-search-scout": 19_000,      # maxTurns 80，检索型最重
