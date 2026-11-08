@@ -144,6 +144,30 @@ def check_params_zh(en_map):
         err("C. 中文译名重复（疑似错位）：%s" % dup)
 
 
+def check_soft_invariants(matrix, en_map):
+    """软不变量检查（CYCLE-1 · S-E29）——产出**真实** warn。
+
+    S-E29：此前 `warn()` 定义后**零调用点**，`warns` 恒空 → `--strict` 的
+    「warn 也阻断」语义永远不触发，strict 与默认实测完全等价（exit 0/0），
+    即 strict 是**语义空转**的第二个死参数。
+
+    本函数落地真实软不变量产出点：
+      W1  英文参数表条数 ≠ 39 → 参数表不完整（不阻断，但必须告警）
+      W2  英文参数表存在重复编号 → 去重不变量违反
+      W3  矩阵行数非 1521（仍可解析）→ 数据集不完整，降级告警
+    """
+    # W1/W2：参数表条数与编号唯一性
+    en_nums = list(en_map.keys()) if en_map else []
+    if en_map and len(en_map) != 39:
+        warn("B. 英文参数表条数 %d ≠ 39（软不变量违反）" % len(en_map))
+    if en_nums and len(set(en_nums)) != len(en_nums):
+        dup = sorted({n for n in en_nums if en_nums.count(n) > 1})
+        warn("B. 英文参数表存在重复编号：%s" % dup)
+    # W3：矩阵行数
+    if matrix and len(matrix) != 1521:
+        warn("A. 矛盾矩阵交叉点数 %d ≠ 1521（数据集不完整，降级）" % len(matrix))
+
+
 def check_anchors(matrix):
     """用已知权威交叉点复算，防整表被替换/错位而行数仍对得上。"""
     if not matrix:
@@ -177,6 +201,8 @@ def main():
     en_map = check_params_en()
     check_params_zh(en_map)
     check_anchors(matrix)
+    # CYCLE-1 · S-E29：落地真实 warn 产出点（此前 warn() 零调用 → strict 空转）
+    check_soft_invariants(matrix, en_map)
 
     for w in warns:
         print("  ⚠️  %s" % w)

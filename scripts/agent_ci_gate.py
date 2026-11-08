@@ -170,7 +170,12 @@ def _process_baseline_markdown(md_path: Path, schema: dict) -> dict:
         report["total"] += 1
         errors = validate_envelope(env, schema)
         agent_id = env.get("agent_id", "?")
-        sender = agent_id
+        # S-E30：sender 由**文件名**推导（T-*__<member>.md 的 <member> 段），
+        # 而非复用 agent_id —— 此前 sender = agent_id 使 `agent_id != sender`
+        # 恒为 False → agent_mismatch 恒 False → 未知 agent_id 直接 PASS（假绿）。
+        # 现在 sender 与 agent_id 是**两个独立来源**，比对才有判别力。
+        stem = md_path.stem
+        sender = stem.split("__", 1)[1] if "__" in stem else stem
         agent_mismatch = (agent_id != sender) and (agent_id not in KNOWN_AGENTS)
         wall_warn = check_wall_clock(env)
         if not errors and not agent_mismatch:

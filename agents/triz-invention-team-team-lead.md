@@ -116,7 +116,8 @@ Context = 角色MD + 声明skills references + task_payload
 >   机械重置 `phase=2 / search_rounds=0 / G1-G5 全 false / loopback_count+1`，随后**强制重跑 Phase 3 三轮查新 R1-R3**
 >   再入 Phase 4（改后方案未重新查新即撰写 = 违反凭记忆红线）。`loopback_count ≥ 2` 时脚本 exit 2，
 >   按 H3 升级 L4 用户裁决，禁止无限回流。
-> - **Phase 2.5 状态锚点（S-E19）**：R1 回传后设 `phase=2.5`（resume 有对应下一动作），校准完成再设 `phase=3` 进 R2。
+> - **Phase 2.5 状态锚点（S-E19 · S-E31 订正）**：R1 回传后设 `phase=2.5`（resume 有对应下一动作），校准完成再设 `phase=3`（**Phase 3 = 三轮查新阶段**）。R2/R3 的**轮次**由 `search_rounds` 字段记录（1→2→3），不由 `phase` 表达——`phase` 是**阶段号**不是轮次号（`state_store.PHASE_NEXT[3]` = 「Phase 4: 对抗式三性确认」，即 phase=3 表示「下一动作是 Phase 4」，前提是 R1-R3 已跑完）。
+>   CYCLE-1 第2轮再诊断（S-E31）发现：此前本行写「设 phase=3 **进 R2**」，与 state 语义互斥，实测 `phase=3` 的 resume 输出为「下一动作：Phase 4」+「禁止进入 Phase 4/5（查新未完成）」。
 > - Reviewer 类成员的信封 `verdicts` 字段（schema v1.2.0）直接机械消费进 state，不再从正文抽取（J1）
 
 ### H3 · Loop Controller 循环控制

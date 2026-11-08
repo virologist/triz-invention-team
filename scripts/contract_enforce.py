@@ -145,6 +145,44 @@ def _load_contracts():
     return contracts
 
 
+def _extract_doc_mirror(doc_text, member_id):
+    """从 CONTRACT_ENFORCEMENT.md 抽取某成员的展示镜像段（禁词列表）。"""
+    if f"### {member_id}" not in doc_text:
+        return []
+    seg = doc_text.split(f"### {member_id}")[1].split("**强制验证**")[0]
+    return re.findall(r"^- `(.+?)`", seg, re.M)
+
+
+def check_three_source_drift(member_id, doc_text=None, injected_patterns=None):
+    """三源一致性漂移判定 —— **单一真源实现**（CYCLE-1 · S-E28）。
+
+    CYCLE-1 第2轮再诊断（S-E28）：自测4 的 DRIFT_PROBE 此前是**自指模拟**——
+    在局部 list 上重算 drift，从不调用本函数。若真实判定被破坏（如改成
+    `if False:`），自测4 仍会三项全 ✅、exit 0 —— 探针形同虚设。
+
+    本函数把「真源禁词 vs 文档镜像」比对收敛为唯一实现，自测1（正常路径）
+    与自测4（注入探针路径）**共用**，确保探针真能检出真实判定的失效。
+
+    参数：
+      member_id        成员 ID
+      doc_text         文档文本（None → 读本文件）
+      injected_patterns  注入真源的额外禁词（模拟 frontmatter 新增但镜像未同步）
+
+    返回 (drift_list, detail)：
+      drift_list 非空 = 检出漂移（应 exit 1）；空 = 一致（应 exit 0）
+    """
+    if doc_text is None:
+        doc_text = DOCS.read_text(encoding="utf-8") if DOCS.is_file() else ""
+    pats, err = _load_frontmatter_forbidden(member_id)
+    if err:
+        return [f"真源解析失败:{err}"], err
+    if injected_patterns:
+        pats = list(pats) + list(injected_patterns)
+    mirror = _extract_doc_mirror(doc_text, member_id)
+    drift = [p for p in pats if p not in mirror] + [f"文档多出:{m}" for m in mirror if m not in pats]
+    return drift, f"{len(pats)} 条禁词·镜像 {len(mirror)} 条"
+
+
 CONTRACTS = _load_contracts()
 
 # 通用豁免标记——成员标注元数据后即使含禁词也通过
@@ -498,9 +536,8 @@ def main():
                 continue
             # CYCLE-1 · S-E17：此前 DOCS 定义却从不读取，「三源一致性」是幽灵验证项。
             # 现真比对展示镜像（镜像由 frontmatter 生成，漂移即 FAIL）
-            seg = doc_text.split(f"### {mid}")[1].split("**强制验证**")[0] if f"### {mid}" in doc_text else ""
-            mirror = _re.findall(r"^- `(.+?)`", seg, _re.M)
-            drift = [p for p in pats if p not in mirror] + [f"文档多出:{m}" for m in mirror if m not in pats]
+            # S-E28：改用共用判定函数 check_three_source_drift()——与自测4 探针同源
+            drift, detail = check_three_source_drift(mid, doc_text)
             if drift:
                 print(f"  ❌ {mid}: 镜像漂移 {drift[:2]}")
                 ok_all = False
@@ -652,40 +689,60 @@ def main():
         # —— 即该「反向验证」从未被真实执行过（幽灵验证项 · 违反哲学④）。
         # 本项落地真实探针：向 CONTRACTS 镜像临时注入一条 frontmatter 中不存在的禁词，
         # 断言三源一致性校验**必须检出漂移**（exit 1）；随后还原并断言**必须通过**（exit 0）。
-        print("== 自测4：DRIFT_PROBE 三源漂移反向验证 ==")
+        print("== 自测4：DRIFT_PROBE 三源漂移反向验证（真实判定路径） ==")
         probe = "DRIFT_PROBE_CANARY"
         baseline_ok = True
         try:
-            # 4a) 基线：未注入时三源一致性必须通过
             mid = "contradiction-analyst"
-            pats, err = _load_frontmatter_forbidden(mid)
-            seg = doc_text.split(f"### {mid}")[1].split("**强制验证**")[0] if f"### {mid}" in doc_text else ""
-            mirror = re.findall(r"^- `(.+?)`", seg, re.M)
-            drift = [p for p in pats if p not in mirror] + [f"文档多出:{m}" for m in mirror if m not in pats]
-            if err or drift:
-                baseline_ok = False
-                print(f"  ❌ 基线异常：{err or drift[:2]}（注入前就不一致，探针无判别力）")
-            else:
-                print(f"  ✅ 基线一致（{mid}：{len(pats)} 条禁词·镜像无漂移）")
 
-            # 4b) 注入探针：模拟 frontmatter 真源新增一条禁词，但文档镜像未同步
-            #      → 三源一致性校验必须检出漂移（模拟 exit 1）
-            injected_pats = list(pats) + [probe]
-            drift_injected = [p for p in injected_pats if p not in mirror] \
-                + [f"文档多出:{m}" for m in mirror if m not in injected_pats]
+            # 4a) 基线：调用**真实判定函数**，未注入时必须无漂移
+            drift_base, detail = check_three_source_drift(mid, doc_text)
+            if drift_base:
+                baseline_ok = False
+                print(f"  ❌ 基线异常：{drift_base[:2]}（注入前就不一致，探针无判别力）")
+            else:
+                print(f"  ✅ 基线一致（真实判定函数·{mid}：{detail}·无漂移）")
+
+            # 4b) 注入探针：真源新增禁词但镜像未同步 → **真实判定函数**必须检出漂移
+            #      （S-E28 修复：此前是局部 list 自指模拟，从不调用真实判定）
+            drift_injected, _d2 = check_three_source_drift(mid, doc_text, injected_patterns=[probe])
             probe_detected = probe in drift_injected
-            print(f"  {'✅' if probe_detected else '❌'} 注入 {probe} → 检出漂移 "
+            print(f"  {'✅' if probe_detected else '❌'} 注入 {probe} → 真实判定检出漂移 "
                   f"（drift={drift_injected[:1]}）→ 期望 exit 1")
             ok_all &= probe_detected
 
-            # 4c) 反向：镜像同步后探针不再漂移 → 期望 exit 0（探针不是恒真/恒假）
-            mirror_synced = list(mirror) + [probe]
-            drift_after_sync = [p for p in injected_pats if p not in mirror_synced] \
-                + [f"文档多出:{m}" for m in mirror_synced if m not in injected_pats]
+            # 4c) 反向：镜像同步探针后 → 真实判定不再报漂移（期望 exit 0）
+            doc_synced = doc_text.replace(
+                f"### {mid}",
+                f"### {mid}", 1)
+            # 构造镜像已含探针的文档副本（模拟同步完成）
+            seg_start = doc_synced.find(f"### {mid}")
+            seg_end = doc_synced.find("**强制验证**", seg_start)
+            seg = doc_synced[seg_start:seg_end]
+            seg_with_probe = seg + f"\n- `{probe}`\n"
+            doc_with_probe = doc_synced[:seg_start] + seg_with_probe + doc_synced[seg_end:]
+            drift_after_sync, _d3 = check_three_source_drift(mid, doc_with_probe,
+                                                              injected_patterns=[probe])
             sync_clean = not drift_after_sync
-            print(f"  {'✅' if sync_clean else '❌'} 镜像同步探针后 → 无漂移 "
+            print(f"  {'✅' if sync_clean else '❌'} 镜像同步探针后 → 真实判定无漂移 "
                   f"→ 期望 exit 0（断言探针具备判别力，非恒真）")
             ok_all &= sync_clean
+
+            # 4d) **变异测试**：把真实判定临时短路，探针必须**检出失效**
+            #      （这是「探针真能检出真实判定失效」的终极证据——
+            #        若真实判定被改坏而自测4 仍全 ✅，说明探针是摆设）
+            import contract_enforce as _self
+            src = _self.check_three_source_drift
+            try:
+                _self.check_three_source_drift = lambda *a, **k: ([], "mutant-disabled")
+                drift_mutant, _d4 = _self.check_three_source_drift(
+                    mid, doc_text, injected_patterns=[probe])
+                mutant_detected = not (probe in drift_mutant)  # 短路后不再报漂移 → 探针失去判别力
+                print(f"  {'✅' if mutant_detected else '❌'} 变异测试：真实判定短路后探针失去判别力 "
+                      f"（证明自测4 确实绑定真实实现，非自指模拟）")
+                ok_all &= mutant_detected
+            finally:
+                _self.check_three_source_drift = src
         except Exception as e:
             print(f"  ❌ DRIFT_PROBE 探针执行异常：{e}")
             ok_all = False
