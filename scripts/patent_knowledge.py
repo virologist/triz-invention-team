@@ -143,11 +143,17 @@ def cmd_query(args):
     # X 级排前（威胁更高），同级按专利号
     hits.sort(key=lambda e: (0 if e["grade"] == "X" else 1, e["patent_no"]))
     print(f"🔍 召回 {len(hits)}/{len(entries)} 条（X级 {sum(1 for e in hits if e['grade']=='X')} / Y级 {sum(1 for e in hits if e['grade']=='Y')}）\n")
+    n_outdated = 0
     for e in hits:
+        if e.get("outdated"):
+            n_outdated += 1
         icon = "🔴" if e["grade"] == "X" else "🟠"
-        print(f"{icon} {e['patent_no']}（{e['grade']}级·{e['domain']}·源 {e['source_task']}）")
+        mark = " ⚫[已失效]" if e.get("outdated") else ""
+        print(f"{icon} {e['patent_no']}（{e['grade']}级·{e['domain']}·源 {e['source_task']}）{mark}")
         print(f"   {e['title']}")
         print(f"   已公开: {e['exposed_features'][:120]}{'…' if len(e['exposed_features'])>120 else ''}")
+        if e.get("outdated"):
+            print(f"   ⚫ 失效: {e.get('outdated_reason')}（{e.get('outdated_at')}）——不可作为现行威胁依据")
     print("\n⚠️ 使用纪律：召回结果是「已知雷区先验」不是查新结论——Phase 3 三轮查新不可省，"
           "召回用于 R1 检索式预热与差异化路径预判。")
     return 0
@@ -163,11 +169,38 @@ def cmd_stats(args):
     for e in entries:
         by_grade[e["grade"]] = by_grade.get(e["grade"], 0) + 1
         by_domain[e["domain"]] = by_domain.get(e["domain"], 0) + 1
-    print(f"📚 专利族谱库存：{len(entries)} 条")
+    n_out = sum(1 for e in entries if e.get("outdated"))
+    print(f"📚 专利族谱库存：{len(entries)} 条（其中已失效 {n_out} 条）")
     for g, n in sorted(by_grade.items()):
         print(f"  {g}级: {n}")
     for d, n in sorted(by_domain.items(), key=lambda x: -x[1]):
         print(f"  域「{d}」: {n}")
+
+
+def cmd_outdated(args):
+    """标注库条目失效（scout MD「失效反馈机制」的兑现命令）。
+
+    用法：patent_knowledge.py outdated CN223231803U --reason "本轮检索确认已被无效宣告"
+    条目不删除——打 outdated:true + reason + 时间戳（保留雷区历史，防止二次引用）。
+    """
+    entries = _load_kb()
+    hit = None
+    for e in entries:
+        if e.get("patent_no") == args.patent_no:
+            hit = e
+            break
+    if not hit:
+        print(f"❌ 库中无 {args.patent_no}（用 query/stats 先核对编号）")
+        return 1
+    import datetime
+    hit["outdated"] = True
+    hit["outdated_reason"] = args.reason
+    hit["outdated_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+    with open(KB_PATH, "w", encoding="utf-8") as f:
+        for e in entries:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    print(f"✅ 已标注失效：{args.patent_no}（{args.reason}）——条目保留，query 时标记 🔴⚫")
+    return 0
 
 
 def main():
@@ -184,6 +217,10 @@ def main():
 
     sub.add_parser("stats", help="库存统计")
 
+    p3 = sub.add_parser("outdated", help="标注库条目失效（不删除，打标记）")
+    p3.add_argument("patent_no", help="专利号（如 CN223231803U）")
+    p3.add_argument("--reason", required=True, help="失效理由（如 已被无效宣告/公开不充分）")
+
     args = ap.parse_args()
     if args.cmd == "ingest":
         return cmd_ingest(args)
@@ -191,6 +228,8 @@ def main():
         return cmd_query(args)
     if args.cmd == "stats":
         return cmd_stats(args)
+    if args.cmd == "outdated":
+        return cmd_outdated(args)
     ap.print_help()
     return 2
 
