@@ -3,7 +3,7 @@
 """
 cost_profile.py — 成本画像：聚合 metrics.jsonl → 成员×阶段经验表（U1 · 2026-11-07 升维）
 ================================================================================
-把散落在 outputs/*/metrics.jsonl 的逐次计量聚合成「成员维度成本经验表」，
+把散落在 tests/baselines/**/metrics.jsonl（及未来 outputs/ 运行目录） 的逐次计量聚合成「成员维度成本经验表」，
 供 preflight 预算估算与主理人路由决策引用（贵的成员少派 / 快的路径优先 / P90 做预算线）。
 
 设计约定：
@@ -43,7 +43,9 @@ def load_ledgers(run_dir=None):
     if run_dir:
         paths = glob.glob(os.path.join(run_dir, "**", "metrics.jsonl"), recursive=True)
     else:
-        paths = glob.glob(os.path.join(PKG, "outputs", "**", "metrics.jsonl"), recursive=True)
+        # 默认扫描归档基线 + 未来运行目录（2026-11-08 outputs→baselines 迁移跟随）
+        paths = glob.glob(os.path.join(PKG, "tests", "baselines", "**", "metrics.jsonl"), recursive=True)
+        paths += glob.glob(os.path.join(PKG, "outputs", "**", "metrics.jsonl"), recursive=True)
     latest = {}  # (task, member) -> row
     for path in sorted(paths):
         for line in open(path, encoding="utf-8"):
