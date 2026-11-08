@@ -70,7 +70,7 @@
 
 ### patent-attorney-writer
 **禁止触发词**（真源=frontmatter）：
-- `约\d+字|左右|估计.*?字`（**failure-006 复发防御**）
+- `约\d+字|左右|估计.{0,6}字`（**failure-006 复发防御**）
 - `approximately|大致|基本`
 - `显著|大幅|明显|高效`（R1 纯净化；附证据场景走 CONTEXT_EXEMPT 豁免）
 

@@ -10,7 +10,7 @@ contract_enforce.py — P0-S1-1 契约执行门禁
   python3 scripts/contract_enforce.py --output-dir <dir> --exit-on-fail
   python3 scripts/contract_enforce.py --self-test
 
-退出码：0=全过 1=有违反 2=参数错
+退出码：0=全过 1=有违反 2=参数错（CYCLE-1 S-E15：违规默认即 1，无需 --exit-on-fail）
 """
 import argparse
 import json
@@ -173,6 +173,10 @@ CONTEXT_EXEMPT = {
            "隐约", "约略", "绰约"],
     # "估计"在否定语境
     "估计": ["不可估计", "无法估计", "难以估计", "不经估计"],
+    # CYCLE-1 · S-E20（S-E15 fail-open 修复暴露的既有误伤）：analyst 禁词单字「可能」
+    # 误伤技术表述「不可能结垢」（否定形态）/「可能出现的可靠性损失」（风险描述），
+    # 与 R1 修 disclosure 单字「约」同型。豁免词限定为明确的非猜测语境。
+    "可能": ["不可能", "可能性", "可能出现的", "可能导致的", "可能存在的", "可能造成的"],
 }
 
 
@@ -483,14 +487,41 @@ def main():
     if args.self_test:
         # 用已知 L2 实测产物做自测 + 三源一致性检查（2026-11-07 单源化新增）
         ok_all = True
-        print("== 自测1：三源一致性（frontmatter 可解析 + 非空 + 与文档并集一致）==")
+        print("== 自测1：三源一致性（frontmatter 可解析 + 非空 + 与文档镜像一致）==")
+        import re as _re
+        doc_text = DOCS.read_text(encoding="utf-8") if DOCS.is_file() else ""
         for mid in MEMBER_IDS:
             pats, err = _load_frontmatter_forbidden(mid)
             if err:
                 print(f"  ❌ {mid}: {err}")
                 ok_all = False
+                continue
+            # CYCLE-1 · S-E17：此前 DOCS 定义却从不读取，「三源一致性」是幽灵验证项。
+            # 现真比对展示镜像（镜像由 frontmatter 生成，漂移即 FAIL）
+            seg = doc_text.split(f"### {mid}")[1].split("**强制验证**")[0] if f"### {mid}" in doc_text else ""
+            mirror = _re.findall(r"^- `(.+?)`", seg, _re.M)
+            drift = [p for p in pats if p not in mirror] + [f"文档多出:{m}" for m in mirror if m not in pats]
+            if drift:
+                print(f"  ❌ {mid}: 镜像漂移 {drift[:2]}")
+                ok_all = False
             else:
-                print(f"  ✅ {mid}: {len(pats)} 条禁词模式（真源=frontmatter）")
+                print(f"  ✅ {mid}: {len(pats)} 条禁词模式（真源=frontmatter·镜像一致）")
+        # S-E17：frontmatter 契约字段完整性（此前 6 字段零消费者）
+        required_fm = ["schema_version", "contract_owner", "verified_at",
+                       "forbidden_phrases", "must_verify", "declared_skills"]
+        fm_missing = {}
+        for mid in MEMBER_IDS:
+            md = (PKG / "agents" / (mid + ".md")).read_text(encoding="utf-8")
+            fm = _re.match(r"^---\s*\n(.*?)\n---\s*\n", md, _re.S)
+            body = fm.group(1) if fm else ""
+            miss = [k for k in required_fm if k not in body]
+            if miss:
+                fm_missing[mid] = miss
+        if fm_missing:
+            print(f"  ❌ frontmatter 契约字段缺失：{fm_missing}")
+            ok_all = False
+        else:
+            print(f"  ✅ 6 成员 frontmatter 契约字段 6/6 齐全 [机械已实现]")
         test_file = PKG / "tests" / "baselines" / "l2-full-a01" / "T-20261015-A07__patent-attorney-writer.md"
         if test_file.exists():
             text = test_file.read_text(encoding="utf-8")
@@ -595,7 +626,10 @@ def main():
                 if not w["ok"]:
                     print(f"    ⚠️  SUMMARY-WARN {w['detail']}")
 
-    return 0 if (all_ok or not args.exit_on_fail) else 1
+    # CYCLE-1 · S-E15：修 fail-open——此前无 --exit-on-fail 时违规也返回 0，
+    # 与文档「退出码：0=全过 1=有违反」契约不符（哲学②/④违背）。
+    # 现在默认违规即 exit 1；--exit-on-fail 保留为兼容参数（语义等价，不破坏既有调用）。
+    return 0 if all_ok else 1
 
 
 if __name__ == "__main__":

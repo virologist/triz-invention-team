@@ -219,6 +219,11 @@ def check_declared_skills():
     if missing:
         blk("7. 成员 MD 声明了 %d 个不存在的 skill 路径：" % len(missing)
             + "; ".join("%s→%s" % x for x in missing))
+    elif checked == 0:
+        # CYCLE-1 · S-E16：此前 checked=0 也输出「全部存在」= 未检查却报通过（假绿）
+        wrn("7. 成员 MD 中未发现 `skills/.../SKILL.md` 形态引用（checked=0）——"
+            "本项实际未校验任何路径；成员技能声明真源在 frontmatter `skills:`，"
+            "请核对 assemble_spawn_prompt.py 的 resolve_skill_paths 结果")
     else:
         ok("7. 成员声明的 %d 处 skill 路径全部存在于磁盘" % checked)
 
@@ -293,6 +298,21 @@ def main():
     check_authoritative_data()
     check_assembler()
     check_declared_skills()
+
+    # CYCLE-1 · S-E04：诊断触发器 T1-T3 机械判定（散文条款脚本化，原则①）
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import diagnosis_trigger as DT
+        checks = {"T1": DT.check_t1(), "T2": DT.check_t2(), "T3": DT.check_t3()}
+        fired = [k for k, (t, _, _) in checks.items() if t]
+        if fired:
+            wrn("9. 诊断触发器命中 %s → 建议本轮收尾执行一次 C1 诊断（见 docs/diagnosis-protocol.md）"
+                % ",".join(fired))
+        else:
+            ok("9. 诊断触发器 T1/T2/T3 均未命中（%s）"
+               % "; ".join(f"{k}:{d[:38]}" for k, (_, d, _) in checks.items()))
+    except Exception as e:
+        wrn("9. 诊断触发器不可用：%s（[暂缓·人工执行]：主理人按 protocol §一 自行判定）" % e)
 
     # P0-S3-1: C3 自动触发
     if args.outputs_dir:
