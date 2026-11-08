@@ -2,6 +2,27 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-11-08
+
+> 工作区整理 + 残留全清偿（11 个 commit：8285208…b43d2de）。第三轮诊断残留 8 项全部闭环。
+
+### Changed（工作区整理）
+- **基线资产归位**：包根游离 `darwin-results.tsv` 按 CHANGELOG 2.2.0 声明补迁移至 `docs/evolution-log.tsv`（该声明当时未实际执行，README.zh.md 引用悬空至今）
+- **回归基线归档**：`outputs/regression-*` → `tests/baselines/{l2-full-a01, l1-analyst-b01, 20261014-p0-2, _pre-fix-b01}` + spawn 文案打包 `_archive/`；新增 baselines/README 导航；outputs/ 目录整体移除
+- **10 个活跃引用点同步**（contract_enforce 自测2 / check_claim_scope --l2 / 5 脚本示例 / 3 文档）；工具清单 13 项
+- OPERATIONS §一 settings.json 判据记载订正（5.9.3 缓存版仍带判据=误报，以 register 成功为准）
+
+### Fixed（残留清偿 8 项）
+- **C01 A6 法25 断言根因修复（d4bee57）**：member_files() 对同名成员多轮产出只留最后文件（A03 复检覆盖 A01 首轮）曾致永久误判——check_required_regex 新增 `any_member` 模式，C01 首次 8/8 全 PASS
+- **U3 outdated 子命令（b0dddf9）**：失效标注/query ⚫显示/stats 计数，兑现 scout MD「失效反馈机制」承诺
+- **D3-1 仲裁链订正 + D1 坍缩表（50d51ed）**：confidence 降为末位参考信号（不得单独裁定）；7 视角补 17 个 TRIZ 参数映射（权威 CSV 校验零越界）
+- **spawn_watchdog 简版（e47a525 + b43d2de 补齐）**：四态判定（OK/WATCH/STALL/TIMEOUT）+ H4 处置建议，P2-15 债务关闭
+- routing-log 单表化 + R-004 缺号登记；diagnosis-protocol 报告存放位置澄清；benchmark/cost_profile 示例改精确子目录
+
+### Evaluated（评估后不实施）
+- D4-2 himmpat 登录态探测：运行时状态不可预判，scout L2→L3 降档规则已覆盖——不实施
+- 48h 回检窗口关闭：窗口内多轮门禁复跑全绿，唯一新发现（benchmark 传参混扫）非修复引入
+
 ## [2.8.0] - 2026-11-07
 
 > 第三轮独立诊断（triz-team-diagnosis-independent-20261107-r3.md · 11 维度从零基准）R1-R5 修复 + U1-U3 升维（用户 11-07 确认全量执行）。
