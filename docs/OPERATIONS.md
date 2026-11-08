@@ -59,6 +59,7 @@
 | `scripts/triz_benchmark.py` | A-Evolve benchmark 适配/独立求值（0.0-1.0 分） | 演化闭环 / 断言快照（Batch5B） |
 | `scripts/cost_profile.py` | 成员成本画像（metrics.jsonl 聚合 → tokens/墙钟 P90 + 成功率） | 建队前（U1）+ 每次交付后台账累积 |
 | `scripts/patent_knowledge.py` | 专利族谱记忆（scout 产出的 X/Y 威胁沉淀 + 按域召回） | Phase 3 前查询（U3）+ 查新完成后沉淀 |
+| `scripts/spawn_watchdog.py` | 成员停滞看门狗（四态判定 OK/WATCH/STALL/TIMEOUT + H4 处置建议） | 每次派单等待窗口（P2-15 简版） |
 
 ## 四、Git 钩子（双层门禁）
 

@@ -144,7 +144,7 @@ Context = 角色MD + 声明skills references + task_payload
 | 内容幻觉 | Reviewer检出虚构 | 强制重做 + 记failure-xxx |
 | Agent冲突 | 两Reviewer结论不一致 | 触发仲裁协议 |
 | **平台级错误**（2026-09-30新增） | 成员报429/配额耗尽/模型不可用，或失败消息含频率限制关键词 | **立即停派同批后续成员**（避免连环撞墙）；记录预计重置时间；三选一降级：a)等待重置后重试 b)主理人降级亲自执行该Phase（标注[主理人代执行]） c)上报用户切换模型/改期。**禁止**对同成员在重置前重复spawn |
-| **成员超时/停滞**（2026-10-15新增） | spawn后 **>10min 未落盘** 且无进度信号（或催办后仍无响应） | ①SendMessage催办（限时+「可partial落盘」指令）②仍无响应 → `TaskStop` 取消 ③**紧凑brief重试**：按 H1「大产出压缩」规则重建任务包 + 明确"限时N分钟 / 禁读超大文件 / 查询数上限"，Loop 预算内（≤3）。实测：30min 停滞 → 取消后 brief 重试 **2m40s** 通过 |
+| **成员超时/停滞**（2026-10-15新增 · **检测已脚本化** 2026-11-08：`python3 scripts/spawn_watchdog.py --run-dir <RUN_DIR> --member <id> --spawned-at "<ISO>"` 四态判定） | spawn后 **>10min 未落盘** 且无进度信号（或催办后仍无响应） | ①SendMessage催办（限时+「可partial落盘」指令）②仍无响应 → `TaskStop` 取消 ③**紧凑brief重试**：按 H1「大产出压缩」规则重建任务包 + 明确"限时N分钟 / 禁读超大文件 / 查询数上限"，Loop 预算内（≤3）。实测：30min 停滞 → 取消后 brief 重试 **2m40s** 通过 |
 | **Loop 降级路径**（2026-10-15 P1-7 新增） | 同一任务重试 ≥3 次仍失败 | 按成员类型三选一：**a) 检索/撰写类** → 主理人[代执行]完成并标注（写明降级原因与残余风险）；**b) 创意/分析类** → 落盘 `partial_output.md`（含已完成部分+剩余项清单）交用户处置；**c) 终评类（examiner/reviewer）** → 一律升级用户裁决（终评不可代执行）。routing verdict 强制填 `success / partial_user / escalated` 之一 |
 
 ## 团队启动前检查清单（Checklist，2026-09-30新增，每次建队必跑）
