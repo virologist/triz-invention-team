@@ -62,15 +62,35 @@
 | `scripts/spawn_watchdog.py` | 成员停滞看门狗（四态判定 OK/WATCH/STALL/TIMEOUT + H4 处置建议） | 每次派单等待窗口（P2-15 简版） |
 | `scripts/threat_grade.py` | **X/E 级威胁判定唯一真源**（结构化载体识别 + 专利号去重 + 多轮聚合 + C3 触发语义） | preflight 第8项自动调用 + patent_knowledge 消费 |
 | `scripts/boundary_guard.py` | **成员产出越界红线机械拦截**（B1-B5 信号 + 角色矩阵 + verdict 四态 + 默认 fail-closed） | 每次 VERIFY 收产出前（验收侧红线）；已由 self_gate 机械触发 |
-| `scripts/self_gate.py` | **判别力门禁唯一汇总入口**（12 脚本自测 + 2 真实基线越界复核 = 14 项） | pre-commit hook + release-sync gate 自动（S-E62） |
+| `scripts/self_gate.py` | **判别力门禁唯一汇总入口**（清单见 `GATES`；含真实基线越界复核 + 宿主接入自检） | pre-commit hook + release-sync gate 自动（S-E62） |
+| `scripts/install_gate_hooks.py` | **宿主门禁接入安装器**（`--verify` / `--install` / `--self-test`，幂等 + 漂移检测） | **每次换机 / 新 clone 后首次部署必跑**（S-E70） |
 | `scripts/diagnosis_trigger.py` | 诊断触发器 T1/T2/T3 机械判定（preflight 第9项自动调用） | 每次建队前（preflight 内自动） |
 | `scripts/evolution_log.py` | 自进化台账唯一写入口（append/backfill/verify/tail/self-test） | 每次批次收口（C5 登记收敛） |
 
 > **判别力门禁的唯一真源 = `scripts/self_gate.py`**（CYCLE-1 第5轮 · S-E62/S-E66/S-E67/S-E68）。
-> 该入口定义 12 个脚本自测 + 2 个真实基线越界复核 = 14 项；改动后一律跑：
-> `python3 scripts/self_gate.py`（全量）· `python3 scripts/self_gate.py --self-test`（清单完整性）。
+> 该入口的 `GATES` 清单定义全部脚本自测 + 真实基线越界复核；**具体项数以脚本输出为准，
+> 本文件不写死数字**（第6轮实测：第5轮写「14 项」在第6轮新增安装器后即漂移为 15 项）。
+> 改动后一律跑：`python3 scripts/self_gate.py`（全量）·
+> `python3 scripts/self_gate.py --self-test`（清单完整性 + 双向差集 + **宿主接入自检**）。
 > 已由 `~/.workbuddy/git-hooks/pre-commit` 与 `release-sync.sh` 条件式调用，
 > 改坏任一真源即阻断提交/推送（实测：short-circuit `c3_should_trigger` → 门禁 1/4 未通过）。
+>
+> ### ⚠️ 换机 / 新 clone 后的首次部署（S-E70 · 必做）
+>
+> 宿主文件 `~/.workbuddy/git-hooks/pre-commit` 与 `~/.workbuddy/bin/release-sync.sh`
+> **不在本仓库内**，干净 clone 后门禁链会退回 3 gate，`boundary_guard` 与全部
+> 判别力自测重新变成幽灵执行点（第6轮实测：clone 内 grep 宿主接入指引零命中）。
+> 首次部署必须执行：
+>
+> ```bash
+> python3 scripts/install_gate_hooks.py --verify    # 只读检查，未接入返回 1
+> python3 scripts/install_gate_hooks.py --install  # 幂等注入（自动备份 .triz-gate.bak）
+> python3 scripts/self_gate.py --self-test         # 须含「✅ 宿主门禁已接入」
+> ```
+>
+> 安装器把宿主接入代码块作为**唯一真源**内置（marker 包裹，可检测手改漂移）；
+> `--host-root` 可参数化以适配不同机器；CI 环境可设
+> `TRIZ_GATE_SKIP_HOST_CHECK=1` 显式跳过宿主自检（留痕，不得静默）。
 >
 > **本文件不再手抄用例数**：此前此处逐脚本列出「N 用例/断言」，属第二份真源，
 > 实测已漂移（`boundary_guard` 文档写 20、实际 22；`patent_knowledge` 写 17、实际 25 断言）

@@ -67,15 +67,25 @@ GATES = [
      "validate_rows 唯一真源 + 7 类判据探针"),
     ("TRIZ 权威数据", "verify_triz_data.py", ["--strict"],
      "矩阵/参数/中文表/锚点复算"),
+    ("宿主门禁接入", "install_gate_hooks.py", ["--self-test"],
+     "新机器可移植性 + 漂移/幂等/元判别力"),
 ]
 
 # 真实基线扫描（对已入库产出做 fail-closed 越界复核）——
 # 这一项是 S-E62 的核心：让 boundary_guard 从「只有 --self-test」变成
 # 「每次门禁都对真实产出跑一遍」。
-BASELINE_DIRS = [
+# TRIZ_GATE_BASELINE_ROOT 可覆盖包根（换机路径不同 / 判别力测试制造
+# 「基线缺失」场景）——S-E70 可移植性 + 让 self_test 的基线非空校验
+# 有可触发的判别力场景（变异 S4 靶点）。
+BASELINE_SUBDIRS = [
     "tests/baselines/l2-full-a01",
     "tests/baselines/l1-analyst-b01",
 ]
+
+
+def baseline_dirs():
+    root = os.environ.get("TRIZ_GATE_BASELINE_ROOT") or PKG
+    return [os.path.join(root, d) for d in BASELINE_SUBDIRS]
 
 
 def run_gate(script, argv):
@@ -102,17 +112,17 @@ def main_gates(as_json=False):
                         "rc": rc, "tail": tail, "desc": desc})
 
     # 真实基线越界复核（S-E62 的运行时落点）
-    for d in BASELINE_DIRS:
-        full = os.path.join(PKG, d)
+    for full in baseline_dirs():
+        d = os.path.relpath(full, os.environ.get("TRIZ_GATE_BASELINE_ROOT") or PKG)
         if not os.path.isdir(full):
             results.append({"name": "基线越界复核", "script": "boundary_guard.py",
                             "argv": ["--run-dir", d], "rc": 2,
-                            "tail": ["基线目录不存在：%s" % d],
+                            "tail": ["基线目录不存在：%s" % full],
                             "desc": "真实产出 fail-closed 复核"})
             continue
-        rc, tail = run_gate("boundary_guard.py", ["--run-dir", d])
-        results.append({"name": "基线越界复核·%s" % os.path.basename(d),
-                        "script": "boundary_guard.py", "argv": ["--run-dir", d],
+        rc, tail = run_gate("boundary_guard.py", ["--run-dir", full])
+        results.append({"name": "基线越界复核·%s" % os.path.basename(full),
+                        "script": "boundary_guard.py", "argv": ["--run-dir", full],
                         "rc": rc, "tail": tail, "desc": "真实产出 fail-closed 复核"})
 
     n_fail = sum(1 for r in results if r["rc"] != 0)
@@ -208,8 +218,8 @@ def self_test():
 
     # 2) 基线目录必须存在（否则越界复核会恒为空集 → 形态 B）
     print("\n  ── 基线扫描目标非空 ──")
-    for d in BASELINE_DIRS:
-        full = os.path.join(PKG, d)
+    for full in baseline_dirs():
+        d = os.path.relpath(full, os.environ.get("TRIZ_GATE_BASELINE_ROOT") or PKG)
         ok = os.path.isdir(full) and any(
             f.startswith("T-") and "__" in f for f in os.listdir(full))
         print("  %s %-40s %s" % ("✅" if ok else "❌", d,
@@ -235,10 +245,40 @@ def self_test():
     if not meta2_ok:
         fails.append("汇总逻辑反向判别力")
 
+    # 5) 宿主接入自检（S-E71：消除「自测全绿但门禁没人调用」的假绿）
+    # 实测：干净 `git clone . /tmp/fresh-clone` 里 --self-test 报「✅ 全通过」，
+    # 但宿主 pre-commit / release-sync 根本没接 self_gate → 门禁链退回 3 gate。
+    # 现消费 install_gate_hooks.verify_host() 唯一判据，未接入/漂移即自测失败。
+    # CI 环境（无宿主工具链）可显式 --skip-host-check 跳过，但默认严格。
+    print("\n  ── 宿主接入自检（S-E71 防幽灵执行点）──")
+    if os.environ.get("TRIZ_GATE_SKIP_HOST_CHECK") == "1":
+        print("  ⏭  已按 TRIZ_GATE_SKIP_HOST_CHECK=1 显式跳过（CI 环境）")
+    else:
+        sys.path.insert(0, HERE)
+        try:
+            import install_gate_hooks as IH
+            host_root = os.environ.get("TRIZ_GATE_HOST_ROOT") or \
+                os.path.expanduser("~/.workbuddy")
+            host_ok, host_res = IH.verify_host(host_root)
+            for k, v in sorted(host_res.items()):
+                flag = "✅" if v["status"] in ("installed", "legacy") else "❌"
+                print("  %s %-14s %-18s %s" %
+                      (flag, k, v["status"], v["detail"]))
+            if not host_ok:
+                print("  ❌ 宿主门禁未接入或已漂移 → 判别力门禁**不会自动运行**")
+                print("     修复：python3 scripts/install_gate_hooks.py --install")
+                fails.append("宿主接入")
+            else:
+                print("  ✅ 宿主门禁已接入（pre-commit + release-sync）")
+        except Exception as e:  # noqa: BLE001 —— 门禁必须 fail loud
+            print("  ❌ 宿主接入自检异常：%s" % e)
+            fails.append("宿主接入自检异常")
+
     if fails:
         print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
         return 1
-    print("\n✅ 自测全通过（%d 门禁清单 + 2 基线 + 2 项元判别力）" % len(GATES))
+    print("\n✅ 自测全通过（%d 门禁清单 + 2 基线 + 2 项元判别力 + 宿主接入）"
+          % len(GATES))
     return 0
 
 
