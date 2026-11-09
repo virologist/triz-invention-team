@@ -39,7 +39,7 @@ description: "团队智能体通信契约的形式化规范 — JSON Schema形�
 | 字段 | 类型 | 约束 |
 |------|------|------|
 | `agent_id` | string | kebab-case，3-64字符，已知7代理+探针后缀（-probe/-reg/-test/-r2） |
-| `task_id` | string | 格式 `^T-[0-9]{8}-[0-9]{3,}$` |
+| `task_id` | string | 格式 `^T-[0-9]{8}-[A-Za-z0-9]{1,8}$`（日期 + 字母数字后缀，如 `T-20260903-001` / `T-20261015-A01`） |
 | `phase` | integer | 0-5 |
 | `status` | enum | `success` / `partial` / `failed` / `blocked` |
 | `confidence` | integer | 0-100 |

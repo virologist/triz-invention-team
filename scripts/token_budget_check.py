@@ -50,8 +50,52 @@ def est_tokens(text_len_bytes: int, conservative: bool = False) -> int:
     return int(text_len_bytes / (2.5 if conservative else 3.5))
 
 
-# 与 result_envelope.schema.json 的 task_id pattern 对齐（允许字母数字后缀，如 T-20261015-B01）
-FILENAME_RE = re.compile(r"(T-\d{8}-[A-Za-z0-9]{1,8})__([a-z0-9-]+)\.md$")
+def _load_task_id_pattern():
+    """从 result_envelope.schema.json 读取 task_id pattern（唯一真源）。
+
+    CYCLE-1 · S-E54（真源唯一化）：此前本文件里的 FILENAME_RE 是 task_id
+    pattern 的**第三份手抄**（另两处：result_envelope.schema.json 与
+    task_payload.schema.json）。S-E49 已把两个 schema 统一，但**漏掉了本文件**
+    —— schema 改了本文件不跟随，文件名匹配静默失效 → 预算计量漏算产出。
+
+    现改为：从 schema 读 pattern，再**派生**出文件名匹配用的正则
+    （文件名形态 = `<task_id>__<member_id>.md`），schema 改了自动跟随。
+
+    读不到 schema → 直接抛错（fail loud）。schema 是入库文件，缺失属仓库损坏，
+    必须显式失败而非用猜测值继续（S-E51 同一纪律）。
+    """
+    fp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      "skills", "agent-protocol", "result_envelope.schema.json")
+    with open(fp, encoding="utf-8") as f:
+        d = json.load(f)
+    pat = d.get("properties", {}).get("task_id", {}).get("pattern")
+    if not pat:
+        raise ValueError(
+            "result_envelope.schema.json 未定义 task_id.pattern——"
+            "契约字段缺失，拒绝用猜测值继续（S-E54）")
+    return pat
+
+
+def _build_filename_re(pattern):
+    """由 schema 的 task_id pattern 派生「落盘文件名」匹配正则。
+
+    schema pattern 形如 `^T-[0-9]{8}-[A-Za-z0-9]{1,8}$`（锚定整个字符串）。
+    落盘文件名是 `<task_id>__<member_id>.md`，因此把两端的 `^`/`$` 换成
+    前后缀，中间插入 `__<member_id>.md`。
+
+    派生而非手抄：schema 改了 → 本正则自动跟随，杜绝第三份真源漂移。
+    """
+    body = pattern
+    if body.startswith("^"):
+        body = body[1:]
+    if body.endswith("$"):
+        body = body[:-1]
+    # member_id 形态：kebab-case（与 agent_id 契约一致）
+    return re.compile("(" + body + r")__([a-z0-9-]+)\.md$")
+
+
+# 文件名匹配正则：由 schema pattern 派生（S-E54 · 唯一真源在 schema）
+FILENAME_RE = _build_filename_re(_load_task_id_pattern())
 
 
 def meter_run(run_dir, ledger=False, conservative=False, global_budget=120_000):

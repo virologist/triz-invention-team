@@ -464,12 +464,13 @@ def check_routing_log_columns():
 
 
 def check_task_id_contract():
-    """15. task_id 契约三处真源一致（CYCLE-1 · S-E49）。
+    """15. task_id 契约四处真源一致（CYCLE-1 · S-E49 建，S-E54/S-E55 扩）。
 
-    **根因（S-E43 同型：契约漂移）**：`task_id` 的取值格式在**三处手抄**——
+    **根因（S-E43 同型：契约漂移）**：`task_id` 的取值格式在**多处手抄**——
       T1 信封真源：`skills/agent-protocol/result_envelope.schema.json`
       T2 任务包真源：`skills/agent-protocol/task_payload.schema.json`
-      T3 文档真源：主理人 MD 的信封示例 + `docs/architecture.md` 的示例
+      T3 文档真源：`skills/agent-protocol/SKILL.md` 字段规范表（S-E55 补入）
+      T4 派生真源：`scripts/token_budget_check.py` 的文件名正则（S-E54 改为派生）
 
     **实测事故（S-E49）**：T1 = `^T-[0-9]{8}-[A-Za-z0-9]{1,8}$`（允许字母后缀），
     T2 = `^T-[0-9]{8}-[0-9]{3,}$`（**只允许纯数字**），T3 示例写 `T-YYYYMMDD-NNN`
@@ -478,14 +479,21 @@ def check_task_id_contract():
     **若下游按 task_payload schema 校验任务包，必被拒绝**；而 payload schema
     **全仓零代码消费**（无人校验）→ 该冲突从未被任何门禁暴露（幽灵契约）。
 
-    **本项判据**（纯机械）：
-      - T1 与 T2 的 task_id pattern 必须**字面相同**（两个方向的下行/上行契约必须同形）
-      - 两者必须能**实际匹配**实测基线中出现的 task_id 形态（用基线文件做样本）
-      - 若两者不一致 → BLOCK，并明确指出以哪一侧为准（**以信封真源 T1 为准**，
-        因为它是代码唯一强制消费的一侧）
+    **实测事故（S-E55）**：S-E49 统一了两个 schema，却**漏掉 T3 文档真源**——
+    SKILL.md 仍写旧 pattern。而 SKILL.md 是 agent **加载时就读**的真源 → agent
+    按文档理解 task_id 口径（字母后缀非法），与代码强制的 schema 口径冲突。
+    → 本项判据 4 把文档纳入机械校验，漂移立即暴露。
 
-    另：本项**顺带校验** task_payload.schema.json 是否至少被一处代码消费
-    （零消费 = 幽灵契约，必须登记；不允许默默存在）。
+    **实测事故（S-E54）**：T4 `token_budget_check.FILENAME_RE` 是 pattern 的
+    **第三份手抄**，schema 改了不跟随 → 文件名匹配静默失效，预算计量漏算产出。
+    → 改为**从 schema 派生**（单一真源，schema 改了自动跟随），并由判据 5 反向校验。
+
+    **本项判据**（纯机械）：
+      - 判据 1：T1 与 T2 的 task_id pattern 必须**字面相同**（上行/下行契约必须同形）
+      - 判据 2：两者必须能**实际匹配**实测基线中出现的 task_id 形态（用基线文件做样本）
+      - 判据 3：task_payload.schema.json 至少被**本脚本以外**一处代码消费（反幽灵契约）
+      - 判据 4：T3（SKILL.md）声明的 pattern 必须与 schema **字面相同**
+      - 判据 5：T4 不得再手抄 pattern —— 必须是**从 schema 派生**（读 schema 的代码路径存在）
     """
     ap_dir = os.path.join(PKG, "skills", "agent-protocol")
     env_p = os.path.join(ap_dir, "result_envelope.schema.json")
@@ -574,8 +582,70 @@ def check_task_id_contract():
             "（注：本项已排除 preflight_check.py 自身，避免自证）")
         return
 
-    ok("15. task_id 契约三处一致（pattern=%s·基线样本 %d 个全匹配·"
-       "任务包 schema 消费方 %s）"
+    # --- 判据 4（附加 · S-E55）：SKILL.md 文档真源的 task_id pattern 必须同步 ---
+    # **实测事故（S-E55）**：S-E49 修复了「两个 schema pattern 冲突」，
+    # 却**漏掉了第三处手抄**——skills/agent-protocol/SKILL.md 的字段规范表
+    # 仍写旧 pattern `^T-[0-9]{8}-[0-9]{3,}$`（只允许纯数字）。
+    # SKILL.md 是 agent **加载时就读**的真源 → agent 按文档理解 task_id 口径，
+    # 与代码强制的 schema 口径不一致（字母后缀被判非法）。
+    # 三处已统一（两 schema）而文档未同步 = 契约漂移复发。
+    # 本判据把文档纳入机械校验，漂移立即暴露。
+    skill_md = os.path.join(ap_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        blk("15. skills/agent-protocol/SKILL.md 不存在——文档真源缺失")
+        return
+    try:
+        md_txt = open(skill_md, encoding="utf-8").read()
+    except Exception as e:
+        blk("15. SKILL.md 读取失败：%s" % e)
+        return
+    md_pats = set(re.findall(r"`(\^T-\[0-9\]\{8\}-[^`]+)`", md_txt))
+    if not md_pats:
+        blk("15. SKILL.md 中未找到 task_id pattern（`^T-[0-9]{8}-…` 形态）——"
+            "文档真源缺失，无法校验一致性")
+        return
+    if md_pats != {env_re_p}:
+        blk("15. task_id pattern 文档真源漂移：SKILL.md 声明 %s ↔ schema 声明 `%s`"
+            "（契约漂移，以 schema 为准；SKILL.md 是 agent 加载时读的真源）"
+            % ("/".join(sorted(md_pats)), env_re_p))
+        return
+
+    # --- 判据 5（附加 · S-E54）：全仓不得再出现 task_id pattern 的手抄 ---
+    # 语义：任何**硬编码** task_id pattern 字面量的脚本 = 一份新真源 = 漂移源。
+    # 合法写法只有两种：
+    #   (a) 从 schema 读取（json.load(...)["properties"]["task_id"]["pattern"]）
+    #   (b) 从 schema 派生（正则以 schema pattern 为原料拼装）
+    # 出现形如 `T-\d{8}` / `T-[0-9]{8}` 的**裸字面量正则**即判为手抄。
+    # 排除本脚本自身（判据文本内含该字面量）。
+    handwritten = []
+    self_name2 = os.path.basename(__file__)
+    for root, _dirs, files in os.walk(os.path.join(PKG, "scripts")):
+        if "__pycache__" in root:
+            continue
+        for f in sorted(files):
+            if not f.endswith(".py") or f == self_name2:
+                continue
+            fp = os.path.join(root, f)
+            try:
+                txt = open(fp, encoding="utf-8", errors="ignore").read()
+            except Exception:
+                continue
+            # 命中「手抄特征」：正则里直接写了 task_id 的日期段字面量
+            if re.search(r'T-\\d\{8\}|T-\[0-9\]\{8\}', txt):
+                # 排除从 schema 派生的实现（它必然含 schema 读取路径）
+                reads_schema = ("result_envelope.schema.json" in txt
+                                or "load_task_id_pattern" in txt
+                                or "_load_task_id_pattern" in txt)
+                if not reads_schema:
+                    handwritten.append(f)
+    if handwritten:
+        blk("15. task_id pattern 出现新的一份手抄：%s——"
+            "必须改为从 result_envelope.schema.json 读取或派生（S-E54 纪律）"
+            % "/".join(handwritten))
+        return
+
+    ok("15. task_id 契约五处一致（pattern=%s·基线样本 %d 个全匹配·"
+       "任务包 schema 消费方 %s·SKILL.md 文档真源已同步·全仓零手抄）"
        % (env_re_p, len(samples), "/".join(consumed)))
 
 
