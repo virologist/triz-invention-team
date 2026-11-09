@@ -42,12 +42,96 @@ def extract_features(text, section_pat, item_pat):
             best = items
     return best
 
+def _self_test():
+    """判别力自测（S-E58）：LCS 匹配 + 特征提取。
+
+    判别力验收标准（原则④）：改坏真源后本测试必须报错；还原后必须 PASS。
+    """
+    fails = []
+
+    def chk(name, got, expect):
+        okk = (got == expect)
+        print("  %s %-46s 期望=%-20s 实得=%s"
+              % ("✅" if okk else "❌", name, expect, got))
+        if not okk:
+            fails.append(name)
+
+    print("🧪 check_claim_scope 判别力自测\n")
+
+    # ── 1. 最长公共子串 ──
+    print("  ── longest_common_substring ──")
+    chk("完全相同", longest_common_substring("刮粪板拆卸连接", "刮粪板拆卸连接"),
+        "刮粪板拆卸连接")
+    chk("部分重叠取最长", longest_common_substring("abcdefg", "xxcdeyy"),
+        "cde")
+    chk("无公共子串 → 空串", longest_common_substring("abc", "xyz"), "")
+    chk("空输入 → 空串", longest_common_substring("", "abc"), "")
+    chk("另一方为空 → 空串", longest_common_substring("abc", ""), "")
+
+    # ── 2. 特征提取（三种标记格式 + 取条目最多的段）──
+    print("\n  ── extract_features ──")
+    txt_star = "## 必要技术特征\n\n**F1 · 刮板本体**\n刮板本体包括…\n\n**F2 · 连接座**\n连接座…\n"
+    f1 = extract_features(txt_star,
+                          r"(?:必要(?:技术)?特征|独立权项素材)[^\n]*\n(.*?)(?=\n#{2,4}\s+[^#]|\Z)",
+                          r"\*{0,2}(F\d+|N\d+)\*{0,2}\s*(?:·|[:：])\s*([^\n]+)")
+    chk("**F1 · 名称** 形态提取条数", len(f1), 2)
+    chk("**F1 · 名称** 首条特征名", f1[0][0] if f1 else None, "F1")
+
+    txt_colon = "## 必要特征\n\nF1: 刮板本体\n说明…\nF2: 连接座\n说明…\nF3: 限位结构\n说明…\n"
+    f2 = extract_features(txt_colon,
+                          r"(?:必要(?:技术)?特征|独立权项素材)[^\n]*\n(.*?)(?=\n#{2,4}\s+[^#]|\Z)",
+                          r"\*{0,2}(F\d+|N\d+)\*{0,2}\s*(?:·|[:：])\s*([^\n]+)")
+    chk("F1: 冒号形态提取条数", len(f2), 3)
+
+    txt_n = "## 独立权项素材\n\nN1: 特征一\n描述\nN2: 特征二\n描述\n"
+    f3 = extract_features(txt_n,
+                          r"(?:必要(?:技术)?特征|独立权项素材)[^\n]*\n(.*?)(?=\n#{2,4}\s+[^#]|\Z)",
+                          r"\*{0,2}(F\d+|N\d+)\*{0,2}\s*(?:·|[:：])\s*([^\n]+)")
+    chk("N1: 形态提取条数", len(f3), 2)
+
+    # 无特征段 → 空列表（不能瞎编）
+    f4 = extract_features("## 其它章节\n\n随便些内容",
+                          r"(?:必要(?:技术)?特征|独立权项素材)[^\n]*\n(.*?)(?=\n#{2,4}\s+[^#]|\Z)",
+                          r"\*{0,2}(F\d+|N\d+)\*{0,2}\s*(?:·|[:：])\s*([^\n]+)")
+    chk("无特征段 → 空列表", f4, [])
+
+    # ── 3. 真实基线可解析 ──
+    print("\n  ── 真实基线 ──")
+    base = Path(__file__).parent.parent / "tests/baselines/l2-full-a01"
+    dpath = base / "T-20261015-A06__disclosure-architect.md"
+    cpath = base / "T-20261015-A07__patent-attorney-writer.md"
+    if dpath.is_file() and cpath.is_file():
+        dtext = dpath.read_text(encoding="utf-8")
+        ctext = cpath.read_text(encoding="utf-8")
+        feats = extract_features(
+            dtext,
+            r"(?:必要(?:技术)?特征|独立权项素材)[^\n]*\n(.*?)(?=\n#{2,4}\s+[^#]|\Z)",
+            r"\*{0,2}(F\d+|N\d+)\*{0,2}\s*(?:·|[:：])\s*([^\n]+)")
+        chk("A06 交底书解析出必要特征", len(feats) > 0, True)
+        claim_sec = ctext[ctext.find("权利要求书"):]
+        import re as _re
+        m = _re.search(r"\*{0,2}1[\.、．]\*{0,2}\s*(.*?)(?=\*{0,2}2[\.、．]\*{0,2})",
+                       claim_sec, _re.S)
+        chk("A07 申请文件解析出独立权项1", m is not None, True)
+    else:
+        chk("L2 基线文件存在", False, True)
+
+    if fails:
+        print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
+        return 1
+    print("\n✅ 自测全通过")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--disclosure"); ap.add_argument("--claims")
     ap.add_argument("--l2", action="store_true")
     ap.add_argument("--threshold", type=int, default=12)
+    ap.add_argument("--self-test", action="store_true", help="判别力自测")
     args = ap.parse_args()
+    if args.self_test:
+        return _self_test()
     if args.l2:
         base = Path(__file__).parent.parent / "tests/baselines/l2-full-a01"
         args.disclosure = args.disclosure or str(base / "T-20261015-A06__disclosure-architect.md")

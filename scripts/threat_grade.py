@@ -40,7 +40,23 @@ PKG = os.path.dirname(HERE)
 
 # 专利号真源：与 patent_knowledge.PAT_NO_RE 同形（单一真源由本模块导出，
 # patent_knowledge 反向 import 本模块，消除双份手抄）。
-PAT_NO_RE = r"(CN|US|EP|WO|JP|KR)[0-9]{7,14}[A-Z]?"
+#
+# 两种尾码形态（两种都必须匹配，否则 X 级威胁被漏计 → 假放行）：
+#  1) kind code 形态：`CN223231803U` / `US1234567B1` / `EP1234567A1`
+#     —— 授权公告号。原正则 `[A-Z]?` 只允许**单个字母**，无法匹配 `B1`
+#     这类两段式尾码 → 美/欧专利被误判为「非专利号」而漏计。
+#  2) 申请号形态：`CN202311321256.8`
+#     —— 中国发明专利**申请号**的标准形态是「CN + 12 位数字 + . + 1 位校验码」，
+#     **无 kind code 尾码**。原正则完全不含小数点 → 这类号码**全部漏计**
+#     （真实基线实测 13 处：CN201921297609.4 / CN202211687392.4 /
+#     CN202311321256.8 / CN202422250692.7 / CN202520196457.8 / CN202520926963.8）。
+#
+# 尾码与校验码**二者必居其一**（故用 `(?:…|…)` 而非 `(?:…)?`）：
+#     · 授权公告号 → 字母（可带一位数字）kind code：`CN223231803U` / `US…B1`
+#     · 申请号     → 小数点校验码：`CN202311321256.8`
+#     · 纯数字号段（`CN202279501`）不是任何法域的标准专利号形态 → **不计**，
+#       否则长号段会被误当专利号。
+PAT_NO_RE = r"(CN|US|EP|WO|JP|KR)[0-9]{7,14}(?:\.[0-9]|[A-Z][0-9]?)"
 _PAT_NO_FULL_RE = re.compile(PAT_NO_RE)
 
 # Markdown 分级节标题：形如「### 4.1 X 类（单独影响新颖性…）」
@@ -209,13 +225,82 @@ def scan_grade_counts(md_path):
 
 
 def latest_scout_output(member_id, outputs_dir):
-    """找出该成员在 outputs_dir 下的最新落盘产出（沿用 preflight 原 glob 语义）。"""
+    """找出该成员在 outputs_dir 下的最新落盘产出。
+
+    ⚠️ 仅用于**单文件**诊断场景。C3 判定**不得**用它——
+    查新往往是多轮迭代（A01 首轮查新 → A03 复检），
+    复检产出**只引用**首轮的分级结论、本身无分级表，
+    只看最新一份会**漏掉**首轮的 X 级载体 → 假放行（比假阻断更危险）。
+    判定请用 scan_member_grades()。
+    """
     import glob
     if not member_id or not os.path.isdir(outputs_dir):
         return None
     pattern = os.path.join(outputs_dir, "T-*__" + member_id + ".md")
     files = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
     return files[0] if files else None
+
+
+def scan_member_grades(member_id, outputs_dir):
+    """扫描该成员在 outputs_dir 下的**全部**产出，聚合 X/E 级计数。
+
+    S-E60（S-E53 收尾审计暴露的真缺陷）：查新是多轮迭代的——首轮产出带完整
+    分级载体（JSON `xyape_grades` + Markdown 分级表），后续**复检**产出只引用
+    首轮结论、本身无分级载体。原实现 `latest_scout_output` 只取最新一份 →
+    复检轮存在时，首轮的 X 级威胁**完全不被计数** → C3 不触发 → **假放行**。
+    （真实基线实测：L2 目录下 scout 有 A01(X=5) + A03(无载体) 两份，
+      只看最新 → X=0；聚合全部 → X=5，正确触发 C3。）
+
+    假放行比假阻断更危险（阻断最多是流程摩擦，放行是漏掉 X 级威胁进入撰写阶段），
+    故此处聚合全部产出，而不是「最新 + 回退」。
+
+    返回 (x_count, e_count, detail)：
+      detail["files"]  = 参与聚合的文件清单
+      detail["verdict"]∈ {"determined", "no_carrier", "unreadable"}
+      detail["per_file"] = 每份文件的判定明细（诊断用）
+    """
+    import glob
+    detail = {"member_id": member_id, "outputs_dir": outputs_dir,
+              "files": [], "per_file": {}, "verdict": "no_carrier",
+              "counts": {g: 0 for g in "XYARPE"},
+              "patents": {g: [] for g in "XYARPE"},
+              "carriers": []}
+    if not member_id or not os.path.isdir(outputs_dir):
+        detail["verdict"] = "unreadable"
+        detail["error"] = "成员 ID 为空或产出目录不存在"
+        return 0, 0, detail
+
+    pattern = os.path.join(outputs_dir, "T-*__" + member_id + ".md")
+    files = sorted(glob.glob(pattern))
+    if not files:
+        detail["verdict"] = "no_carrier"
+        detail["error"] = "目录下无该成员的落盘产出"
+        return 0, 0, detail
+
+    seen = {g: set() for g in "XYARPE"}
+    carriers = []
+    for p in files:
+        x, e, d = scan_grade_counts(p)
+        detail["files"].append(p)
+        detail["per_file"][os.path.basename(p)] = {
+            "verdict": d.get("verdict"), "counts": d.get("counts", {}),
+            "carriers": d.get("carriers", [])}
+        for c in d.get("carriers", []):
+            if c not in carriers:
+                carriers.append(c)
+        for g in "XYARPE":
+            for pn in d.get("patents", {}).get(g, []):
+                if pn not in seen[g]:
+                    seen[g].add(pn)
+                    detail["patents"][g].append(pn)
+        if d.get("verdict") == "unreadable":
+            detail["verdict"] = "unreadable"
+        elif d.get("verdict") == "determined":
+            detail["verdict"] = "determined"
+
+    detail["counts"] = {g: len(detail["patents"][g]) for g in "XYARPE"}
+    detail["carriers"] = carriers
+    return detail["counts"].get("X", 0), detail["counts"].get("E", 0), detail
 
 
 def c3_should_trigger(x_count, e_count):
@@ -289,6 +374,36 @@ _SELF_TEST_CASES = [
      "### 4.1 X 类\n\n| 专利号 | 标题 |\n|---|---|\n| CN202279501U | 双色刮除器 |\n\n"
      "### 4.2 Y 类\n\n| 专利号 | 标题 |\n|---|---|\n| CN202279501U | 双色刮除器 |\n",
      1, 0, "md"),
+    # ── 分级节正则须覆盖全部 6 级（变异 T5 的靶点）──
+    # 分级节只匹配 X → Y/A/R/P/E 节全部漏解析 → threat_grade 漏计威胁。
+    ("分级节覆盖-Y类节被正确解析",
+     "### 4.2 Y 类（组合威胁）\n\n| 专利号 | 标题 |\n|---|---|\n"
+     "| CN224124877U | 养猪舍用刮粪车 |\n",
+     0, 0, "md"),
+    ("分级节覆盖-A类节被正确解析",
+     "### 4.3 A 类（背景技术）\n\n| 专利号 | 标题 |\n|---|---|\n"
+     "| CN102502176A | 过渡件 |\n",
+     0, 0, "md"),
+    ("分级节覆盖-E类节被正确解析（E 级触发 C3）",
+     "### 4.5 E 类（可检索范围内未见）\n\n| 专利号 | 标题 |\n|---|---|\n"
+     "| CN123456789A | 未检到同族 |\n",
+     0, 1, "md"),
+    # ── S-E61：专利号形态覆盖（漏计方向 = 假放行）──
+    # 中国发明专利**申请号**标准形态：CN + 12 位数字 + . + 1 位校验码
+    # 原正则不含小数点 → 这类号码全部漏计（真实基线 A01/A03 实测 13 处）
+    ("S-E61-申请号形态-CN带小数点",
+     '{"xyape_grades": {"X": ["CN202311321256.8"]}}', 1, 0, "json"),
+    ("S-E61-kindcode两段-US带B1",
+     '{"xyape_grades": {"X": ["US1234567B1"]}}', 1, 0, "json"),
+    ("S-E61-kindcode两段-EP带A1",
+     '{"xyape_grades": {"X": ["EP1234567A1"]}}', 1, 0, "json"),
+    ("S-E61-单字母尾码-授权公告号",
+     '{"xyape_grades": {"X": ["CN223231803U"]}}', 1, 0, "json"),
+    # 反证：正则放宽后不得把**纯数字号段**误当专利号
+    ("S-E61-反证-纯数字无尾码不计",
+     '{"xyape_grades": {"X": "CN202311321256"}}', 0, 0, None),
+    ("S-E61-反证-非专利前缀不计",
+     '{"xyape_grades": {"X": "DE1234567A1"}}', 0, 0, None),
 ]
 
 
@@ -305,8 +420,11 @@ def _self_test():
         res = extract_grade_counts(text)
         got_x = res["counts"].get("X", 0)
         got_e = res["counts"].get("E", 0)
+        # 来源标记：取**任意等级**的首个来源（不限于 X/E）——
+        # 否则 Y/A 级别的用例永远拿不到来源标记 → 期望值无法验证
+        # （S-E61 补强时实测暴露的自测盲区）。
         src = None
-        for g in ("X", "E"):
+        for g in ("X", "E", "Y", "A", "R", "P"):
             if res["sources"].get(g):
                 src = res["sources"][g][0].split(":")[0]
                 break
@@ -336,7 +454,71 @@ def _self_test():
     if fails:
         print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
         return 1
-    print("\n✅ 自测全通过（%d 用例 + 3 项 C3 语义）" % len(_SELF_TEST_CASES))
+
+    # ── S-E60：多轮产出聚合自测（假放行防线）──
+    # 查新是多轮迭代：首轮带完整分级载体，后续复检轮只引用首轮结论。
+    # 只看最新一份 → 首轮 X 级不被计数 → C3 不触发 → 假放行。
+    print("\n  ── S-E60 多轮产出聚合（假放行防线）──")
+    import tempfile
+    _agg_fails = []
+    with tempfile.TemporaryDirectory() as td:
+        _first = os.path.join(td, "T-20261015-A01__patent-search-scout.md")
+        with open(_first, "w", encoding="utf-8") as f:
+            f.write('{"xyape_grades": {"X": ["CN223231803U", "CN214126439U"], '
+                    '"E": "无（可检索范围内未见）"}}\n')
+        _recheck = os.path.join(td, "T-20261015-A03__patent-search-scout.md")
+        with open(_recheck, "w", encoding="utf-8") as f:
+            f.write("## 六、残余威胁清单\n\n本轮沿用 A01 分级结论。\n")
+
+        # 场景 1：只有复检轮（无载体）→ 不可判定，不能当成「确实无威胁」
+        _only = os.path.join(td, "only_recheck")
+        os.makedirs(_only)
+        with open(os.path.join(_only, "T-20261015-A03__patent-search-scout.md"),
+                  "w", encoding="utf-8") as f:
+            f.write("本轮沿用 A01 分级结论。\n")
+        x1, e1, d1 = scan_member_grades("patent-search-scout", _only)
+        _ok1 = (d1["verdict"] == "no_carrier" and x1 == 0)
+        print("  %s 仅复检轮（无载体）→ verdict=%s X=%d（不可判定，非「无威胁」）"
+              % ("✅" if _ok1 else "❌", d1["verdict"], x1))
+        if not _ok1:
+            _agg_fails.append("仅复检轮应判 no_carrier")
+
+        # 场景 2：首轮 + 复检轮并存 → 必须聚合出首轮的 X 级（否则假放行）
+        x2, e2, d2 = scan_member_grades("patent-search-scout", td)
+        _ok2 = (x2 == 2 and e2 == 0 and d2["verdict"] == "determined")
+        print("  %s 首轮+复检轮 → X=%d（聚合首轮，期望 2）verdict=%s"
+              % ("✅" if _ok2 else "❌", x2, d2["verdict"]))
+        if not _ok2:
+            _agg_fails.append("聚合应得 X=2，实得 %d" % x2)
+
+        # 场景 3：只看最新一份会漏 → 显式断言「最新一份」的 X 确实为 0
+        _latest = latest_scout_output("patent-search-scout", td)
+        xl, _, dl = scan_grade_counts(_latest)
+        _ok3 = (xl == 0 and d2["counts"]["X"] == 2)
+        print("  %s 反证：只看最新一份得 X=%d（应 0），聚合得 X=%d（应 2）"
+              % ("✅" if _ok3 else "❌", xl, d2["counts"]["X"]))
+        if not _ok3:
+            _agg_fails.append("反证不成立")
+
+        # 场景 4：跨文件同一文献必须去重（两轮都列了同一批 X 级文献）
+        _dup = os.path.join(td, "dup")
+        os.makedirs(_dup)
+        for _fn in ("T-20261015-A01__patent-search-scout.md",
+                    "T-20261015-A02__patent-search-scout.md"):
+            with open(os.path.join(_dup, _fn), "w", encoding="utf-8") as f:
+                f.write('{"xyape_grades": {"X": ["CN223231803U", "CN214126439U"]}}\n')
+        x4, _, d4 = scan_member_grades("patent-search-scout", _dup)
+        _ok4 = (x4 == 2)
+        print("  %s 跨文件去重：两轮各列同 2 条 X → 聚合 X=%d（应 2，非 4）"
+              % ("✅" if _ok4 else "❌", x4))
+        if not _ok4:
+            _agg_fails.append("跨文件去重失效，X=%d" % x4)
+
+    if _agg_fails:
+        print("\n❌ S-E60 聚合自测失败：%s" % _agg_fails)
+        return 1
+
+    print("\n✅ 自测全通过（%d 用例 + 3 项 C3 语义 + 3 项 S-E60 聚合）" % len(_SELF_TEST_CASES))
     return 0
 
 

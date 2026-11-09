@@ -130,6 +130,89 @@ def render_list(recs):
     return 0
 
 
+def _self_test():
+    """判别力自测（S-E58）：筛选语义 + 排序 + 截断。
+
+    关键判别点：**成员筛 与 关键词筛 取并集**（OR），不是交集。
+    这决定注入摘要的召回范围，取错了会漏注入真实教训。
+    """
+    fails = []
+
+    def chk(name, got, expect):
+        okk = (got == expect)
+        print("  %s %-48s 期望=%-18s 实得=%s"
+              % ("✅" if okk else "❌", name, expect, got))
+        if not okk:
+            fails.append(name)
+
+    print("🧪 failure_memory 判别力自测\n")
+
+    recs = [
+        {"id": "f-1", "member_id": "contradiction-analyst", "severity": "major",
+         "fail_type": "matrix", "fail_date": "2026-10-01",
+         "symptom": "凭记忆补全矛盾矩阵", "learned_rule": "必须走查询器",
+         "tags": ["矩阵", "TRIZ"]},
+        {"id": "f-2", "member_id": "patent-search-scout", "severity": "critical",
+         "fail_type": "envelope", "fail_date": "2026-10-02",
+         "symptom": "信封字段缺失", "learned_rule": "六项必填字段置前",
+         "tags": ["信封"]},
+        {"id": "f-3", "member_id": "", "severity": "minor",
+         "fail_type": "general", "fail_date": "2026-09-01",
+         "symptom": "通用教训", "learned_rule": "先查权威数据",
+         "tags": ["通用"]},
+    ]
+
+    # ── 1. 成员筛 ──
+    print("  ── 成员筛 ──")
+    got = [d["id"] for d in recs if matches(d, ["contradiction-analyst"], [])]
+    chk("成员筛精确命中", got, ["f-1"])
+    got = [d["id"] for d in recs if matches(d, ["nobody"], [])]
+    chk("成员筛无命中 → 空", got, [])
+
+    # ── 2. 关键词筛（跨字段：symptom/rule/tags/member/fail_type）──
+    print("\n  ── 关键词筛 ──")
+    chk("关键词命中 tags", [d["id"] for d in recs if matches(d, [], ["矩阵"])], ["f-1"])
+    chk("关键词命中 learned_rule", [d["id"] for d in recs if matches(d, [], ["查询器"])], ["f-1"])
+    chk("关键词命中 symptom", [d["id"] for d in recs if matches(d, [], ["信封字段"])], ["f-2"])
+    chk("关键词命中 fail_type", [d["id"] for d in recs if matches(d, [], ["matrix"])], ["f-1"])
+
+    # ── 3. 成员 + 关键词 = **并集**（OR），不是交集 ──
+    print("\n  ── 成员+关键词 取并集（关键）──")
+    got = [d["id"] for d in recs
+           if matches(d, ["contradiction-analyst"], ["信封"])]
+    chk("并集：成员命中 + 关键词命中", got, ["f-1", "f-2"])
+
+    # ── 4. 全空条件 = 全收 ──
+    print("\n  ── 空条件 ──")
+    chk("无成员无关键词 → 全收", len([d for d in recs if matches(d, [], [])]), 3)
+
+    # ── 5. 排序：severity 优先（critical → major → minor），同 severity 按日期 ──
+    print("\n  ── 排序 ──")
+    ordered = sorted(recs, key=sort_key)
+    chk("severity 优先级顺序", [d["id"] for d in ordered], ["f-2", "f-1", "f-3"])
+    chk("SEVERITY_RANK 映射", SEVERITY_RANK["critical"], 0)
+
+    # ── 6. 截断 ──
+    print("\n  ── 截断 ──")
+    chk("brief 不超长时原样返回", brief("短文本", 10), "短文本")
+    chk("brief 超长时截断+省略号", brief("a" * 50, 10), "a" * 9 + "…")
+    chk("brief 折叠空白", brief("a   b\n\nc", 20), "a b c")
+
+    # ── 7. 摘要渲染（空结果必须显式说明，不能静默空白）──
+    print("\n  ── 摘要渲染 ──")
+    empty_digest = render_digest([], [], [], False)
+    chk("空记录 → 显式声明无记录", "无相关失败记录" in empty_digest, True)
+    full_digest = render_digest(recs, [], [], False)
+    chk("有记录 → 含标题", "失败记忆摘要" in full_digest, True)
+    chk("有记录 → 含记录 id", "f-1" in full_digest or "f1" in full_digest, True)
+
+    if fails:
+        print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
+        return 1
+    print("\n✅ 自测全通过")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="episodic 失败记忆注入器（P2-12）")
     ap.add_argument("--dir", default=DEFAULT_DIR, help=f"失败索引目录（默认 {DEFAULT_DIR}）")
@@ -141,7 +224,11 @@ def main():
     ap.add_argument("--max", type=int, default=12, help="摘要最多条数（默认 12）")
     ap.add_argument("--full", action="store_true", help="摘要不截断正文")
     ap.add_argument("--json", action="store_true", help="机器可读输出")
+    ap.add_argument("--self-test", action="store_true", help="判别力自测")
     args = ap.parse_args()
+
+    if args.self_test:
+        return _self_test()
 
     if not os.path.isdir(args.dir):
         print(f"❌ 失败索引目录不存在：{args.dir}", file=sys.stderr)

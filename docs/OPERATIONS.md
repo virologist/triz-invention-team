@@ -44,7 +44,7 @@
 
 | 脚本 | 用途 | 何时跑 |
 |---|---|---|
-| `scripts/preflight_check.py` | 建队前 15 项检查（失败索引/路由可写/预算/Phase0五参数/权威数据/装配器/skills路径/C3检查点/诊断触发器/登记表结构/README结构图/**Workflow D 前置闸**/**state 模板三处真源一致性**/**routing-log 列契约**/**task_id 契约三处一致 + 反幽灵契约**） | **每次建队前（强制）** |
+| `scripts/preflight_check.py` | 建队前 15 项检查（失败索引/路由可写/预算/Phase0五参数/权威数据/装配器/skills路径/C3检查点/诊断触发器/登记表结构/README结构图/**Workflow D 前置闸**/**state 模板三处真源一致性**/**routing-log 列契约**/**task_id 契约五处一致 + 反幽灵契约**） | **每次建队前（强制）** |
 | `scripts/assemble_spawn_prompt.py` | spawn 文案装配（shared-core shim + vendor 兜底） | 每次派单（强制） |
 | `scripts/failure_memory.py` | 失败记忆摘要注入（按成员/关键词筛 expert-failures） | 每次派单第2步（强制） |
 | `scripts/token_budget_check.py` | 预算估算（默认）/ 产出机械计量（`--meter --ledger`） | 建队前 + 每次交付后 |
@@ -60,8 +60,18 @@
 | `scripts/cost_profile.py` | 成员成本画像（metrics.jsonl 聚合 → tokens/墙钟 P90 + 成功率） | 建队前（U1）+ 每次交付后台账累积 |
 | `scripts/patent_knowledge.py` | 专利族谱记忆（scout 产出的 X/Y 威胁沉淀 + 按域召回） | Phase 3 前查询（U3）+ 查新完成后沉淀 |
 | `scripts/spawn_watchdog.py` | 成员停滞看门狗（四态判定 OK/WATCH/STALL/TIMEOUT + H4 处置建议） | 每次派单等待窗口（P2-15 简版） |
+| `scripts/threat_grade.py` | **X/E 级威胁判定唯一真源**（结构化载体识别 + 专利号去重 + 多轮聚合 + C3 触发语义） | preflight 第8项自动调用 + patent_knowledge 消费 |
+| `scripts/boundary_guard.py` | **成员产出越界红线机械拦截**（B1-B5 信号 + 角色矩阵 + verdict 四态） | 每次 VERIFY 收产出前（验收侧红线） |
 | `scripts/diagnosis_trigger.py` | 诊断触发器 T1/T2/T3 机械判定（preflight 第9项自动调用） | 每次建队前（preflight 内自动） |
 | `scripts/evolution_log.py` | 自进化台账唯一写入口（append/backfill/verify/tail/self-test） | 每次批次收口（C5 登记收敛） |
+
+> **带 `--self-test` 的脚本**（判别力自测，改坏真源必报错）：
+> `threat_grade`（27 用例 + 3 项 C3 语义 + 3 项多轮聚合）·
+> `boundary_guard`（20 用例 + 7 成员角色矩阵）·
+> `patent_knowledge`（17 断言）· `check_claim_scope`（13）·
+> `cost_profile`（18）· `failure_memory`（18）· `spawn_watchdog`（15）·
+> `triz_benchmark`（19）· `contract_enforce` · `agent_ci_gate` ·
+> `diagnosis_trigger` · `evolution_log` · `verify_triz_data` · `query_triz_matrix`。
 
 ## 四、Git 钩子（双层门禁）
 

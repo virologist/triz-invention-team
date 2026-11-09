@@ -923,7 +923,7 @@ def check_c3_trigger(member_id, outputs_dir, x_count, c3_path, e_count=0):
 
 
 def scan_x_grade(member_id, outputs_dir):
-    """扫指定成员最新产出，统计 X 级 / E 级威胁条数。
+    """扫指定成员的**全部**产出，统计 X 级 / E 级威胁条数。
 
     CYCLE-1 · S-E53：此前本函数用宽松正则 `X\\s*[\\W_]*\\s*(\\d+)`，
     对 7 个真实场景误判 4 例，最严重「本产出无 X 级威胁」被判 1 条 →
@@ -933,15 +933,17 @@ def scan_x_grade(member_id, outputs_dir):
     现改为消费 scripts/threat_grade.py 的**唯一真源**（结构化判据：
     JSON `xyape_grades` 数组 / Markdown 分级表节 + 专利号正则 + 否定值过滤
     + 跨载体专利号去重），本函数保留为兼容包装，返回 (x_count, e_count, detail)。
+
+    CYCLE-1 · S-E60：原实现只扫**最新一份**产出。查新是多轮迭代的——
+    首轮产出带完整分级载体，后续复检产出只引用首轮结论、本身无分级载体 →
+    只看最新一份会漏掉首轮 X 级 → C3 不触发 → **假放行**。
+    现改为聚合该成员的**全部**产出（threat_grade.scan_member_grades）。
+    假放行比假阻断危险得多（阻断只是流程摩擦，放行是带着 X 级威胁进入撰写）。
     """
     import threat_grade as TG
     if HERE not in sys.path:
         sys.path.insert(0, HERE)
-    path = TG.latest_scout_output(member_id, outputs_dir)
-    if not path:
-        return 0, 0, {"verdict": "no_file"}
-    x, e, detail = TG.scan_grade_counts(path)
-    return x, e, detail
+    return TG.scan_member_grades(member_id, outputs_dir)
 
 
 def main():

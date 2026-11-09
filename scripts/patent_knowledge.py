@@ -92,8 +92,17 @@ def parse_scout_output(md_path, domain):
         task_id = m.group(1)
     entries = []
     # 按 X/Y 节切分（标题形如「### 4.1 X 类（…）」——编号在前，X/Y 与「类」间允许空格）
+    #
+    # CYCLE-1 · S-E59（单源化的副作用清偿）：S-E53 把 GRADE_SEC_RE 收敛到
+    # threat_grade 后，该正则的等级组从 [XY] 放宽为 [XYARPE]（threat_grade 需要
+    # 统计全部 6 级）→ 本模块**顺带把 A 级也收了**（实测 A01 基线多出 11 条 A 级），
+    # 违反本文件的数据纪律「只收 X/Y 级；A/R/P/E 不收（信息量低、噪音大）」。
+    # 根因：真源合并后**消费方的过滤义务被稀释**。
+    # 现显式按本模块的收库范围过滤——真源管「怎么解析」，本模块管「收什么」。
     for sec_m in GRADE_SEC_RE.finditer(text):   # S-E45：消费唯一真源常量
         grade = sec_m.group(1)
+        if grade not in ("X", "Y"):            # S-E59：只收威胁级
+            continue
         body = sec_m.group(2)
         for line in body.split("\n"):
             line = line.strip()
@@ -103,6 +112,13 @@ def parse_scout_output(md_path, domain):
             if len(cols) < 2 or not re.fullmatch(PAT_NO_RE, cols[0]):
                 continue
             pat_no, title = cols[0], cols[1]
+            # S-E61（消费方过滤义务显式化）：真源 PAT_NO_RE 现同时覆盖
+            # 「授权公告号」（CN223231803U）与「申请号」（CN202311321256.8）。
+            # 申请号**尚未公开审查结论**，本库的用途是「跨任务复用已核验的
+            # 对比文件族谱」→ 申请号**不入库**（只保留在 scout 原始产出中）。
+            # 判据：含小数点校验码者 = 申请号形态。
+            if "." in pat_no:
+                continue
             features = "；".join(c for c in cols[2:] if c and not re.match(r"^[-—\s]*$", c))
             entries.append({
                 "patent_no": pat_no,
@@ -222,6 +238,99 @@ def cmd_outdated(args):
     return 0
 
 
+def _self_test():
+    """判别力自测（S-E58）：scout 产出解析 + 专利号正则 + 否定值过滤。
+
+    与 threat_grade 共用真源（S-E53），本自测验证**族谱沉淀**这条消费路径
+    不会因上游改动而静默失效。
+    """
+    import threat_grade as TG
+    fails = []
+
+    def chk(name, got, expect):
+        okk = (got == expect)
+        print("  %s %-48s 期望=%-18s 实得=%s"
+              % ("✅" if okk else "❌", name, expect, got))
+        if not okk:
+            fails.append(name)
+
+    print("🧪 patent_knowledge 判别力自测\n")
+
+    # ── 1. 真源一致性（必须与 threat_grade 同形）──
+    print("  ── 真源一致性 ──")
+    chk("PAT_NO_RE == threat_grade.PAT_NO_RE", PAT_NO_RE, TG.PAT_NO_RE)
+    chk("GRADE_SEC_RE == threat_grade.GRADE_SEC_RE",
+        GRADE_SEC_RE.pattern, TG.GRADE_SEC_RE.pattern)
+
+    # ── 2. 专利号正则 ──
+    print("\n  ── 专利号正则 ──")
+    for pat in ("CN223231803U", "CN214126439U", "US1234567B1", "EP1234567A"):
+        chk("合法专利号 %s" % pat, bool(re.fullmatch(PAT_NO_RE, pat)), True)
+    for bad in ("CN123", "123456789", "XX223231803U", "CN223231803UU"):
+        chk("非法专利号 %s" % bad, bool(re.fullmatch(PAT_NO_RE, bad)), False)
+    # S-E61（真源收紧后消费方同步）：申请号形态（CN+数字+小数点校验码）
+    # 现已是**合法专利号形态**（THREAT 判定必须计入，否则漏计 X 级威胁）；
+    # 但本模块的收库纪律是「只收已公开的授权公告号」——
+    # 申请号尚未公开审查结论，**不入族谱库**。
+    # 真源管「怎么解析」，本模块管「收什么」——与 S-E59 的等级过滤同型。
+    chk("申请号形态是合法专利号（S-E61 真源）",
+        bool(re.fullmatch(PAT_NO_RE, "CN202311321256.8")), True)
+    chk("纯数字号段不是专利号（S-E61 反证）",
+        bool(re.fullmatch(PAT_NO_RE, "CN202279501")), False)
+
+    # ── 3. Markdown 分级节解析 ──
+    print("\n  ── 分级节解析 ──")
+    md = ("### 4.1 X 类（最高威胁）\n\n"
+          "| 专利号 | 标题 | 特征 |\n|---|---|---|\n"
+          "| CN223231803U | 畜牧养殖刮粪装置 | 免工具拆装 |\n"
+          "| CN214126439U | 猪舍粪污处理设备 | 弹性卡块 |\n\n"
+          "### 4.2 Y 类（组合威胁）\n\n"
+          "| 专利号 | 标题 | 组合 |\n|---|---|---|\n"
+          "| CN224124877U | 养猪舍用刮粪车 | 与CN223231803U组合 |\n")
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        fp = os.path.join(td, "T-20261015-A01__patent-search-scout.md")
+        open(fp, "w", encoding="utf-8").write(md)
+        entries = parse_scout_output(fp, "测试域")
+        chk("解析条目数", len(entries), 3)
+        chk("X 级条数", sum(1 for e in entries if e["grade"] == "X"), 2)
+        chk("Y 级条数", sum(1 for e in entries if e["grade"] == "Y"), 1)
+        chk("首条专利号", entries[0]["patent_no"] if entries else None, "CN223231803U")
+        chk("首条标题", entries[0]["title"] if entries else None, "畜牧养殖刮粪装置")
+        chk("域标签写入", entries[0]["domain"] if entries else None, "测试域")
+        chk("task_id 缺省为 -", entries[0]["source_task"] if entries else None, "-")
+
+        # 无效专利号行必须跳过（存疑线索不入库）
+        md_bad = md + "\n| 申请号线索 CN202520926963.8 | 存疑 | 不入库 |\n"
+        fp2 = os.path.join(td, "T-20261015-A02__patent-search-scout.md")
+        open(fp2, "w", encoding="utf-8").write(md_bad)
+        chk("无效专利号行被跳过", len(parse_scout_output(fp2, "测试域")), 3)
+
+        # 空产出 → 空列表（不编造）
+        fp3 = os.path.join(td, "T-20261015-A03__patent-search-scout.md")
+        open(fp3, "w", encoding="utf-8").write("没有分级节的普通文本")
+        chk("无分级节 → 空列表", len(parse_scout_output(fp3, "测试域")), 0)
+
+    # ── 4. 真实基线 ──
+    print("\n  ── 真实基线 ──")
+    real = os.path.join(PKG, "tests", "baselines", "l2-full-a01",
+                        "T-20261015-A01__patent-search-scout.md")
+    if os.path.isfile(real):
+        e = parse_scout_output(real, "畜牧养殖/粪污处理")
+        chk("A01 基线解析出条目", len(e) > 0, True)
+        chk("A01 含 X 级", sum(1 for x in e if x["grade"] == "X") > 0, True)
+        chk("A01 不含 A/R/P/E 级（只收 X/Y）",
+            all(x["grade"] in ("X", "Y") for x in e), True)
+    else:
+        chk("A01 基线存在", False, True)
+
+    if fails:
+        print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
+        return 1
+    print("\n✅ 自测全通过")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="专利族谱记忆（跨任务查新沉淀与召回）")
     sub = ap.add_subparsers(dest="cmd")
@@ -240,7 +349,10 @@ def main():
     p3.add_argument("patent_no", help="专利号（如 CN223231803U）")
     p3.add_argument("--reason", required=True, help="失效理由（如 已被无效宣告/公开不充分）")
 
+    ap.add_argument("--self-test", action="store_true", help="判别力自测")
     args = ap.parse_args()
+    if getattr(args, "self_test", False):
+        return _self_test()
     if args.cmd == "ingest":
         return cmd_ingest(args)
     if args.cmd == "query":

@@ -23,6 +23,7 @@ cost_profile.py — 成本画像：聚合 metrics.jsonl → 成员×阶段经验
 import argparse
 import glob
 import json
+import math
 import os
 import sys
 
@@ -31,10 +32,23 @@ PKG = os.path.dirname(HERE)
 
 
 def _pct(sorted_vals, p):
-    """P90 等分位数（nearest-rank 简化实现）"""
+    """P90 等分位数（nearest-rank 标准实现）。
+
+    CYCLE-1 · S-E58（自测暴露的真实算法偏差）：此前实现为
+        idx = round(p / 100 * (n + 1)) - 1
+    这**不是** nearest-rank —— nearest-rank 的定义是取第 ceil(p/100 × n) 个
+    观测值（1-based）。旧公式在 n=10/20/100 时分别返回 10/19/91，
+    而标准 nearest-rank 应为 9/18/90 → **P90 被系统性高估一位**。
+    该值用于「Σ 成员 tokens P90 合计 ≈」的预算线，高估意味着预算被虚高，
+    与「机械计量优先于自报」（原则②）相悖——分位数算错就不是机械的。
+
+    现改为标准 nearest-rank：idx = ceil(p/100 × n) - 1（下标 0-based）。
+    """
     if not sorted_vals:
         return None
-    idx = max(0, min(len(sorted_vals) - 1, round(p / 100 * (len(sorted_vals) + 1)) - 1))
+    n = len(sorted_vals)
+    idx = math.ceil(p / 100 * n) - 1
+    idx = max(0, min(n - 1, idx))
     return sorted_vals[idx]
 
 
@@ -94,12 +108,84 @@ def build_profile(rows):
     return profile
 
 
+def _self_test():
+    """判别力自测（S-E58）：成本画像的核心算法 + 口径纪律。
+
+    判别力验收标准（原则④）：改坏真源后本测试必须报错；还原后必须 PASS。
+    """
+    fails = []
+
+    def chk(name, got, expect):
+        okk = (got == expect)
+        print("  %s %-46s 期望=%-14s 实得=%s"
+              % ("✅" if okk else "❌", name, expect, got))
+        if not okk:
+            fails.append(name)
+
+    print("🧪 cost_profile 判别力自测\n")
+
+    # ── 1. 分位数算法（nearest-rank）──
+    print("  ── P90 分位数 ──")
+    chk("_pct([]) → None", _pct([], 90), None)
+    chk("_pct([10],90)", _pct([10], 90), 10)
+    chk("_pct([1..10],90) = 9", _pct(list(range(1, 11)), 90), 9)
+    chk("_pct([1..100],90) = 90", _pct(list(range(1, 101)), 90), 90)
+    chk("_pct([1..100],50) = 50", _pct(list(range(1, 101)), 50), 50)
+
+    # ── 2. 聚合口径（关键：**墙钟缺失不计入耗时统计**）──
+    print("\n  ── 聚合口径 ──")
+    rows = [
+        {"task_id": "T-1", "member": "m1", "out_tokens_est": 1000,
+         "duration_ms_wall": 5000, "status": "success", "metered_at": "2026-01-01"},
+        {"task_id": "T-2", "member": "m1", "out_tokens_est": 3000,
+         "duration_ms_wall": None, "status": "failed", "metered_at": "2026-01-02"},
+        {"task_id": "T-3", "member": "m1", "out_tokens_est": 2000,
+         "duration_ms_wall": 3000, "status": "success", "metered_at": "2026-01-03"},
+    ]
+    prof = build_profile(rows)
+    p = prof["m1"]
+    chk("成员数 n", p["n"], 3)
+    chk("成功率", p["success_rate"], 0.67)
+    chk("tokens 均值", p["out_tokens"]["mean"], 2000)
+    chk("tokens 中位", p["out_tokens"]["median"], 2000)
+    chk("tokens P90", p["out_tokens"]["p90"], 3000)
+    # 墙钟：只有 2 条有效（5000 + 3000），缺失那条不计入均值
+    chk("墙钟均值(s) 只算有效值", p["wall_s"]["mean"], 4)
+    chk("墙钟覆盖率", p["wall_s"]["coverage"], "2/3")
+
+    # ── 3. 空输入不崩（边界）──
+    print("\n  ── 边界 ──")
+    chk("build_profile([]) → {}", build_profile([]), {})
+    empty = build_profile([{"task_id": "T", "member": "m", "out_tokens_est": None,
+                            "duration_ms_wall": None, "status": "success"}])["m"]
+    chk("单条无墙钟 → wall mean None", empty["wall_s"]["mean"], None)
+    chk("单条无墙钟 → coverage 0/1", empty["wall_s"]["coverage"], "0/1")
+
+    # ── 4. 真实台账可加载（真源存在性）──
+    print("\n  ── 真实台账 ──")
+    real = load_ledgers()
+    chk("入库基线有 metrics.jsonl 可聚合", len(real) > 0, True)
+    if real:
+        prof2 = build_profile(real)
+        chk("真实画像成员数 > 0", len(prof2) > 0, True)
+
+    if fails:
+        print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
+        return 1
+    print("\n✅ 自测全通过")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="成员成本画像（metrics.jsonl 聚合）")
     ap.add_argument("--run-dir", help="限定单个运行目录")
     ap.add_argument("--member", help="单成员明细（含逐任务行）")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--self-test", action="store_true", help="判别力自测")
     args = ap.parse_args()
+
+    if args.self_test:
+        return _self_test()
 
     rows = load_ledgers(args.run_dir)
     if not rows:
