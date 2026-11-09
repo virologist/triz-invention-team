@@ -26,6 +26,103 @@ All notable changes to the **TRIZ Invention Team** will be documented here. The 
 - D4-2 himmpat 登录态探测：运行时状态不可预判，scout L2→L3 降档规则已覆盖——不实施
 - 48h 回检窗口关闭：窗口内多轮门禁复跑全绿，唯一新发现（benchmark 传参混扫）非修复引入
 
+## [2.10.0] - 2026-11-09
+
+> **CYCLE-1 · 第 3 轮（全面排查 + 契约漂移根因整治）**——用户授权推送 GitHub 后的全量复检。
+> 排查范围：死代码 / 契约漂移 / 幽灵验证项 / 幽灵契约 / 安装路径 / 版本口径。
+> 新增 **8 项** S-E44…S-E52，preflight 检查项 **13 → 15**。
+
+### Fixed（缺陷清偿 · S-E44…S-E47）
+- **S-E44 [P1] `agent_ci_gate` schema 路径二次手抄**：`ENVELOPE_SCHEMA_PATH` / `PAYLOAD_SCHEMA_PATH`
+  定义后从未被引用，`main()` 在下方**重新手拼**一遍同名路径 → 同一路径两处定义，改一处必漂移另一处。
+  现改为唯一真源常量，`main()` 直接消费；`run_regression.load_task_id_pattern()` 的
+  **全仓第三处手抄**同步改为消费 `agent_ci_gate.ENVELOPE_SCHEMA_PATH`（与本脚本既有的
+  `import state_store as SS` 复用先例一致）。判别力实测：把常量指向坏路径 → 落到保底字面量 → 还原恢复。
+- **S-E45 [P1] `patent_knowledge.GRADE_SEC_RE` 死常量**：常量定义后从未被引用，而
+  `parse_scout_output()` 另写了一条功能等价的正则 → 两条正则可各自漂移（如一条支持
+  「### 4.1 X 类」编号在前、另一条不支持），导致「常量看起来是规范、正则却各写各的」。
+  现把**切分实现下沉到常量**，解析处直接消费。等价性实测 6/6 用例新旧行为完全一致。
+- **S-E46 [P2] 死变量清理**：`skill_test_runner.RESULTS`（统计实际走返回值累加）·
+  `state_store.PKG`（与其它脚本同名但语义不同，保留会误用）→ 均移除。
+- **S-E47 [P1] Claude Code 单仓安装路径失效（推送阻塞项）**：`.gitignore` 整目录排除
+  `.claude-plugin/` → GitHub 上**完全没有** Claude marketplace 定义 → `/plugin marketplace add`
+  根本读不到插件清单（官方要求 marketplace 定义必须在 `<市场根>/.claude-plugin/marketplace.json`
+  且**必须提交到 git**）；同时双 `marketplace.json` 的 `source` 指向**不存在**的
+  `./plugins/triz-invention-team`（本仓 git 根为平铺布局，无 `plugins/` 嵌套层）。
+  - 修复：`.gitignore` 改为 `.claude-plugin/*` + `!.claude-plugin/marketplace.json`（排除内容但强制保留清单）；
+    双 `marketplace.json` 的 `source` 改为 `"./"`（根目录插件写法，相对**市场根**而非 `.claude-plugin/`）。
+  - 依据三重权威证据：① Claude Code 官方文档 ② 本地 6 个已工作的同类单仓 marketplace
+    （`agricidaniel-claude-obsidian` / `claude-scholar` / `science-superpowers-dev` /
+    `anthropic-agent-skills` 等，**全部**用 `source: "./"` 且 `.claude-plugin/` 全部入库）
+    ③ `git clone` 远端端到端实测确认远端确实缺 `.claude-plugin/`。
+  - 连带修 `README.zh.md` 结构图（preflight 第 11 项**正确阻断**了「结构图缺 `.claude-plugin`」）+ 注 1 说明订正。
+  - 不影响宿主：宿主实际生效的市场索引在 `my-experts/.codebuddy-plugin/marketplace.json`
+    （独立文件，`source: "./plugins/triz-invention-team"`，已是自动生成）→ 本仓
+    `.codebuddy-plugin/marketplace.json` 是插件包内元数据（单仓自描述），两者语义各自正确、互不冲突。
+
+### Added（新增机械能力 · S-E48/S-E49）
+- **S-E48 [P1] `preflight_check.py` 第 14 项 · routing-log 列契约一致性机械校验（根因整治）**：
+  落盘表在**三处手抄**（头部「字段：」声明 / Markdown 表头 / 实际数据行）且无机械校验。
+  **实测事故**：表头只声明 7 列，而 R-20261108-001（**已入库于 7b6ffb8**）与 R-20261108-002
+  两行均含 `rationale_class` 尾列共 8 列 → Markdown 渲染时该列**溢出表头**，
+  读者按表头解读会误判第 6 列「结果」实为「理由」→ **本表唯一可复盘字段失效**。
+  现落地第 14 项：表头列数 == 全部数据行列数 == 头部「字段：」声明字段数，三者逐位对齐，
+  否则 BLOCK。历史 25 条旧 7 列行按 append-only 原则**只补不改**（末列填
+  `—（旧格式无此字段）`），分隔行同步补列。
+  - 变异测试（判别力验证）：删数据行一列 → BLOCK；表头删一列 → BLOCK；
+    头部声明与表头逐位错位 → BLOCK；还原 → PASS。
+  - 口径澄清：SOP `RoutingDecision` JSON 有 8 字段，但 SOP「强制落盘规则」只要求
+    「decision_id + target + confidence + 简述」→ 落盘表是**精简投影**，
+    故对齐真源是**头部「字段：」行**，不是 SOP JSON 全字段。
+- **S-E49 [P1] `preflight_check.py` 第 15 项 · task_id 契约三处一致性 + 反幽灵契约（根因整治）**：
+  `task_id` 格式在**三处手抄**（信封 schema / 任务包 schema / 文档示例）且无机械校验。
+  **实测事故**：信封 schema = `^T-[0-9]{8}-[A-Za-z0-9]{1,8}$`（允许字母后缀），
+  任务包 schema = `^T-[0-9]{8}-[0-9]{3,}$`（**只允许纯数字**），文档示例写 `T-YYYYMMDD-NNN`
+  （纯数字口径）；而**实测基线全部采用字母后缀**（`T-20261015-A01`…`A07`，7 份成员信封 +
+  9 份 spawn 文档）→ 主理人按实测形态派单时，**若下游按任务包 schema 校验必被拒**；
+  而任务包 schema **全仓零代码消费**（幽灵契约）→ 该冲突从未被任何门禁暴露。
+  - 修复：任务包 schema 的 `task_id.pattern` 与信封 schema **字面统一**；主理人 MD 与
+    `docs/architecture.md` 补「task_id 格式（NNN|字母数字后缀）」说明。
+  - 反幽灵契约：`agent_ci_gate` 新增 `_load_schema()` 单一真源载入器，并新增
+    **task_payload schema 自测**（合规 payload `T-20261015-A01` 通过 / 缺 `instruction` 检出）。
+  - 变异测试：改回纯数字 → BLOCK（preflight + ci_gate 自测**双重检出**）；
+    任务包 schema 零消费 → BLOCK；还原 → PASS。
+  - **判别力自查修正**：判据 3「至少被一处代码消费」最初把 `preflight_check.py` **自身**也算作
+    消费方 → 本脚本「自己给自己作证」（假绿）。已改为**排除自身**，只认其它脚本的真实消费。
+
+### Fixed（续 · S-E50…S-E52）
+- **S-E50 [P2] `state_store.HERE` 死变量**：定义后从未被引用 → 移除（与 S-E46 的 `PKG` 同批清理）。
+- **S-E51 [P2] `run_regression` 保底字面量是 schema pattern 的第二份真源**：
+  `load_task_id_pattern()` 读不到 schema 时**静默回退**到字面量
+  `^T-[0-9]{8}-[A-Za-z0-9]{1,8}$` → schema 改了不跟随，契约漂移**静默**发生
+  （当前恰好相同，纯属巧合）。现改为读不到即**抛错**（fail loud，不静默降级）。
+  实测：常量指向坏路径 → `FileNotFoundError`（不再静默返回字面量）。
+- **S-E52 [P1] `--scaffold` 全线崩溃（层级误读 · 预先存在）**：`cmd_scaffold` 写 `exp["expect"]`，
+  但 `expect` 是**断言层**字段（每条 assertion 自带 expect），顶层无此键 →
+  用例 A（`target_member=full-team`）必然 `KeyError: 'expect'`。
+  **用 HEAD 版本复现，确认非本轮引入**。真实成员清单位于断言 `all_members_landed`（A2）的 expect。
+  现按断言层读取；无成员清单时显式报错，不静默产出空成员 state。
+  实测：`--case workflow-a-01 --scaffold` → 正常产出 `RUN_INFO.md` + `state.json`
+  （`retry_counts` 含 6 成员）。
+
+### Changed（口径同步）
+- **版本收口 2.9.0 → 2.10.0**：三处版本号统一（`plugin.json` / 双 `marketplace.json`）+
+  `README.zh.md` 三处（标题/导语/落款）+ `docs/OPERATIONS.md` 工具清单版本号。
+- **preflight 项数 13 → 15**：`docs/OPERATIONS.md` 工具清单行同步（补第 14/15 项）；
+  `preflight_check.py` docstring 检查项清单同步。
+- **`docs/routing-log.md` 列契约订正**：表头补 `rationale_class` 列 + 头部「字段：」声明同步为
+  8 字段 + 历史 25 行补列 + 分隔行补列。
+
+### 验收证据（机械实测）
+- **9 项门禁全绿**：`verify_triz_data --strict` · `agent_ci_gate --strict` · `agent_ci_gate --self-test` ·
+  `contract_enforce --self-test` · `state_store self-test` · `preflight_check` ·
+  `skill_test_runner` · `evolution_log verify` · `token_budget_check`（全部 rc=0）
+- **三用例回归零回退**：A 7/7 PASS · B 7/8 PASS + 1 INFO · C 8/8 PASS
+- **18 脚本 `--help` 零异常** · **全仓 JSON 零非法**
+- **变异测试 7 例全过**：第 14 项（A 删数据行列 / B 删表头列 / C 头部逐位错位）·
+  第 15 项（D 改 pattern / F schema 缺失 / G 零消费）+ S-E51（schema 路径坏 → fail loud）
+- **端到端安装实测**：`git clone` 远端 → 确认 `.claude-plugin/marketplace.json` 已入库
+
 ## [2.9.0] - 2026-11-09
 
 > **CYCLE-1 · 可持续迭代引擎（墨衡）**——针对本专家团的独立诊断 → 构建 → 测试&debug → 再诊断循环。

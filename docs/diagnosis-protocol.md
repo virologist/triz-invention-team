@@ -64,6 +64,7 @@
 | 2026-11-08（残留清偿） | T1 同类失败复发（member_files 覆盖误判同型） | C01 法25 / U3 outdated / D3-1+D1 / OPERATIONS 订正 / vendor 核验 / spawn_watchdog / D4-2 / 回检登记 | 8 项全部清偿（d4bee57→e47a525） | 48h 后复检 | 无遗留 |
 | 2026-11-08（CYCLE-1 · 墨衡） | T4 手动 + T3 架构变更（门禁状态机改动） | 19 项（S-E01…S-E19） | P0-1（3812043）+ P1-1（a8633ba）+ P1-2（1a747b5）+ P1-3（3a51ce1）+ P2-1（ad96ee9）+ P1-4（764b1dd）+ P1-5/P1-6（b871989）+ C4-🔴（fdf1a95） | 见下方「CYCLE-1 已知残留」 | 见下方「CYCLE-1 已知残留」 |
 | 2026-11-09（CYCLE-1 · 第2轮交叉验证 + C4 再诊断） | T3 架构变更 + 第2轮交叉验证 + C4 独立子智能体审计 | 19 条（第2轮交叉验证确证问题）+ 14 条（C4 再诊断新增：🔴4·🟡6·🟢4） | 第2轮 19 条 → b871989；C4 4 条🔴 → fdf1a95；C4 剩余 10 条🟡/🟢 → C5 批次 commit | 48h 后复检 | `marketplace.json` source 指向单仓 GitHub 安装路径失效（评估后不实施，见 CHANGELOG 2.9.0 Evaluated） |
+| 2026-11-09（CYCLE-1 · 第3轮全面排查） | T4 手动（用户授权推送 GitHub 后的全量复检） | 9 项（S-E44…S-E52：死代码 3 · 契约漂移 3 · 幽灵契约 1 · 安装路径 1 · 崩溃 1） | 全部清偿（v2.10.0） | 48h 后复检 | 无遗留（本轮 9 项全部落地并有变异测试证明判别力） |
 
 **已知残留（2026-11-07 第三轮交接）**：
 - ~~spawn_watchdog（P2-15）~~ → **简版已落地**（2026-11-08，e47a525+）：scripts/spawn_watchdog.py 四态判定（OK/WATCH/STALL/TIMEOUT）+ H4 处置建议；桌面通知通道仍未建（等待窗口手动调用够用）
@@ -94,3 +95,27 @@
 - **C4 再诊断闭环判据**（实测满足）：新增 🔴 = 0 且新增 🟡 = 0 → 准予进入 C5 登记收敛。
 - **C4 再诊断新增待登记**：`marketplace.json` 的 `source` 字段指向 `./plugins/triz-invention-team`，但本仓 git 根为**平铺布局**（无 `plugins/` 嵌套层）——本地安装（`my-experts` 市场根含 `plugins/`）正常，但**单仓 GitHub 安装**（`/plugin marketplace add virologist/triz-invention-team`）会指向不存在的目录
 - **本轮新增待登记（实测发现）**：~~`marketplace.json` 的 `source` 指向 `./plugins/triz-invention-team`~~ → **已评估并登记于 CHANGELOG 2.9.0 Evaluated 段**（单仓 GitHub 安装路径失效；本仓 git 根为平铺布局，本地安装正常）。C5 收口时以「评估后不实施」结案，**不擅自改动发布路径语义**。
+
+- **第3轮全面排查新增 9 条（S-E44…S-E52）· 全部清偿（v2.10.0）**：
+  - **死代码（3 条）**：**S-E44** `agent_ci_gate` 的两个 schema 路径常量定义后从未引用、`main()` 二次手抄
+    （`run_regression` 另有全仓第三处手抄）→ 三处统一消费唯一真源常量 ·
+    **S-E45** `patent_knowledge.GRADE_SEC_RE` 死常量 + 76 行另有独立正则（两条可各自漂移）→
+    切分实现下沉到常量，解析处直接消费（等价性实测 6/6 一致）·
+    **S-E46/S-E50** `skill_test_runner.RESULTS` / `state_store.PKG` / `state_store.HERE` 三个死变量移除。
+  - **契约漂移（3 条 · 根因整治）**：**S-E48** routing-log 落盘表三处手抄无校验 → 表头 7 列 vs 数据行 8 列
+    （**已入库于 7b6ffb8** 的 R-20261108-001 即是）→ 第 6 列「结果」被挤出表头，**唯一可复盘字段失效**
+    → 落地 **preflight 第 14 项**（表头列数 == 全部数据行列数 == 头部「字段：」声明数，逐位对齐）·
+    **S-E49** `task_id` 三处手抄无校验 → 信封 schema 允许字母后缀、任务包 schema 只允许纯数字、
+    文档示例写纯数字，而**实测基线全部用字母后缀**（`T-20261015-A01`…`A07`，7 信封 + 9 spawn）
+    → 主理人按实测形态派单时下游按任务包 schema 校验**必被拒**；且任务包 schema **零代码消费**（幽灵契约）
+    → 落地 **preflight 第 15 项**（pattern 字面统一 + 基线样本全匹配 + 反幽灵契约且**排除本项自身**避免自证）·
+    **S-E51** `run_regression` 保底字面量是 schema pattern 的**第二份真源** → 改 fail loud（不静默降级）。
+  - **安装路径（1 条）**：**S-E47** `.claude-plugin/` 整目录被 gitignore → GitHub 上**完全没有** Claude marketplace
+    定义（官方要求必须入库）→ 单仓 `/plugin marketplace add` 根本读不到插件清单；且双 `marketplace.json` 的
+    `source` 指向不存在目录 → 改为 `source: "./"` + gitignore 改为「排除内容但保留 marketplace.json」。
+    依据三重权威证据：官方文档 + 本地 6 个已工作的同类单仓 marketplace + `git clone` 端到端实测。
+  - **崩溃（1 条）**：**S-E52** `--scaffold` 全线 `KeyError: 'expect'`（层级误读，`expect` 是断言层字段）
+    → **用 HEAD 版本复现确认预先存在**，非本轮引入 → 改按断言 `all_members_landed` 读取成员清单。
+  - **判别力验收**：本轮新增的 2 个 preflight 检查项均做变异测试（**第 14 项 3 例 + 第 15 项 4 例 + S-E51 1 例 = 8 例**），
+    破坏必检出、还原必 PASS；其中第 15 项判据 3 曾因「自证」漏检（preflight 自己算消费方）→ **已自查修正**。
+  - **本轮登记**：preflight 项数 13 → **15**；版本 2.9.0 → **2.10.0**（三处版本号 + README 三处 + OPERATIONS 一处）。
