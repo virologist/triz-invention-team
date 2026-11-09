@@ -61,17 +61,26 @@
 | `scripts/patent_knowledge.py` | 专利族谱记忆（scout 产出的 X/Y 威胁沉淀 + 按域召回） | Phase 3 前查询（U3）+ 查新完成后沉淀 |
 | `scripts/spawn_watchdog.py` | 成员停滞看门狗（四态判定 OK/WATCH/STALL/TIMEOUT + H4 处置建议） | 每次派单等待窗口（P2-15 简版） |
 | `scripts/threat_grade.py` | **X/E 级威胁判定唯一真源**（结构化载体识别 + 专利号去重 + 多轮聚合 + C3 触发语义） | preflight 第8项自动调用 + patent_knowledge 消费 |
-| `scripts/boundary_guard.py` | **成员产出越界红线机械拦截**（B1-B5 信号 + 角色矩阵 + verdict 四态） | 每次 VERIFY 收产出前（验收侧红线） |
+| `scripts/boundary_guard.py` | **成员产出越界红线机械拦截**（B1-B5 信号 + 角色矩阵 + verdict 四态 + 默认 fail-closed） | 每次 VERIFY 收产出前（验收侧红线）；已由 self_gate 机械触发 |
+| `scripts/self_gate.py` | **判别力门禁唯一汇总入口**（12 脚本自测 + 2 真实基线越界复核 = 14 项） | pre-commit hook + release-sync gate 自动（S-E62） |
 | `scripts/diagnosis_trigger.py` | 诊断触发器 T1/T2/T3 机械判定（preflight 第9项自动调用） | 每次建队前（preflight 内自动） |
 | `scripts/evolution_log.py` | 自进化台账唯一写入口（append/backfill/verify/tail/self-test） | 每次批次收口（C5 登记收敛） |
 
-> **带 `--self-test` 的脚本**（判别力自测，改坏真源必报错）：
-> `threat_grade`（27 用例 + 3 项 C3 语义 + 3 项多轮聚合）·
-> `boundary_guard`（20 用例 + 7 成员角色矩阵）·
-> `patent_knowledge`（17 断言）· `check_claim_scope`（13）·
-> `cost_profile`（18）· `failure_memory`（18）· `spawn_watchdog`（15）·
-> `triz_benchmark`（19）· `contract_enforce` · `agent_ci_gate` ·
-> `diagnosis_trigger` · `evolution_log` · `verify_triz_data` · `query_triz_matrix`。
+> **判别力门禁的唯一真源 = `scripts/self_gate.py`**（CYCLE-1 第5轮 · S-E62/S-E66/S-E67/S-E68）。
+> 该入口定义 12 个脚本自测 + 2 个真实基线越界复核 = 14 项；改动后一律跑：
+> `python3 scripts/self_gate.py`（全量）· `python3 scripts/self_gate.py --self-test`（清单完整性）。
+> 已由 `~/.workbuddy/git-hooks/pre-commit` 与 `release-sync.sh` 条件式调用，
+> 改坏任一真源即阻断提交/推送（实测：short-circuit `c3_should_trigger` → 门禁 1/4 未通过）。
+>
+> **本文件不再手抄用例数**：此前此处逐脚本列出「N 用例/断言」，属第二份真源，
+> 实测已漂移（`boundary_guard` 文档写 20、实际 22；`patent_knowledge` 写 17、实际 25 断言）
+> —— 且 `diagnosis_trigger` / `verify_triz_data` / `query_triz_matrix` 三个条目
+> **根本不接受 `--self-test`**（RC=2），`evolution_log` 用的是子命令 `self-test`。
+> 判别力口径请直接查 `self_gate.py:GATES` 或各脚本 `--self-test` 输出，勿在此处维护。
+>
+> 附：另有 3 个脚本走**非 `--self-test` 形态**——`verify_triz_data.py --strict`
+> （已列入 self_gate 清单）、`query_triz_matrix.py --list-params`、
+> `diagnosis_trigger.py --json`（两者无判别力自测，属真实数据校验/触发器，非门禁）。
 
 ## 四、Git 钩子（双层门禁）
 

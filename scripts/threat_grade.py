@@ -293,9 +293,16 @@ def scan_member_grades(member_id, outputs_dir):
                 if pn not in seen[g]:
                     seen[g].add(pn)
                     detail["patents"][g].append(pn)
-        if d.get("verdict") == "unreadable":
+        # S-E65（第5轮排查实测）：原写法是 `if unreadable: ... elif determined: ...`
+        # ——后一个 determined 会把前面文件的 unreadable **覆盖掉**。
+        # 实测：1 份不可读 + 1 份正常 → verdict=determined，损坏产出被静默吞掉
+        # （假放行）。改为**严重度优先**：unreadable 一旦出现即锁死，不可被覆盖；
+        # 同时把不可读文件清单落到 detail，供人工定位。
+        fv = d.get("verdict")
+        if fv == "unreadable":
             detail["verdict"] = "unreadable"
-        elif d.get("verdict") == "determined":
+            detail.setdefault("unreadable_files", []).append(os.path.basename(p))
+        elif fv == "determined" and detail["verdict"] != "unreadable":
             detail["verdict"] = "determined"
 
     detail["counts"] = {g: len(detail["patents"][g]) for g in "XYARPE"}
@@ -514,11 +521,30 @@ def _self_test():
         if not _ok4:
             _agg_fails.append("跨文件去重失效，X=%d" % x4)
 
+        # 场景 5（S-E65）：一份不可读产出**不可被**另一份正常产出覆盖
+        _bad = os.path.join(td, "unreadable")
+        os.makedirs(_bad)
+        with open(os.path.join(_bad, "T-20261109-A01__patent-search-scout.md"),
+                  "wb") as f:
+            f.write(b"bad\xff\xfe bytes\n")
+        with open(os.path.join(_bad, "T-20261109-A02__patent-search-scout.md"),
+                  "w", encoding="utf-8") as f:
+            f.write('{"xyape_grades": {"X": ["CN223231803U"]}}\n')
+        x5, _, d5 = scan_member_grades("patent-search-scout", _bad)
+        _ok5 = (d5["verdict"] == "unreadable"
+                and len(d5.get("unreadable_files", [])) == 1)
+        print("  %s S-E65 不可读优先：verdict=%s（应 unreadable）不可读文件=%s"
+              % ("✅" if _ok5 else "❌", d5["verdict"],
+                 d5.get("unreadable_files", [])))
+        if not _ok5:
+            _agg_fails.append("unreadable 被覆盖，verdict=%s" % d5["verdict"])
+
     if _agg_fails:
         print("\n❌ S-E60 聚合自测失败：%s" % _agg_fails)
         return 1
 
-    print("\n✅ 自测全通过（%d 用例 + 3 项 C3 语义 + 3 项 S-E60 聚合）" % len(_SELF_TEST_CASES))
+    print("\n✅ 自测全通过（%d 用例 + 3 项 C3 语义 + 4 项多轮聚合）"
+          % len(_SELF_TEST_CASES))
     return 0
 
 

@@ -134,6 +134,28 @@ def main_gates(as_json=False):
     return 1 if n_fail else 0
 
 
+def discover_selftest_scripts():
+    """机械发现**所有**接受 `--self-test` 的脚本（用于双向差集）。
+
+    S-E69（第5轮 C4 再诊断实测）：原 --self-test 只校验「清单里的脚本存在」
+    （单向），实测注入一个带 --self-test 的新脚本 `__canary_gate.py` 后，
+    self_gate --self-test 仍 RC=0、输出完全不提 canary → **漏挂不会被发现**。
+    这与第4轮 S-E54 的「契约手抄无机械校验」同型，解法同为双向差集。
+    注：以 `--help` 输出是否含 `--self-test` 作为判据（不 import、不执行主流程）。
+    """
+    import glob
+    found = set()
+    for path in glob.glob(os.path.join(HERE, "*.py")):
+        name = os.path.basename(path)
+        if name == os.path.basename(__file__):
+            continue  # 自身是汇总入口，不是被汇总的门禁
+        p = subprocess.run([sys.executable, path, "--help"],
+                           capture_output=True, text=True)
+        if "--self-test" in (p.stdout + p.stderr):
+            found.add(name)
+    return found
+
+
 def self_test():
     """门禁清单自身的完整性与判别力（防止清单变成新的幽灵验证项）。"""
     fails = []
@@ -149,13 +171,40 @@ def self_test():
             continue
         p = subprocess.run([sys.executable, path, "--help"],
                            capture_output=True, text=True)
-        # 子命令形态（evolution_log self-test）单独跳过 --help 参数校验
         flag_arg = argv[0]
-        if flag_arg.startswith("--") and flag_arg not in p.stdout:
+        help_txt = p.stdout + p.stderr
+        if flag_arg.startswith("--"):
+            ok = flag_arg in help_txt
+        else:
+            # 子命令形态：也要真校验（旧实现直接跳过 → 形态 A 缺口）
+            ok = flag_arg in help_txt
+        if not ok:
             print("  ❌ %-30s %s 不接受 %s" % (name, script, flag_arg))
             fails.append(name)
         else:
             print("  ✅ %-30s %s %s" % (name, script, " ".join(argv)))
+
+    # 1b) 双向差集：清单 ↔ 全仓真实自测脚本，差集必须为空（S-E69）
+    print("\n  ── 清单双向差集（S-E69 防漏挂）──")
+    discovered = discover_selftest_scripts()
+    # verify_triz_data 用 --strict 而非 --self-test，属**显式例外**，
+    # 在清单里但不在 discovered 里是预期行为，不算差集。
+    EXPLICIT_NON_SELFTEST = {"verify_triz_data.py"}
+    listed_selftest = {s for _, s, argv, _ in GATES
+                       if argv and argv[0] == "--self-test"}
+    missing = discovered - listed_selftest          # 有自测但没挂进门禁用
+    stale = listed_selftest - discovered - EXPLICIT_NON_SELFTEST  # 挂了但已无自测
+    print("  %s 全仓发现 %d 个 --self-test 脚本 / 清单收录 %d 个"
+          % ("✅" if not missing and not stale else "❌",
+             len(discovered), len(listed_selftest)))
+    if missing:
+        print("  ❌ 漏挂（有自测但不在门禁清单）：%s" % sorted(missing))
+        fails.append("漏挂:%s" % sorted(missing))
+    if stale:
+        print("  ❌ 陈旧（清单收录但已无自测）：%s" % sorted(stale))
+        fails.append("陈旧:%s" % sorted(stale))
+    if not missing and not stale:
+        print("  ✅ 双向差集为空")
 
     # 2) 基线目录必须存在（否则越界复核会恒为空集 → 形态 B）
     print("\n  ── 基线扫描目标非空 ──")
