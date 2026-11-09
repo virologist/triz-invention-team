@@ -21,6 +21,8 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
   10. docs/diagnosis-protocol.md §六 诊断登记表结构完整（表头 + 数据行列数一致）
   11. README.zh.md 结构图与 git 实际入库顶层项一致（按 .gitignore 解析后比对）
   12. Workflow D 入口前置闸：G1/G2/G3 全关 + 查新与裁决证据文件真实落盘
+  13. state 模板三处真源一致性：代码真源（state_store.STATE_TEMPLATE）↔ 文档真源
+      （architecture.md §3.2）↔ SOP 真源（主理人 MD 状态块模板）——双向差集必须为空
 
 用法：
   python3 scripts/preflight_check.py [--expert-dir DIR] [--members a,b,c] [--task-file F] [--keywords 词1,词2]
@@ -188,6 +190,146 @@ def check_diagnosis_registry():
             blk(f"10. 诊断登记表结构异常——{pr}")
     else:
         ok(f"10. 诊断登记表结构完整（{data_rows} 行数据·{ncol} 列）")
+
+
+def check_state_template_consistency():
+    """13. state 模板三处真源一致性（CYCLE-1 · S-E43）。
+
+    **根因**：state 模板此前在**三处手抄**——`scripts/state_store.py` 的 `STATE_TEMPLATE`
+    （代码真源）· `docs/architecture.md` §3.2（文档真源）· `agents/*-team-lead.md`
+    （主理人 SOP 的状态块模板）。三处**无任何机械校验** → 任一处漏字段都静默漂移。
+
+    **实测事故（S-E42）**：主理人 MD 的状态块模板写 `metrics: {duration_ms, agent_calls}`，
+    **漏掉 `duration_ms_wall` + `duration_source`** → 成员照此输出 → 墙钟永远缺失 →
+    `agent_ci_gate.check_wall_clock()` 只能永远发 WARN，收不到回填后的墙钟。
+    即 S-E25「墙钟双轨制」**未真正下沉到 SOP**，只在架构文档里存在。
+
+    **本项判据**（机械比对三处字段集合，双向差集必须为空）：
+      T1 代码真源 `state_store.STATE_TEMPLATE` 的 gates/evidence/metrics 键集合
+      T2 文档真源 `docs/architecture.md` §3.2 JSON 代码块的同名键集合
+      T3 SOP 真源 主理人 MD 状态块模板中的字段名
+    任一缺失 → BLOCK（这是**契约漂移**，不是文档整洁度问题，必须阻断）。
+    """
+    import json as _json
+    import re as _re
+
+    def _read_text(path):
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+
+    # --- T1 代码真源 ---
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import state_store as _ss
+        tpl = _ss.STATE_TEMPLATE
+        code_gates = set(tpl.get("gates", {}).keys())
+        code_evidence = set(tpl.get("evidence", {}).keys())
+        code_metrics = set(tpl.get("metrics", {}).keys())
+    except Exception as e:
+        blk("13. 无法载入 state_store.STATE_TEMPLATE（代码真源）：%s" % e)
+        return
+
+    # --- T2 文档真源：architecture.md §3.2 的 JSON 代码块 ---
+    arch = os.path.join(PKG, "docs", "architecture.md")
+    if not os.path.isfile(arch):
+        blk("13. docs/architecture.md 不存在——无法校验文档真源（state 模板契约漂移）")
+        return
+    atext = _read_text(arch)
+    blocks = _re.findall(r"```json\s*(.*?)```", atext, _re.S)
+    doc = None
+    for b in blocks:
+        if '"gates"' in b and '"metrics"' in b:
+            doc = b
+            break
+    if doc is None:
+        blk("13. architecture.md 中未找到含 gates+metrics 的 JSON 模板代码块——"
+            "文档真源无法解析（契约漂移）")
+        return
+
+    def _keys_in(section, text):
+        """从文本中取某 section 的键名集合（括号配平，不依赖 JSON 可解析性）。
+
+        架构文档的模板含 `"phase": 0-5` 这类**示意值**（非法 JSON），
+        故不能用 json.loads —— 改用括号配平 + 正则提键。
+        """
+        m = _re.search(r'"%s"\s*:\s*\{' % section, text)
+        if not m:
+            return None
+        i = m.end() - 1
+        depth = 0
+        for j in range(i, len(text)):
+            if text[j] == "{":
+                depth += 1
+            elif text[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    inner = text[i + 1:j]
+                    return set(_re.findall(r'"([^"]+)"\s*:', inner))
+        return None
+
+    doc_gates = _keys_in("gates", doc)
+    doc_evidence = _keys_in("evidence", doc)
+    doc_metrics = _keys_in("metrics", doc)
+    for nm, kv in (("gates", doc_gates), ("evidence", doc_evidence),
+                   ("metrics", doc_metrics)):
+        if kv is None:
+            blk("13. architecture.md 模板中未找到 %s 段——文档真源无法解析（契约漂移）" % nm)
+            return
+
+    # --- T3 SOP 真源：主理人 MD 状态块模板 ---
+    md = os.path.join(PKG, "agents", "triz-invention-team-team-lead.md")
+    if not os.path.isfile(md):
+        blk("13. 主理人 MD 不存在——无法校验 SOP 真源（state 模板契约漂移）")
+        return
+    mtext = _read_text(md)
+    # 括号配平提取 TASK_STATE 块（正则 `\{[^}]*\}` 会在**内层** `}` 处截断，
+    # 导致 evidence/metrics 等嵌套段被误判为缺失 —— 必须配平）
+    _mi = mtext.find("TASK_STATE:")
+    sop = ""
+    if _mi >= 0:
+        _bs = mtext.find("{", _mi)
+        if _bs >= 0:
+            depth = 0
+            for _j in range(_bs, len(mtext)):
+                if mtext[_j] == "{":
+                    depth += 1
+                elif mtext[_j] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        sop = mtext[_bs:_j + 1]
+                        break
+    if not sop:
+        blk("13. 主理人 MD 中未找到 TASK_STATE 状态块模板——SOP 真源无法解析（契约漂移）")
+        return
+
+    # --- 双向差集比对（缺一即漂移）---
+    problems = []
+    for name, code_set, doc_set in (
+        ("gates", code_gates, doc_gates),
+        ("evidence", code_evidence, doc_evidence),
+        ("metrics", code_metrics, doc_metrics),
+    ):
+        miss_doc = sorted(code_set - doc_set)
+        extra_doc = sorted(doc_set - code_set)
+        if miss_doc:
+            problems.append("文档缺 %s：%s" % (name, "、".join(miss_doc)))
+        if extra_doc:
+            problems.append("文档多 %s：%s" % (name, "、".join(extra_doc)))
+
+    # SOP 侧：逐个代码真源字段名必须在状态块模板中出现
+    for name, keys in (("gates", code_gates), ("evidence", code_evidence),
+                       ("metrics", code_metrics)):
+        for k in sorted(keys):
+            if k not in sop:
+                problems.append("SOP 状态块模板缺 %s.%s" % (name, k))
+
+    if problems:
+        blk("13. state 模板三处真源漂移（代码真源 = state_store.STATE_TEMPLATE）："
+            + "；".join(problems) + " —— 以代码真源为准修文档/SOP，不得反向放宽真源")
+        return
+    ok("13. state 模板三处真源一致（gates %d / evidence %d / metrics %d 键·"
+       "代码↔文档↔SOP 双向差集为空）"
+       % (len(code_gates), len(code_evidence), len(code_metrics)))
 
 
 def check_workflow_d_gate(state_path):
@@ -501,6 +643,7 @@ def main():
     check_diagnosis_registry()
     check_readme_structure()
     check_workflow_d_gate(args.state_path)
+    check_state_template_consistency()
 
     # CYCLE-1 · S-E04：诊断触发器 T1-T3 机械判定（散文条款脚本化，原则①）
     try:

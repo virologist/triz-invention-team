@@ -95,7 +95,13 @@ Context = 角色MD + 声明skills references + task_payload
 > 实测对照：把 59KB 查新报告全文作为输入 → 成员 30 分钟超时未落盘（TaskStop 取消）；改用 4KB 紧凑 brief（含 X 级速览 + 差异化路径 + 路径指针）→ **2 分 40 秒**完成且四项要求全达标。此规则即 H1「仅本阶段依赖部分」的执行标准。
 
 ### H2 · State Store 状态存储
-维护全局唯一状态对象，随每次调度下发快照：`task_id / phase / domain / search_rounds / verdicts{examiner,second_opinion} / gates{search_3rounds_complete, c1_c8_confirmed, ...} / retry_counts / confirmed_items / conflicts / metrics`。
+维护全局唯一状态对象，随每次调度下发快照：`task_id / phase / domain / search_rounds / verdicts{examiner,second_opinion} / gates{search_3rounds_complete, trinity_verdict_pass, c1_c8_confirmed, disclosure_gap_scan, g5_format_compliant} / evidence{search_report, verdict_report} / conditions / retry_counts / confirmed_items / conflicts / metrics{total_duration_ms, total_duration_ms_wall, agent_calls, duration_source, loopback_count}`。
+
+> **CYCLE-1 · S-E42（2026-11-09）**：本行此前以 `...` 省略 gates 后半段，且**完全遗漏** `evidence`
+> （Workflow D 前置闸的落盘证据源，S-E02）· `conditions`（二审条件对账源，J2）·
+> `trinity_verdict_pass`（G2 语义键）· `total_duration_ms_wall` / `duration_source` / `loopback_count`
+> （墙钟双轨制与回流上限，S-E25/S-E10）——与 `docs/architecture.md` §3.2 及
+> `scripts/state_store.py` 的 `STATE_TEMPLATE` **三处不一致**。现以 §3.2 为单一权威对齐。
 
 > 🔴 **状态持久化硬规则（2026-11-07 Batch2 · 修 S-X3；2026-11-08 CYCLE1 门禁归一）**：内存态不可靠——主理会话中断即丢失。
 > 每次 VERIFY 后**必须**把状态落盘到运行目录（一行命令，确定性）：
@@ -573,4 +579,18 @@ RoutingDecision 的 alternatives_top2 与 reasoning 同时写入装配产出的�
 
 每次输出末尾维护状态块（用户输入"状态"显示完整版）：
 
-TASK_STATE: { task_id, phase: 0-5, domain, invention_name, search_rounds: 0-3, verdicts: {examiner, second_opinion}, gates: {G1-G5}, retry_counts: {agent: N}, confirmed: C1-C8, conflicts: [], metrics: {duration_ms, agent_calls}, blocker }
+TASK_STATE: { task_id, phase: 0-5, domain, invention_name, search_rounds: 0-3, verdicts: {examiner, second_opinion}, gates: {search_3rounds_complete, trinity_verdict_pass, c1_c8_confirmed, disclosure_gap_scan, g5_format_compliant}, evidence: {search_report, verdict_report}, conditions: {K1..K7/M1..M7}, retry_counts: {agent: N}, confirmed: C1-C8, conflicts: [], metrics: {total_duration_ms, total_duration_ms_wall, agent_calls, duration_source, loopback_count}, blocker }
+
+> **字段层级说明（S-E42/S-E43）**：本状态块 = **state 累计口径**，`metrics.total_duration_ms` /
+> `total_duration_ms_wall` 是**全流程累计墙钟**；而**成员信封内**的 metrics 用
+> `duration_ms`（成员自报）/ `duration_ms_wall`（主理人实测·权威）+ `duration_source`
+> （self_report / lead_measured / estimated）。两层字段名**故意不同**，禁止混用——
+> 成员层是**单次调用**口径，state 层是**累计**口径（`state_store.py` `set_nested` 按
+> `total_*` 前缀累加）。门禁别名 `G1..G5` ↔ 语义键的对应关系见 `state_store.GATE_ALIASES`
+> （唯一真源），本块写**语义键**以便机械比对。
+
+> **CYCLE-1 · S-E42（2026-11-09）**：本状态块模板此前写 `metrics: {duration_ms, agent_calls}`——
+> **漏掉 `duration_ms_wall`（主理人实测墙钟·权威口径）与 `duration_source`（自报/实测/估算三值）**，
+> 即 S-E25 墙钟双轨制**未下沉到状态块模板**；成员照此输出 → 墙钟永远缺失 →
+> `agent_ci_gate.check_wall_clock()` 只能对每份产出发 WARN，永远收不到回填后的墙钟。
+> 同时补 `evidence`（Workflow D 前置闸证据源）· `conditions`（二审对账源）· `loopback_count`（回流上限）。

@@ -40,7 +40,7 @@ Team 型（多角色协作团队）
 python3 scripts/agent_ci_gate.py --strict                  # 信封 schema 门禁
 python3 scripts/contract_enforce.py --self-test            # 契约自测（三源一致性 + 豁免双向断言）
 python3 scripts/state_store.py self-test                   # 门禁状态机（G1-G5 别名归一 + 回流重置）
-python3 scripts/preflight_check.py                         # 建队前 12 项 preflight
+python3 scripts/preflight_check.py                         # 建队前 13 项 preflight
 python3 scripts/run_regression.py --list                   # 3 个回归用例
 ```
 

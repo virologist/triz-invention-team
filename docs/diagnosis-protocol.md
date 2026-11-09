@@ -84,6 +84,13 @@
   - **🟢 4 条**：S-E38 README.zh 报告名 `agent_ci_gate_report.json` → `ci_gate_report.json` ·
     S-E39 装配器白名单口径显式化（6 执行成员 vs 全仓 7）· S-E40 `LEGACY_CUTOFF` 死代码 → 抽出 `_is_legacy_name()` 单一真源 ·
     S-E41 CHANGELOG `[Unreleased]` 去日期 + 2.9.0 段补录本轮全部变更。
+- **C4 闭环复查新发现 2 条（S-E42/S-E43）· 已清偿**：
+  - **S-E42 [P1]** 主理人 MD 两处 state 口径漂移（MD:98 快照字段列表遗漏 `evidence`/`conditions`/
+    `trinity_verdict_pass`/墙钟字段；MD:576 状态块模板 `metrics` 漏 `duration_ms_wall`/`duration_source`
+    → S-E25 墙钟双轨制未下沉到 SOP）→ 两处按 `architecture.md` §3.2 补全 + 标注字段层级口径。
+  - **S-E43 [P1]** 根因整治：state 模板三处手抄（代码/文档/SOP）且无机械校验 → 落地
+    **preflight 第 13 项**「state 模板三处真源一致性」校验（双向差集为空才放行，漂移即 BLOCK），
+    变异测试证明有判别力（删字段必检出）。preflight 项数 12 → **13**。
 - **C4 再诊断闭环判据**（实测满足）：新增 🔴 = 0 且新增 🟡 = 0 → 准予进入 C5 登记收敛。
 - **C4 再诊断新增待登记**：`marketplace.json` 的 `source` 字段指向 `./plugins/triz-invention-team`，但本仓 git 根为**平铺布局**（无 `plugins/` 嵌套层）——本地安装（`my-experts` 市场根含 `plugins/`）正常，但**单仓 GitHub 安装**（`/plugin marketplace add virologist/triz-invention-team`）会指向不存在的目录
 - **本轮新增待登记（实测发现）**：~~`marketplace.json` 的 `source` 指向 `./plugins/triz-invention-team`~~ → **已评估并登记于 CHANGELOG 2.9.0 Evaluated 段**（单仓 GitHub 安装路径失效；本仓 git 根为平铺布局，本地安装正常）。C5 收口时以「评估后不实施」结案，**不擅自改动发布路径语义**。

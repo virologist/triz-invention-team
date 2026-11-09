@@ -115,6 +115,26 @@ All notable changes to the **TRIZ Invention Team** will be documented here. The 
 - **S-E41 CHANGELOG 排序**：`[Unreleased]` 段带日期 `2026-11-08` 排在 `[2.9.0]`（2026-11-09）之前形成日期倒序
   → 按 Keep a Changelog 规范改为不带日期的 `[Unreleased]`。
 
+### Fixed（C4 闭环复查新发现 · S-E42/S-E43）
+- **S-E42 [P1] 主理人 MD 两处 state 口径漂移**：C4 闭环机械复查（14 条逐条 grep 实测）时发现——
+  MD:98 的状态对象快照字段列表以 `...` 省略 gates 后半段，且**完全遗漏** `evidence`（Workflow D
+  前置闸证据源）· `conditions`（二审对账源）· `trinity_verdict_pass`（G2 语义键）·
+  `total_duration_ms_wall` / `duration_source` / `loopback_count`；MD:576 的状态块模板写
+  `metrics: {duration_ms, agent_calls}`——**漏掉 `duration_ms_wall` + `duration_source`**，
+  即 S-E25「墙钟双轨制」**未真正下沉到 SOP**，只在架构文档里存在 → 成员照此输出 → 墙钟永远缺失 →
+  `agent_ci_gate.check_wall_clock()` 只能永远发 WARN，收不到回填后的墙钟。
+  现两处均按 `docs/architecture.md` §3.2（单一权威）补全，并标注**字段层级**：
+  成员层 = 单次调用口径（`duration_ms`/`duration_ms_wall`/`duration_source`），
+  state 层 = 累计口径（`total_duration_ms`/`total_duration_ms_wall`），两层字段名故意不同、禁止混用。
+- **S-E43 [P1] preflight 第 13 项 · state 模板三处真源一致性机械校验（根因整治）**：
+  上述漂移的**根因**是 state 模板在**三处手抄**（`state_store.STATE_TEMPLATE` 代码真源 ·
+  `architecture.md` §3.2 文档真源 · 主理人 MD 状态块模板 SOP 真源）且**无任何机械校验** → 任一处漏字段都静默漂移。
+  现落地第 13 项：机械比对三处的 gates/evidence/metrics 键集合，**双向差集必须为空**，否则 BLOCK
+  （契约漂移属阻断项，非文档整洁度问题）。判据：以**代码真源**为准修文档/SOP，不得反向放宽真源。
+  - 变异测试（判别力验证）：SOP 删 `total_duration_ms_wall` → BLOCK；architecture 删 `evidence` 段 → BLOCK；还原 → PASS。
+  - 实现要点：架构文档模板含 `"phase": 0-5` 等示意值（非法 JSON）→ 文档侧改用**括号配平 + 正则提键**，
+    不依赖 `json.loads`；SOP 侧同理（正则 `\{[^}]*\}` 会在内层 `}` 处截断 → 必须配平）。
+
 ### Evaluated（评估后不实施）
 - `marketplace.json` 的 `source: "./plugins/triz-invention-team"`：本仓 git 根为平铺布局（无 `plugins/`
   嵌套层）。本地安装（`my-experts` 市场根含 `plugins/`）正常；**单仓 GitHub 安装**会指向不存在目录。
