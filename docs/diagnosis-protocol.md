@@ -119,3 +119,32 @@
   - **判别力验收**：本轮新增的 2 个 preflight 检查项均做变异测试（**第 14 项 3 例 + 第 15 项 4 例 + S-E51 1 例 = 8 例**），
     破坏必检出、还原必 PASS；其中第 15 项判据 3 曾因「自证」漏检（preflight 自己算消费方）→ **已自查修正**。
   - **本轮登记**：preflight 项数 13 → **15**；版本 2.9.0 → **2.10.0**（三处版本号 + README 三处 + OPERATIONS 一处）。
+
+- **第4轮全面排查新增 9 条（S-E53…S-E61）· 全部清偿（v2.11.0 · 2026-11-09）**（角色 = AI agent 开发/测试工程师；用户要求「修复和测试与 debug 后再次全面排查」）：
+  - **契约双源漂移（根因整治）**：**S-E53** X 级计数两套判据（preflight 宽松正则 `X\s*[\W_]*\s*(\d+)`
+    对 7 真实场景误判 4 例 · patent_knowledge 结构化判据）→ 新增 `scripts/threat_grade.py` **唯一真源**
+    （结构载体 + 专利号正则 + 否定值过滤 + 跨载体按专利号去重 + C3 触发「X 或 E」语义），preflight 第 8 项与
+    patent_knowledge 均改消费 ·
+    **S-E54** task_id pattern 全仓**第三份手抄**（`token_budget_check.FILENAME_RE`）→ 从 schema 派生，
+    读不到 fail loud · **S-E55** `agent-protocol/SKILL.md` 文档真源漂移（旧 pattern 漏实测字母后缀形态）
+    → 同步 + preflight 第 15 项扩为**五处判据**（含全仓零手抄扫描）。
+  - **死参数/恒绿退出码**：**S-E56** `triz_benchmark` 恒 `return 0`（有 FAIL 也绿）→ 语义化退出码；
+    变异 Q1 首轮未捕获 → 补「实跑 main()」用例（自测只验函数不验退出码 = 判别力缺口）·
+    **S-E57** `split` 参数定义后从未读取（训练/评测集划分形同虚设 → 数据泄漏风险）→ 二值校验 + holdout 只留 L2；
+    用例基线分离（b-01 不再共用 l2 求值目录，L1 综合分 0.750 → 1.000）·
+    **S-E58a** 回归报告 run_dir 原样写入（换机不可复现）→ 包内相对化 + `--no-report-write` 求值不污染基线。
+  - **零门禁覆盖**：**S-E58b** 6 脚本补 `--self-test`（check_claim_scope 13 / cost_profile 18 / failure_memory 18 /
+    patent_knowledge 17 / spawn_watchdog 15 / triz_benchmark 19）——自测过程**暴露两个真缺陷**：
+    cost_profile P90 非标准 nearest-rank（系统性高估一位）；spawn_watchdog 判定逻辑双份。变异 R1-R5 全捕获。
+  - **验收侧红线缺失**：**S-E59** `forbidden_boundary` 只在下发侧（S-E11 半截工程），验收侧零机械校验
+    → 新增 `scripts/boundary_guard.py`（5 信号 × 角色矩阵，判据基于产出结构，verdict 四态，
+    **不可判定 ≠ 放过**）；收尾审计又修 3 处判据缺陷（假绿用例 / 前置窗口漏后置引用线索 / 分支重叠）。
+    变异 **19/19** 全捕获。
+  - **假放行防线**：**S-E60** threat_grade 只看最新一份产出——查新多轮迭代时复检轮只引用首轮结论，
+    首轮 X 级**完全不被计数** → C3 不触发 → **假放行**（比假阻断危险）→ `scan_member_grades()` 聚合全部产出
+    + 跨文件去重（真实基线实测：只看最新 X=0，聚合 X=5 正确触发 C3）·
+    **S-E61** `PAT_NO_RE` 只支持字母尾码 → 申请号形态 `CN202311321256.8` 全漏计（真实基线 13 处）
+    → 尾码与校验码**二者必居其一**，纯数字号段不计；patent_knowledge 显式化消费方过滤义务（申请号不入族谱库）。
+  - **判别力验收**：boundary_guard 变异 19/19 + threat_grade 变异 12/12 全捕获（首轮 3 项逃逸 →
+    补强用例后重测通过——「引用上游评级」用例系假绿：文本形态不匹配评级正则，从未经过引用排除分支）。
+  - **本轮登记**：版本 2.10.0 → **2.11.0**；preflight 第 8 项判据升级（宽松正则 → 唯一真源聚合）。

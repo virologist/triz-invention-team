@@ -2,6 +2,70 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] - 2026-11-09
+
+> **CYCLE-1 · 第 4 轮（AI agent 开发/测试工程师视角全面排查 + 修复与 debug）**。
+> 新增 **9 项** S-E53…S-E61，全部清偿。核心成果：X/E 级威胁判定**唯一真源化**、
+> 越界红线**验收侧机械拦截**、全部关键脚本补**判别力自测**（变异测试靶点）。
+
+### Added（新工具）
+- **S-E59 `scripts/boundary_guard.py` 成员产出越界红线机械拦截**：S-E11 只把
+  `forbidden_boundary` 下沉到下发侧（task_payload schema），验收侧零机械校验。
+  现 5 信号（B1 申请文件正文 / B2 肯定性授权断言 / B3 自我评价 / B4 越权改写方案 /
+  B5 非职责角色出具三性评级）按 `docs/architecture.md` §二 角色矩阵判定；
+  判据基于产出结构而非成员自述；verdict 四态（clean/violation/unknown_role/unreadable，
+  **不可判定 ≠ 放过**）；引用语境按句级豁免（B5）、断言句式不豁免（B2）。
+  自测 20 用例 + 7 成员角色矩阵；**变异测试 19/19 全捕获**
+- **S-E53 `scripts/threat_grade.py` X/E 级威胁判定唯一真源**：此前 preflight 宽松正则
+  `X\s*[\W_]*\s*(\d+)` 对 7 个真实场景误判 4 例（最严重「本产出无 X 级威胁」被判 1 条 →
+  假触发 C3 阻断），且与 patent_knowledge 构成契约双源漂移。现只认结构载体
+  （JSON `xyape_grades` 数组+字符串两形态 / Markdown 分级表节）+ 专利号正则 +
+  否定值过滤 + 跨载体按专利号去重（同批文献 JSON+表格双载体 → 10 实为 5）
+
+### Fixed（缺陷清偿 · S-E54…S-E61）
+- **S-E54/S-E55 task_id pattern 第三份手抄清偿**：`token_budget_check.FILENAME_RE`
+  为全仓**第三份**手抄（schema 改了不跟随 → 静默漂移）；现改为从
+  `result_envelope.schema.json` 读 pattern **派生**，读不到 schema 直接抛错（fail loud）；
+  `agent-protocol/SKILL.md` 文档真源同步（旧 pattern 漏 A01 形态 `T-20261015-A01`）；
+  preflight 第 15 项扩为**五处判据**（pattern 一致 + 基线样本全匹配 + 消费方清单 +
+  SKILL.md 同步 + 全仓零手抄）。变异 P1/P2/N1/N2 全捕获
+- **S-E56 benchmark 退出码语义化**：此前恒 `return 0`（有 FAIL 也绿）→
+  现语义化 `0`=全过 / `1`=有 FAIL（gate 未通过）/ `2`=用法或环境错误；
+  变异 Q1（退回恒 0）首轮未被捕获 → 补「实跑 main() 读真实退出码」用例后捕获
+- **S-E57 benchmark `split` 死参数清偿**：定义后从未被读取，任何 split 返回同一任务
+  列表 → A-Evolve 按 split 划分训练/评测集会**数据泄漏**；现校验 `train|holdout`
+  二值，holdout 只保留 L2 用例；用例基线分离（b-01 用 l1 目录，不再共用 l2 求值目录，
+  L1 综合分 0.750 → 1.000）
+- **S-E58a 回归报告可移植 + 求值不污染**：run_dir 原样写入报告（换机不可复现）→
+  包内路径改相对；`--no-report-write` 开关让求值不写基线目录（工作树干净）
+- **S-E58b 6 脚本补 `--self-test` 判别力自测**：check_claim_scope(13)/cost_profile(18)/
+  failure_memory(18)/patent_knowledge(17)/spawn_watchdog(15)/triz_benchmark(19)。
+  自测过程暴露并修复真缺陷：**cost_profile P90 非标准 nearest-rank**
+  （`round(p/100×(n+1))-1` 系统性高估一位 → 改 `math.ceil(p/100×n)-1`）；
+  spawn_watchdog 抽 `_judge()` 纯函数消除判定逻辑双份。变异 R1-R5 全捕获
+- **S-E60 threat_grade 多轮产出聚合（假放行防线）**：查新是多轮迭代（首轮带完整
+  分级载体，复检轮只引用首轮结论），原 `latest_scout_output` 只取最新一份 →
+  复检轮存在时首轮 X 级**完全不被计数** → C3 不触发 → **假放行**。假放行比假阻断
+  危险（阻断是流程摩擦，放行是带着 X 级威胁进撰写）。现 `scan_member_grades()`
+  聚合全部产出 + 跨文件专利号去重；preflight 第 8 项改消费聚合结果
+  （实测基线 A01 X=5 正确触发 C3）
+- **S-E61 专利号形态全覆盖（漏计防线）**：原 `PAT_NO_RE` 只支持字母尾码 →
+  申请号形态 `CN202311321256.8`（中国发明专利申请号标准形态：12 位数字 + 小数点
+  校验码）全漏计（真实基线实测 13 处）。新正则
+  `(CN|US|EP|WO|JP|KR)[0-9]{7,14}(?:\.[0-9]|[A-Z][0-9]?)`——尾码与校验码
+  **二者必居其一**，纯数字号段不计（非任何法域标准形态）；
+  patent_knowledge 同步显式化消费方过滤义务（申请号不入族谱库——真源管「怎么解析」，
+  本模块管「收什么」，与 S-E59 等级过滤同型）
+- **S-E59 收尾审计中的判别力补强**：「引用上游评级不算越界」用例原为**假绿**
+  （文本形态不匹配 `_VERDICT_QUOTE_RE`，从未经过引用排除分支——变异 M2 逃逸暴露）；
+  `_sentence_of` 只取匹配点前 60 字符（后置引用线索「（详见 A01）」看不到）→
+  改为句级上下文；`_SPEC_SEC_RE` 与 `_CLAIM_HEAD_RE` 分支重叠 → 互斥拆分
+
+### Changed（文档）
+- `docs/OPERATIONS.md`：工具清单补 `threat_grade` / `boundary_guard` 两行 + 带
+  `--self-test` 脚本索引；preflight 第 15 项描述「三处一致」→「五处一致」
+- `docs/CONTRACT_ENFORCEMENT.md`：维护节补 S-E59 / S-E53/S-E60/S-E61 机械拦截说明
+
 ## [Unreleased]
 
 > 本段内容为 **2026-11-08 工作区整理 + 残留全清偿**（11 个 commit：8285208…b43d2de），
