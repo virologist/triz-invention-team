@@ -603,7 +603,7 @@ def cmd_scaffold(case_id, out_dir, task_id_override=None):
     return 0
 
 
-def cmd_verify(case_id, run_dir, as_json):
+def cmd_verify(case_id, run_dir, as_json, no_report_write=False):
     exp, task_text, _ = load_case(case_id)
     if exp is None:
         return 2
@@ -623,8 +623,24 @@ def cmd_verify(case_id, run_dir, as_json):
     info = [r for r in results if r["pass"] is None]
     passes = [r for r in results if r["pass"] is True]
 
+    # CYCLE-1 · S-E58（报告可移植性）：此前 run_dir **原样写入报告**。
+    # 调用方传相对路径时报告里就是相对路径（可移植 ✅），
+    # 传绝对路径时报告里就是绝对路径（换机 clone 后完全失效 ❌）。
+    # 基线报告是**入库资产**（tests/baselines/*/regression_report__*.json），
+    # 里面出现 /Users/<用户名>/... 这类本机绝对路径 → 换机后路径无意义，
+    # 且泄露本机目录结构。
+    # 现统一：**落在包根内 → 记相对路径；落在包外 → 记绝对路径**
+    # （包外的临时运行目录用相对路径无意义，必须保留绝对）。
+    _abs = os.path.abspath(run_dir)
+    _pkg_abs = os.path.abspath(PKG)
+    if _abs.startswith(_pkg_abs + os.sep):
+        _run_dir_repr = os.path.relpath(_abs, _pkg_abs)
+    else:
+        _run_dir_repr = _abs
+
     report = {
-        "case_id": case_id, "run_dir": run_dir, "checked_at": datetime.datetime.now().isoformat(),
+        "case_id": case_id, "run_dir": _run_dir_repr,
+        "checked_at": datetime.datetime.now().isoformat(),
         "total": len(results), "passed": len(passes), "failed": len(fails), "info": len(info),
         "results": results, "verdict": "PASS" if not fails else "FAIL",
     }
@@ -640,6 +656,13 @@ def cmd_verify(case_id, run_dir, as_json):
         print()
         print(f"结果：{len(passes)}/{len(results)} PASS · {len(fails)} FAIL · {len(info)} INFO → {report['verdict']}")
     # 报告落盘（供归档）
+    # CYCLE-1 · S-E58（求值污染）：bench 反复求值会**改写入库的基线报告**
+    # （checked_at 时间戳每次刷新）→ git 工作树变脏 → 评审 diff 全是时间戳噪音。
+    # 故加 --no-report-write：只读求值场景（bench / CI 复算）不写盘。
+    if no_report_write:
+        if not as_json:
+            print(f"报告：未写入（--no-report-write，避免污染入库基线）")
+        return 0 if not fails else 1
     rp = os.path.join(run_dir, f"regression_report__{case_id}.json")
     try:
         json.dump(report, open(rp, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
@@ -659,6 +682,8 @@ def main():
     ap.add_argument("--out", help="scaffold 输出目录（默认 outputs/regression-<date>）")
     ap.add_argument("--task-id", help="覆盖 scaffold 自动生成的 task_id（须符合 envelope schema）")
     ap.add_argument("--json", action="store_true", help="机器可读输出")
+    ap.add_argument("--no-report-write", action="store_true",
+                    help="只读求值，不写回归报告（避免污染入库基线）")
     args = ap.parse_args()
 
     if args.list:
@@ -669,7 +694,7 @@ def main():
     if args.scaffold:
         return cmd_scaffold(args.case, args.out, args.task_id)
     if args.dir:
-        return cmd_verify(args.case, args.dir, args.json)
+        return cmd_verify(args.case, args.dir, args.json, args.no_report_write)
     ap.print_help()
     return 2
 
