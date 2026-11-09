@@ -815,17 +815,30 @@ def check_declared_skills():
         ok("7. 成员声明的 %d 处 skill 路径全部存在于磁盘" % checked)
 
 
-def check_c3_trigger(member_id, outputs_dir, x_grade_count, c3_path):
+def check_c3_trigger(member_id, outputs_dir, x_count, c3_path, e_count=0):
     """P0-S3-1: C3 检查点自动触发
 
     当指定成员（默认 patent-search-scout）在 outputs_dir 下的最新产出信封
-    含 X 级文献时，必须提供 c3_path（指向 C3 确认文件）；
+    含 X 级（或 E 级）文献时，必须提供 c3_path（指向 C3 确认文件）；
     无该文件则 exit 1（阻断）。
+
+    CYCLE-1 · S-E53：触发条件此前只认 X 级，与 skills/patent-law/SKILL.md §四
+    「对比文件分级出现 X **或** E 时」的权威定义漂移 → E 类命中时漏触发。
+    现按权威定义补齐 E。
     """
-    if member_id != "patent-search-scout" or x_grade_count == 0:
+    if member_id != "patent-search-scout":
         return
+    trig_x, trig_e = x_count or 0, e_count or 0
+    if trig_x <= 0 and trig_e <= 0:
+        return
+    detail = []
+    if trig_x > 0:
+        detail.append("X 级 %d 条" % trig_x)
+    if trig_e > 0:
+        detail.append("E 级 %d 条" % trig_e)
     if not c3_path:
-        BLOCK.append("8. C3 检查点：X 级出现 %d 条但未提供 --c3-confirmation-path" % x_grade_count)
+        BLOCK.append("8. C3 检查点：%s出现但未提供 --c3-confirmation-path"
+                     % "、".join(detail))
         return
     if not os.path.isfile(c3_path):
         BLOCK.append("8. C3 检查点：%s 文件不存在" % c3_path)
@@ -836,27 +849,29 @@ def check_c3_trigger(member_id, outputs_dir, x_grade_count, c3_path):
         if marker not in text:
             BLOCK.append("8. C3 检查点：%s 缺关键标记「%s」" % (c3_path, marker))
             return
-    OK.append("8. C3 检查点：%d 条 X 级已确认（%s）" % (x_grade_count, c3_path))
+    OK.append("8. C3 检查点：%s已确认（%s）" % ("、".join(detail), c3_path))
 
 
 def scan_x_grade(member_id, outputs_dir):
-    """扫指定成员最新产出，统计 X 级文献数（从 threat_list 段）"""
-    if not member_id or not os.path.isdir(outputs_dir):
-        return 0
-    # 找最新落盘
-    pattern = os.path.join(outputs_dir, "T-*__" + member_id + ".md")
-    files = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
-    if not files:
-        return 0
-    text = open(files[0], encoding="utf-8").read()
-    # 找 threat_list 段（scout A01 风格：X 1, Y 12, A 12 等）
-    # 简易：X 后跟数字
-    import re as _re
-    m = _re.search(r"X\s*[\W_]*\s*(\d+)", text)
-    if m:
-        return int(m.group(1))
-    # 备用：从"X 级"统计
-    return len(_re.findall(r"X\s*级", text))
+    """扫指定成员最新产出，统计 X 级 / E 级威胁条数。
+
+    CYCLE-1 · S-E53：此前本函数用宽松正则 `X\\s*[\\W_]*\\s*(\\d+)`，
+    对 7 个真实场景误判 4 例，最严重「本产出无 X 级威胁」被判 1 条 →
+    **假触发 C3 阻断**，scout 正常流程被无端阻断；且与 patent_knowledge
+    的结构化判据构成契约双源漂移。
+
+    现改为消费 scripts/threat_grade.py 的**唯一真源**（结构化判据：
+    JSON `xyape_grades` 数组 / Markdown 分级表节 + 专利号正则 + 否定值过滤
+    + 跨载体专利号去重），本函数保留为兼容包装，返回 (x_count, e_count, detail)。
+    """
+    import threat_grade as TG
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    path = TG.latest_scout_output(member_id, outputs_dir)
+    if not path:
+        return 0, 0, {"verdict": "no_file"}
+    x, e, detail = TG.scan_grade_counts(path)
+    return x, e, detail
 
 
 def main():
@@ -912,9 +927,19 @@ def main():
     # P0-S3-1: C3 自动触发
     if args.outputs_dir:
         after_member = args.after_search or "patent-search-scout"
-        x_count = scan_x_grade(after_member, args.outputs_dir)
-        if x_count > 0:
-            check_c3_trigger(after_member, args.outputs_dir, x_count, args.c3_confirmation_path)
+        x_count, e_count, detail = scan_x_grade(after_member, args.outputs_dir)
+        verdict = detail.get("verdict", "no_carrier")
+        if verdict == "no_carrier":
+            # S-E53：count=0 有两种含义——「确实无威胁」与「未识别到分级载体」。
+            # 二者不可混同：恒返回 0 = 幽灵验证项形态 B。此处显式 WARN，
+            # 提示人工确认产出结构，而非静默当作「无威胁」放行。
+            wrn("8. C3 检查点：未在 %s 的产出中识别到分级载体"
+                "（JSON xyape_grades / Markdown 分级表节）——"
+                "**无法机械判定 X/E 级计数**，请人工确认该产出是否含威胁清单"
+                % after_member)
+        elif x_count > 0 or e_count > 0:
+            check_c3_trigger(after_member, args.outputs_dir, x_count,
+                             args.c3_confirmation_path, e_count)
 
     print("\n———— 结果 ————")
     for m in OK:

@@ -35,18 +35,27 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(HERE)
 KB_PATH = os.path.join(PKG, "knowledge", "patent-family.jsonl")
 
-PAT_NO_RE = r"(CN|US|EP|WO|JP|KR)[0-9]{7,14}[A-Z]?"
+# CYCLE-1 · S-E53：X/Y 级判定与专利号正则的唯一真源在 scripts/threat_grade.py
+# （与 preflight_check.py 共用）。此处 import 使两处判据**必然同形**。
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import threat_grade  # noqa: E402
+
+PAT_NO_RE = threat_grade.PAT_NO_RE
 # CYCLE-1 · S-E45（单源化）：本常量此前**定义后从未被引用**，
 # 而下方 parse_scout_output() 另写了一条功能等价的正则 —— 两条正则可各自漂移
 # （如一条支持「### 4.1 X 类」编号在前、另一条不支持），
 # 导致「常量看起来是规范、正则却各写各的」。现把**切分实现**下沉到常量，
 # 解析处直接消费，形成唯一真源。
 #
-# 判据：标题形如「### 4.1 X 类（威胁）」——编号在前，X/Y 与「类」间允许空格；
-# 捕获组1 = 等级(X/Y)，组2 = 节正文（到下一个标题为止）。
-GRADE_SEC_RE = re.compile(
-    r"^#{2,4}[^\n]*?\b(X|Y)\s*类[^\n]*$\n([^#]*?)(?=^#{2,4}\s|\Z)",
-    re.M | re.S)
+# CYCLE-1 · S-E53（真源合并）：本模块的 GRADE_SEC_RE 与 PAT_NO_RE 与
+# scripts/preflight_check.py 的 X 级扫描曾是**两套独立手抄**——preflight 用宽松
+# 正则 `X\s*[\W_]*\s*(\d+)`，本模块用结构化判据，对同一语义给出不同答案
+# （preflight 对 7 个真实场景误判 4 例，最严重「本产出无 X 级威胁」误判为 1 条
+# → 假触发 C3 阻断）。
+# 现统一由 scripts/threat_grade.py 导出，本模块与 preflight 共同消费 →
+# 「X 级有几条」只有一份判据，改一处即全链路同步。
+GRADE_SEC_RE = threat_grade.GRADE_SEC_RE
 
 
 def _ensure_kb():
