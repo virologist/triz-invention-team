@@ -30,8 +30,27 @@ except ImportError:
 
 SCRIPT_DIR = Path(__file__).parent
 SKILL_DIR = SCRIPT_DIR.parent / "skills" / "agent-protocol"
+# CYCLE-1 · S-E44（单源化）：这两个常量此前**定义后从未被引用**，
+# 而 main() 在下方**重新手拼**了一遍同名路径（SKILL_DIR / "result_envelope.schema.json"）
+# → 同一路径两处定义，改一处必漂移另一处。现改为**唯一真源**，
+# main() 直接消费本常量，杜绝二次手抄。
 ENVELOPE_SCHEMA_PATH = SKILL_DIR / "result_envelope.schema.json"
 PAYLOAD_SCHEMA_PATH = SKILL_DIR / "task_payload.schema.json"
+
+
+def _load_schema(path: Path):
+    """载入 JSON Schema 文件（单一真源入口 · S-E49）。
+
+    此前 `main()` 直接 `json.load(open(schema_path))`，而自测路径没有载入器 →
+    自测无法覆盖另一份 schema。现抽出本函数，两个 schema（信封 / 任务包）
+    统一走此入口，**杜绝二次手抄路径 + 杜绝自测只测一侧**。
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"  ❌ schema 载入失败 {path}: {e}")
+        return None
 
 # 已知7代理ID（白名单）
 KNOWN_AGENTS = {
@@ -316,6 +335,33 @@ def self_test_schemas(schema: dict) -> bool:
         return False
     print(f"  ✅ self-test: 合规样本通过，不合规样本检出{len(errs_bad)}条错误")
 
+    # ── S-E49 task_payload schema 自测（消除幽灵契约）──────────────────────────
+    # 此前 task_payload.schema.json **全仓零代码消费**（无人校验）→ 下行任务契约
+    # 无任何强制校验点，与信封 schema 的 task_id pattern 冲突无法被拦截。
+    # 现让本脚本真正消费 PAYLOAD_SCHEMA_PATH，并对「实测基线形态」的 task_id
+    # （字母后缀，如 T-20261015-A01）做**双侧**断言：
+    #   合规 payload 通过 + 缺必填字段的 payload 被拒。
+    payload_schema = _load_schema(PAYLOAD_SCHEMA_PATH)
+    if payload_schema is None:
+        print("  ❌ self-test: task_payload.schema.json 载入失败")
+        return False
+    pay_good = {
+        "task_id": "T-20261015-A01",   # 实测基线形态（字母后缀）
+        "phase": 2,
+        "instruction": "构造矛盾矩阵并回传",
+    }
+    pay_bad = {"task_id": "T-20261015-A01", "phase": 2}   # 缺 instruction
+    errs_pay_good = validate_envelope(pay_good, payload_schema)
+    errs_pay_bad = validate_envelope(pay_bad, payload_schema)
+    if errs_pay_good:
+        print(f"  ❌ self-test: 合规 task_payload 被误判：{errs_pay_good}")
+        return False
+    if not errs_pay_bad:
+        print("  ❌ self-test: 缺必填字段的 task_payload 被误判为合规")
+        return False
+    print("  ✅ self-test: task_payload schema 自测通过（实测形态 T-20261015-A01 接受"
+          " / 缺必填字段检出）")
+
     # ── S-E12 墙钟 WARN 双向断言（2026-11-09）────────────────────────────────────
     # 有 metrics 但缺 duration_ms_wall → 必须产出 WARN（预算熔断依据缺失），
     # 但不得升级为 FAIL（不改 schema required，避免破历史归档与回归基线）。
@@ -369,7 +415,7 @@ def main():
 
     root = Path(args.root).resolve()
     results_dir = resolve_results_dir(root, args.results_dir)
-    schema_path = SKILL_DIR / "result_envelope.schema.json"
+    schema_path = ENVELOPE_SCHEMA_PATH   # S-E44：消费唯一真源常量，不二次手抄
 
     if not schema_path.exists():
         print(f"❌ schema文件不存在: {schema_path}")

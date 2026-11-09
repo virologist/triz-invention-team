@@ -33,8 +33,10 @@ import json
 import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-PKG = os.path.dirname(HERE)
+# CYCLE-1 · S-E46：PKG 此前**定义后从未被引用**（死变量）→ 移除。
+# CYCLE-1 · S-E50：HERE 同样**定义后从未被引用**（死变量）→ 一并移除。
+# 注意：state_store 的路径基准一律用 os.path.dirname(os.path.abspath(__file__))
+# 现场推导，与其它脚本的 PKG（包根）语义不同，此处刻意不保留同名常量，避免误用。
 
 # 门禁别名表（CYCLE-1 · S-E01/S-E02 修复，唯一真源）
 # 历史缺陷：SOP（主理人 MD H2 示例）让主理人写 gates.G1..G5，而本模板用语义键 →

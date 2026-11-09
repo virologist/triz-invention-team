@@ -13,8 +13,8 @@
   "properties": {
     "task_id": {
       "type": "string",
-      "pattern": "^T-[0-9]{8}-[0-9]{3,}$",
-      "description": "任务ID（YYYYMMDD-NNN）"
+      "pattern": "^T-[0-9]{8}-[A-Za-z0-9]{1,8}$",
+      "description": "任务ID（YYYYMMDD-{NNN|字母数字后缀}，例T-20260903-001或T-20261015-A01）。CYCLE-1 · S-E49：此前本字段写 `^T-[0-9]{8}-[0-9]{3,}$`（只允许纯数字），与 result_envelope.schema.json 的 pattern 冲突，且与实测基线（7 份成员信封 + 9 份 spawn 文档全部采用字母后缀 T-20261015-A01…A07）脱节 → 下游按本 schema 校验任务包必被拒。现与信封 schema 字面统一（两个方向的契约必须同形），由 preflight 第 15 项机械校验防漂移。"
     },
     "phase": {
       "type": "integer",

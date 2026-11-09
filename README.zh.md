@@ -1,10 +1,10 @@
-# TRIZ 通用发明专家团（v2.9）
+# TRIZ 通用发明专家团（v2.10）
 
 > **跨领域 TRIZ 发明团队**：从矛盾建模 → 三轮专利查新 → 模拟审查 → 交底书与申请文件撰写，**陪跑至中国发明专利申请草稿**。
 
 一个像真实发明团队一样协作的多代理系统——主理人调度全局，矛盾分析师应用 39×39 TRIZ 矩阵，查新员跑三轮专利查新，模拟审查员攻击新颖性/创造性/实用性，二审员做独立复审（自动捕捉确认偏误），交底书架构师把发明结构化为五要素，专利代理师撰写权项、说明书与摘要。
 
-v2.2 起把代理间契约形式化为 JSON Schema（`agent-protocol`），并附带 CI gate 脚本——在产出进入下游核验前自动校验所有代理输出。v2.9 补齐门禁状态机（元层触发器 / 台账单源化 / 契约 fail-open 修复 / Workflow D 前置闸机械校验 / 三源漂移真实探针 / 墙钟双轨制）。
+v2.2 起把代理间契约形式化为 JSON Schema（`agent-protocol`），并附带 CI gate 脚本——在产出进入下游核验前自动校验所有代理输出。v2.9 补齐门禁状态机（元层触发器 / 台账单源化 / 契约 fail-open 修复 / Workflow D 前置闸机械校验 / 三源漂移真实探针 / 墙钟双轨制）。v2.10 铲除**契约漂移**（两个 schema 的 task_id 统一 / routing-log 列契约校验 / Claude Code 单仓安装路径修复 / scaffold 崩溃修复）。
 
 ---
 
@@ -115,6 +115,8 @@ cp -R <克隆下来的仓库根> <你的agent插件目录>/triz-invention-team
 
 ```
 triz-invention-team/                          # ← 仓库根 = 插件本体（单仓自包含）
+├── .claude-plugin/
+│   └── marketplace.json                      # Claude Code 市场描述（单仓安装必需·已入库）
 ├── .codebuddy-plugin/
 │   ├── marketplace.json                      # WorkBuddy 市场描述
 │   └── plugin.json                           # WorkBuddy 插件清单（version）
@@ -132,17 +134,22 @@ triz-invention-team/                          # ← 仓库根 = 插件本体（�
 │   └── shared-core/                          # 装配脚本 + 版本锁（VENDOR.json）
 ├── .learnings/                               # 自进化经验层（LEARNINGS/ERRORS/FEATURE_REQUESTS）
 ├── avatars/                                  # 512×512 代理头像
-├── .gitignore                                # 排除 .claude-plugin/ 与 __pycache__ 与 outputs/
+├── .gitignore                                # 排除 .claude-plugin/ 内容（保留 marketplace.json）与 __pycache__ 与 outputs/
 ├── README.md                                 # 英文版
 ├── README.zh.md                              # ← 中文版（当前文件）
 ├── CHANGELOG.md                              # 发布历史
 └── LICENSE                                   # Apache-2.0
 ```
 
-> **注 1（本地生成·不入库）**：`.claude-plugin/` 整个目录被 `.gitignore` 排除（宿主启动时会
-> `unlink` 单键 agent 型文件，见 `docs/OPERATIONS.md` §二），本地存在但**不在上方结构图**内——
+> **注 1（`.claude-plugin/marketplace.json` 已入库 · 2026-11-09 · S-E47）**：
+> Claude Code 官方要求 marketplace 定义必须在 `<市场根>/.claude-plugin/marketplace.json`
+> 且**必须提交到 git**（否则从 git 克隆的仓库没有 marketplace，`/plugin marketplace add`
+> 读不到任何插件清单）。故该文件现已入库，出现在上方结构图中。
+> `.claude-plugin/` 其余内容仍被 `.gitignore` 排除（宿主启动时会 `unlink` 单键 agent 型文件，
+> 见 `docs/OPERATIONS.md` §二）。
 > 结构图对齐的是 git 实际入库内容（preflight 第11项按 `.gitignore` 解析后比对）。
-> Claude Code 侧清单由市场描述文件承载。
+> 另：`marketplace.json` 的 `source` 字段为**相对市场根**的路径，本仓 git 根 = 市场根 = 插件根，
+> 故取 `"./"`（根目录插件写法）。
 >
 > **注 2（本地生成·不入库）**：`outputs/` 为门禁派生报告目录（`ci_gate_report.json` 等），
 > 同样被 `.gitignore` 排除，不在结构图内。
@@ -192,4 +199,4 @@ Apache-2.0 — 见 [`LICENSE`](LICENSE)。专利授权明示，允许商用，�
 
 ---
 
-— 作者：TZUVet · v2.9 · 为中国发明专利工业化质量而建。
+— 作者：TZUVet · v2.10 · 为中国发明专利工业化质量而建。

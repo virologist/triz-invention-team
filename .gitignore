@@ -3,7 +3,18 @@
 *.bak
 *.bak.*
 *.orig
-.claude-plugin/
+# ─── Claude Code 侧目录 ──────────────────────────────────────────────
+# 历史缘由（2026-09-18 · 7866b3b）：宿主启动时会 unlink 单键 agent 型文件，
+# 故整目录排除，避免空目录/临时文件入库。
+#
+# **CYCLE-1 · S-E47（2026-11-09）**：整目录排除导致 GitHub 上**完全没有**
+# Claude Code 的 marketplace 定义 —— 单仓安装（/plugin marketplace add
+# virologist/triz-invention-team）根本读不到任何插件清单。
+# 官方要求：marketplace 定义必须在 <市场根>/.claude-plugin/marketplace.json
+# 且**必须提交到 git**（否则从 git 克隆的仓库没有 marketplace）。
+# 故改为：排除目录内容，但**强制保留 marketplace.json**。
+.claude-plugin/*
+!.claude-plugin/marketplace.json
 
 # Python bytecode
 __pycache__/

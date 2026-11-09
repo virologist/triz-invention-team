@@ -539,6 +539,10 @@ RoutingDecision 的 alternatives_top2 与 reasoning 同时写入装配产出的�
 > 🔴 **v2.2契约形式化（2026-09-03起执行）**：以下契约已形式化为JSON Schema，详见 `skills/agent-protocol/`（SKILL.md + result_envelope.schema.json + task_payload.schema.json）。任何违背schema的回传视为partial并触发重试。下发任务前/VERIFY阶段前**必须**加载该skill。
 
 ### 下行：你 → 成员（task_payload，spawn时必须下发）
+> **task_id 格式（CYCLE-1 · S-E49）**：`T-YYYYMMDD-{NNN|字母数字后缀}`，
+> 例 `T-20260903-001` 或 `T-20261015-A01`。**与上行 result_envelope 的 task_id 同形**
+> （两个方向的契约必须一致，否则下游按任务包 schema 校验会拒收主理人自己派出的单）。
+
 ```json
 {
   "task_id": "T-YYYYMMDD-NNN",

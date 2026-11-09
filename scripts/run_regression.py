@@ -477,16 +477,35 @@ def cmd_list():
 
 
 def load_task_id_pattern():
-    """从 result_envelope.schema.json 读取 task_id pattern（读不到时用保底字面量）。
+    """从 result_envelope.schema.json 读取 task_id pattern（唯一真源）。
 
     教训（2026-10-15 · failure-008）：scaffold 曾生成 'T-<date>-REG-B01'（第二个连字符），
-    违反 schema 与 meter 的文件名契约 → 在此加自校验，防止再生违约 ID。"""
-    fp = os.path.join(PKG, "skills", "agent-protocol", "result_envelope.schema.json")
+    违反 schema 与 meter 的文件名契约 → 在此加自校验，防止再生违约 ID。
+
+    CYCLE-1 · S-E44（单源化）：schema 路径此前是**全仓第三处手抄**
+    （另有 agent_ci_gate.py 的定义处 + 其 main() 的二次拼接）。
+    现改为消费 agent_ci_gate 的唯一真源常量，与本脚本既有的
+    `import state_store as SS` 复用先例一致。
+
+    CYCLE-1 · S-E51（真源唯一化）：此前读不到 schema 时**静默回退到保底字面量**
+    `^T-[0-9]{8}-[A-Za-z0-9]{1,8}$` —— 该字面量是 schema pattern 的**第二份真源**，
+    schema 改了不跟随 → 契约漂移静默发生（当前恰好相同，纯属巧合）。
+    现改为：读不到 schema → **直接抛错**（fail loud，不静默降级）。
+    schema 是入库文件，缺失属仓库损坏，必须显式失败而非用猜测值继续。
+    """
     try:
-        d = json.load(open(fp, encoding="utf-8"))
-        return d["properties"]["task_id"]["pattern"]
-    except Exception:  # noqa
-        return r"^T-[0-9]{8}-[A-Za-z0-9]{1,8}$"
+        import agent_ci_gate as ACG
+        fp = str(ACG.ENVELOPE_SCHEMA_PATH)
+    except Exception:
+        fp = os.path.join(PKG, "skills", "agent-protocol", "result_envelope.schema.json")
+    with open(fp, encoding="utf-8") as f:
+        d = json.load(f)
+    pat = d.get("properties", {}).get("task_id", {}).get("pattern")
+    if not pat:
+        raise ValueError(
+            "result_envelope.schema.json 未定义 task_id.pattern——"
+            "契约字段缺失，拒绝用猜测值继续（S-E51）")
+    return pat
 
 
 def cmd_scaffold(case_id, out_dir, task_id_override=None):
@@ -534,7 +553,26 @@ def cmd_scaffold(case_id, out_dir, task_id_override=None):
     for a in exp.get("assertions", []):
         info += f"- [{a.get('id')}] {a.get('type')}：{json.dumps({k: v for k, v in a.items() if k not in ('id','type')}, ensure_ascii=False)}\n"
     # 恢复点段（v2.6.0 Batch2 · S-X3）：scaffold 同时初始化 state.json，断点续接有确定性入口
-    members_for_state = ",".join(exp["expect"]) if exp.get("target_member") == "full-team" else exp.get("target_member", "")
+    #
+    # CYCLE-1 · S-E52（层级误读修复）：此前写 `exp["expect"]` —— 但 `expect` 是
+    # **断言层**的字段（每条 assertion 自带 expect），顶层根本没有 `expect` 键
+    # → 用例 A（target_member=full-team）必然抛 `KeyError: 'expect'`，
+    # **`--scaffold` 全线崩溃**（用 HEAD 版本复现，非本轮引入）。
+    # 真实成员清单位于断言 `all_members_landed`（A2）的 expect 列表。
+    members_for_state = ""
+    if exp.get("target_member") == "full-team":
+        for a in exp.get("assertions", []):
+            if a.get("type") == "all_members_landed":
+                members_for_state = ",".join(a.get("expect", []))
+                break
+        if not members_for_state:
+            # 断言层也没有成员清单 → 显式报错（不静默产出空成员 state）
+            raise ValueError(
+                "用例 %s 声明 target_member=full-team，但既无顶层 expect、"
+                "也无 all_members_landed 断言的成员清单——无法确定 state 成员"
+                "（S-E52）" % case_id)
+    else:
+        members_for_state = exp.get("target_member", "")
     phase_hint = {"full-team": 0, "contradiction-analyst": 1, "patent-search-scout": 3}.get(exp.get("target_member"), 0)
     info += f"""
 ## 恢复点（断点续接 · v2.6.0）

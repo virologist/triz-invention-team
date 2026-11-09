@@ -8,7 +8,7 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
 同一失效模式）。本脚本把 4 项里**可机械判定**的部分变成一次命令，
 并把 failure-007 教训（权威数据未经校验就注入上下文）也纳入必检。
 
-检查项（共 12 项，S-E34 补全至与实现一致）：
+检查项（共 15 项，S-E34 补全至与实现一致，S-E48 补第 14 项，S-E49 补第 15 项）：
   1. 失败索引可查（expert-failures 目录 + index.md 可读 + 按关键词命中相关记录）
   2. docs/routing-log.md 可写（路由决策落盘点）
   3. 预算估算：成员数 × 单成员预估 token ≤ 全局预算 120K
@@ -23,6 +23,10 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
   12. Workflow D 入口前置闸：G1/G2/G3 全关 + 查新与裁决证据文件真实落盘
   13. state 模板三处真源一致性：代码真源（state_store.STATE_TEMPLATE）↔ 文档真源
       （architecture.md §3.2）↔ SOP 真源（主理人 MD 状态块模板）——双向差集必须为空
+  14. routing-log 表头列数 ↔ 数据行列数 ↔ SOP RoutingDecision 字段数三者一致
+      （契约漂移检测：表头漏列 → Markdown 渲染错位，「结果」列失效）
+  15. task_id 契约一致性：信封 schema ↔ 任务包 schema pattern 字面相同，
+      且能匹配实测基线的 task_id 形态 + 任务包 schema 至少被一处代码消费（反幽灵契约）
 
 用法：
   python3 scripts/preflight_check.py [--expert-dir DIR] [--members a,b,c] [--task-file F] [--keywords 词1,词2]
@@ -330,6 +334,249 @@ def check_state_template_consistency():
     ok("13. state 模板三处真源一致（gates %d / evidence %d / metrics %d 键·"
        "代码↔文档↔SOP 双向差集为空）"
        % (len(code_gates), len(code_evidence), len(code_metrics)))
+
+
+def check_routing_log_columns():
+    """14. routing-log 表头列数 ↔ 数据行列数一致性（CYCLE-1 · S-E48）。
+
+    **根因（S-E43 同型：契约漂移）**：`RoutingDecision` 契约在**三处手抄**——
+      T1 SOP 真源：`agents/triz-invention-team-team-lead.md` 的 `RoutingDecision` JSON 块
+      T2 落盘真源：`docs/routing-log.md` 的 Markdown 表头
+      T3 数据行：routing-log 的每一条实际记录
+    T1 定义了 **8 个字段**（含 `rationale_class`），T2 表头只声明 **7 列**
+    （漏 `rationale_class`），T3 实际数据行写 **8 列** → 三处不对齐。
+
+    **实测事故**：R-20261108-001（已入库于 7b6ffb8）与 R-20261108-002 两行均含
+    `rule_match` 尾列，而表头无此列声明 → Markdown 渲染时该列**溢出表头**，
+    读者按表头解读会误判第 6 列「结果」实为「理由」、第 7 列「理由」实为「未声明列」。
+    这不是排版问题：**「结果」列是本表唯一可复盘字段（P1-4 规范）**，
+    列错位等于让审计链失去可复盘性。
+
+    **本项判据**（纯机械，不依赖人眼）：
+      - 表头列数 = **所有**数据行列数（逐行核对）
+      - 表头列名 ↔ 头部说明「字段：」声明行**逐位**对齐（数量 + 顺序）
+      - 表头**不得**漏声明任何数据行实际存在的列
+
+    **口径澄清**：SOP `RoutingDecision` JSON 有 8 字段（含 `rationale_class`），
+    但 SOP「强制落盘规则」写明落盘只需「decision_id + target + confidence + 简述」——
+    落盘表是**精简投影**，故对齐真源是**头部「字段：」行**，不是 SOP JSON 全字段。
+
+    任一不满足 → BLOCK（契约漂移必须阻断，不是文档整洁度问题）。
+    """
+    p = os.path.join(PKG, "docs", "routing-log.md")
+    if not os.path.isfile(p):
+        wrn("14. docs/routing-log.md 不存在——跳过表头/数据行列数一致性校验")
+        return
+
+    lines = open(p, encoding="utf-8").read().split("\n")
+
+    # --- 定位表头行与分隔行 ---
+    hdr_idx = None
+    for i, ln in enumerate(lines):
+        s = ln.strip()
+        if s.startswith("|") and "decision_id" in s and "timestamp" in s:
+            hdr_idx = i
+            break
+    if hdr_idx is None:
+        blk("14. routing-log 未找到表头行（含 decision_id+timestamp）——"
+            "无法校验列契约（契约漂移）")
+        return
+    if hdr_idx + 1 >= len(lines) or not re.match(r"^\|[\s\-:|]+\|?$",
+                                                 lines[hdr_idx + 1].strip()):
+        blk("14. routing-log 表头下方缺 Markdown 分隔行——表格结构损坏")
+        return
+
+    def _cells(ln):
+        s = ln.strip()
+        if s.startswith("|"):
+            s = s[1:]
+        if s.endswith("|"):
+            s = s[:-1]
+        return [c.strip() for c in s.split("|")]
+
+    hdr_cells = _cells(lines[hdr_idx])
+    n_hdr = len(hdr_cells)
+
+    # --- 收集数据行 ---
+    data_rows = []
+    for i in range(hdr_idx + 2, len(lines)):
+        s = lines[i].strip()
+        if not s.startswith("|"):
+            continue
+        cells = _cells(lines[i])
+        if not cells or not re.match(r"^R-\d{8}-\d{3}$", cells[0]):
+            continue
+        data_rows.append((i + 1, cells))
+
+    if not data_rows:
+        wrn("14. routing-log 无数据行——跳过列数一致性校验")
+        return
+
+    # --- 判据 1：所有数据行列数必须等于表头列数 ---
+    bad = [(ln_no, len(c)) for ln_no, c in data_rows if len(c) != n_hdr]
+    if bad:
+        blk("14. routing-log 数据行列数与表头不一致（表头 %d 列）：%s"
+            % (n_hdr, "；".join("第%d行=%d列" % (n, c) for n, c in bad)))
+        return
+
+    # --- 判据 2：表头列名集合 ↔ 头部说明「字段：」行声明的字段集合，双向差集为空 ---
+    #
+    # **口径澄清（重要）**：SOP 的 `RoutingDecision` JSON 有 8 个字段，但 SOP「强制落盘规则」
+    # 明确写的是「一次任务一行，含 decision_id + target + confidence + 简述」——
+    # 即落盘表是**精简投影**（7 列），**不要求全字段落盘**。
+    # 故本项对齐的落盘契约真源是**头部说明「字段：」行**，而非 SOP JSON 全字段。
+    # SOP JSON 只用于交叉参考（字段名出处），不作为列数判据。
+    head_field_line = ""
+    for ln in lines[:40]:
+        if ln.strip().startswith("> 字段："):
+            head_field_line = ln
+            break
+    if not head_field_line:
+        wrn("14. routing-log 头部未找到「字段：」声明行——"
+            "跳过落盘契约交叉核对（仅完成列数自洽校验）")
+        ok("14. routing-log 表头 %d 列 ↔ %d 数据行列数自洽"
+           % (n_hdr, len(data_rows)))
+        return
+
+    declared = head_field_line.split("：", 1)[1]
+    declared = declared.replace("**", "")
+    declared = [x.strip() for x in declared.split("/") if x.strip()]
+
+    # 头部用中英混写（confidence / 结果 / 理由），表头同序 → 按位置对齐
+    if len(declared) != n_hdr:
+        blk("14. routing-log 头部「字段：」声明 %d 个（%s）↔ 表头 %d 列，数量不符"
+            "（契约漂移）" % (len(declared), "/".join(declared), n_hdr))
+        return
+    pos_mismatch = []
+    for i, (d, h) in enumerate(zip(declared, hdr_cells)):
+        dn = d.replace("*", "").strip()
+        hn = h.replace("*", "").strip()
+        if dn != hn:
+            pos_mismatch.append("第%d列 声明=%s 表头=%s" % (i + 1, dn, hn))
+    if pos_mismatch:
+        blk("14. routing-log 头部「字段：」与表头逐位不符：%s（契约漂移）"
+            % "；".join(pos_mismatch))
+        return
+
+    ok("14. routing-log 表头 %d 列 ↔ %d 数据行列数自洽 ↔ 头部「字段：」声明 "
+       "%d 字段逐位对齐（无漂移）"
+       % (n_hdr, len(data_rows), len(declared)))
+
+
+def check_task_id_contract():
+    """15. task_id 契约三处真源一致（CYCLE-1 · S-E49）。
+
+    **根因（S-E43 同型：契约漂移）**：`task_id` 的取值格式在**三处手抄**——
+      T1 信封真源：`skills/agent-protocol/result_envelope.schema.json`
+      T2 任务包真源：`skills/agent-protocol/task_payload.schema.json`
+      T3 文档真源：主理人 MD 的信封示例 + `docs/architecture.md` 的示例
+
+    **实测事故（S-E49）**：T1 = `^T-[0-9]{8}-[A-Za-z0-9]{1,8}$`（允许字母后缀），
+    T2 = `^T-[0-9]{8}-[0-9]{3,}$`（**只允许纯数字**），T3 示例写 `T-YYYYMMDD-NNN`
+    （纯数字口径）。而**实测基线全部采用字母后缀**（`T-20261015-A01` … `A07`，
+    7 份成员信封 + 9 份 spawn 文档）→ 主理人按实测形态派单时，
+    **若下游按 task_payload schema 校验任务包，必被拒绝**；而 payload schema
+    **全仓零代码消费**（无人校验）→ 该冲突从未被任何门禁暴露（幽灵契约）。
+
+    **本项判据**（纯机械）：
+      - T1 与 T2 的 task_id pattern 必须**字面相同**（两个方向的下行/上行契约必须同形）
+      - 两者必须能**实际匹配**实测基线中出现的 task_id 形态（用基线文件做样本）
+      - 若两者不一致 → BLOCK，并明确指出以哪一侧为准（**以信封真源 T1 为准**，
+        因为它是代码唯一强制消费的一侧）
+
+    另：本项**顺带校验** task_payload.schema.json 是否至少被一处代码消费
+    （零消费 = 幽灵契约，必须登记；不允许默默存在）。
+    """
+    ap_dir = os.path.join(PKG, "skills", "agent-protocol")
+    env_p = os.path.join(ap_dir, "result_envelope.schema.json")
+    pay_p = os.path.join(ap_dir, "task_payload.schema.json")
+    for p, nm in ((env_p, "result_envelope"), (pay_p, "task_payload")):
+        if not os.path.isfile(p):
+            blk("15. %s.schema.json 不存在——task_id 契约真源缺失" % nm)
+            return
+
+    def _pattern_of(path):
+        try:
+            obj = json.load(open(path, encoding="utf-8"))
+        except Exception as e:
+            blk("15. %s 解析失败：%s" % (os.path.basename(path), e))
+            return None
+        props = obj.get("properties", {})
+        t = props.get("task_id")
+        if not isinstance(t, dict) or "pattern" not in t:
+            blk("15. %s 未定义 task_id.pattern——契约字段缺失"
+                % os.path.basename(path))
+            return None
+        return t["pattern"]
+
+    env_re_p = _pattern_of(env_p)
+    pay_re_p = _pattern_of(pay_p)
+    if env_re_p is None or pay_re_p is None:
+        return
+
+    # --- 判据 1：两个 schema 的 pattern 必须字面相同 ---
+    if env_re_p != pay_re_p:
+        blk("15. task_id pattern 双真源冲突：信封 schema=`%s` ↔ 任务包 schema=`%s`"
+            "（契约漂移，以信封 schema 为准）" % (env_re_p, pay_re_p))
+        return
+
+    # --- 判据 2：pattern 必须能匹配实测基线的 task_id 形态 ---
+    samples = set()
+    base = os.path.join(PKG, "tests", "baselines")
+    for root, _dirs, files in os.walk(base):
+        for f in files:
+            if not f.endswith(".md"):
+                continue
+            fp = os.path.join(root, f)
+            try:
+                txt = open(fp, encoding="utf-8", errors="ignore").read()
+            except Exception:
+                continue
+            for m in re.finditer(r"\bT-\d{8}-[A-Za-z0-9]{1,8}\b", txt):
+                samples.add(m.group(0))
+    if not samples:
+        wrn("15. 基线中未取到 task_id 样本——跳过样本匹配校验")
+    else:
+        try:
+            rx = re.compile(env_re_p)
+        except Exception as e:
+            blk("15. task_id pattern 非法正则：%s" % e)
+            return
+        bad = sorted(s for s in samples if not rx.match(s))
+        if bad:
+            blk("15. task_id pattern 拒绝实测基线样本 %d 个（例 %s）——"
+                "契约与实测形态脱节" % (len(bad), bad[0]))
+            return
+
+    # --- 判据 3（附加）：task_payload.schema.json 至少被**本脚本以外**一处代码消费 ---
+    # 反幽灵契约：若零消费，下行任务契约无任何强制校验点，与信封 schema 的冲突无法被拦截。
+    #
+    # **判别力注意（S-E49 自查修正）**：本项若把 `preflight_check.py` 自身也算作消费方，
+    # 则本脚本「自己给自己作证」——即使全仓其他代码都不消费，本项仍 PASS（假绿）。
+    # 故**必须排除自身**，只认其它脚本的真实消费。
+    consumed = []
+    self_name = os.path.basename(__file__)
+    for root, _dirs, files in os.walk(os.path.join(PKG, "scripts")):
+        if "__pycache__" in root:
+            continue
+        for f in files:
+            if not f.endswith(".py"):
+                continue
+            if f == self_name:
+                continue          # 排除自身（反自指）
+            fp = os.path.join(root, f)
+            txt = open(fp, encoding="utf-8", errors="ignore").read()
+            if "task_payload.schema.json" in txt:
+                consumed.append(f)
+    if not consumed:
+        blk("15. task_payload.schema.json 全仓零代码消费（幽灵契约）——"
+            "下行任务契约无任何强制校验点，与信封 schema 的冲突无法被拦截"
+            "（注：本项已排除 preflight_check.py 自身，避免自证）")
+        return
+
+    ok("15. task_id 契约三处一致（pattern=%s·基线样本 %d 个全匹配·"
+       "任务包 schema 消费方 %s）"
+       % (env_re_p, len(samples), "/".join(consumed)))
 
 
 def check_workflow_d_gate(state_path):
@@ -644,6 +891,8 @@ def main():
     check_readme_structure()
     check_workflow_d_gate(args.state_path)
     check_state_template_consistency()
+    check_routing_log_columns()
+    check_task_id_contract()
 
     # CYCLE-1 · S-E04：诊断触发器 T1-T3 机械判定（散文条款脚本化，原则①）
     try:

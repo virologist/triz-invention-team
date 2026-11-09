@@ -36,7 +36,17 @@ PKG = os.path.dirname(HERE)
 KB_PATH = os.path.join(PKG, "knowledge", "patent-family.jsonl")
 
 PAT_NO_RE = r"(CN|US|EP|WO|JP|KR)[0-9]{7,14}[A-Z]?"
-GRADE_SEC_RE = re.compile(r"^#{2,4}\s*(X|Y)\s*[类类].*?$", re.M)
+# CYCLE-1 · S-E45（单源化）：本常量此前**定义后从未被引用**，
+# 而下方 parse_scout_output() 另写了一条功能等价的正则 —— 两条正则可各自漂移
+# （如一条支持「### 4.1 X 类」编号在前、另一条不支持），
+# 导致「常量看起来是规范、正则却各写各的」。现把**切分实现**下沉到常量，
+# 解析处直接消费，形成唯一真源。
+#
+# 判据：标题形如「### 4.1 X 类（威胁）」——编号在前，X/Y 与「类」间允许空格；
+# 捕获组1 = 等级(X/Y)，组2 = 节正文（到下一个标题为止）。
+GRADE_SEC_RE = re.compile(
+    r"^#{2,4}[^\n]*?\b(X|Y)\s*类[^\n]*$\n([^#]*?)(?=^#{2,4}\s|\Z)",
+    re.M | re.S)
 
 
 def _ensure_kb():
@@ -73,7 +83,7 @@ def parse_scout_output(md_path, domain):
         task_id = m.group(1)
     entries = []
     # 按 X/Y 节切分（标题形如「### 4.1 X 类（…）」——编号在前，X/Y 与「类」间允许空格）
-    for sec_m in re.finditer(r"^#{2,4}[^\n]*?\b(X|Y)\s*类[^\n]*$\n([^#]*?)(?=^#{2,4}\s|\Z)", text, re.M | re.S):
+    for sec_m in GRADE_SEC_RE.finditer(text):   # S-E45：消费唯一真源常量
         grade = sec_m.group(1)
         body = sec_m.group(2)
         for line in body.split("\n"):

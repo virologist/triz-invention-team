@@ -71,6 +71,10 @@ Context = 角色MD(自身)
 
 全局唯一状态对象，由编排者维护并随每次调度下发：
 
+> **task_id 格式（CYCLE-1 · S-E49）**：`T-YYYYMMDD-{NNN|字母数字后缀}`，
+> 例 `T-20260903-001` 或 `T-20261015-A01`。与 `result_envelope` / `task_payload`
+> 两个 schema 的 `task_id.pattern` 字面统一（由 preflight 第 15 项机械校验防漂移）。
+
 ```json
 {
   "task_id": "T-YYYYMMDD-NNN",

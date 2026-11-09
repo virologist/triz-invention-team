@@ -15,7 +15,8 @@ from pathlib import Path
 
 PKG = Path(__file__).parent.parent
 FAIL = 0
-RESULTS = []
+# CYCLE-1 · S-E46：RESULTS 此前**定义后从未被追加/读取**（死变量）。
+# 实际统计走 run_case() 的返回值累加（见下方 ok/FAIL 计数），本变量纯误导 → 移除。
 
 
 def run_case(skill, case):
