@@ -2,6 +2,54 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.2] - 2026-11-10
+
+> **CYCLE-1 · 第 6 轮（终局复核发现真实遗留 → 修复 → 收敛）**。
+> 起始动作是「独立终态核验，不采信历史结论」——上轮结论「无遗留」被
+> 实测推翻：第 5 轮的宿主门禁改动**不在仓库内**，换机即失效。新增 **3 项**
+> S-E70…S-E72 全部清偿。
+
+### P0
+- **S-E70 宿主门禁改动未版本化（换机即失效）**：第 5 轮 S-E62 把 `self_gate.py`
+  挂进 `~/.workbuddy/git-hooks/pre-commit` 与 `~/.workbuddy/bin/release-sync.sh`，
+  但这两个文件**不在本仓库**。实测干净 `git clone . /tmp/fresh-clone` 后
+  `grep -rln "git-hooks/pre-commit|release-sync"` 零命中，仓库内既无安装器、
+  无快照、也无安装指引 → 换机/重装/新同事 clone 后门禁链退回 3 gate，
+  `boundary_guard` 与 9 个判别力自测重新变成幽灵执行点。
+  新增 **`scripts/install_gate_hooks.py`**：宿主接入代码块作为唯一真源内置
+  （marker 包裹，可检测手改漂移）；`--verify` 只读检查 / `--install` 幂等注入
+  （自动备份、不破坏宿主其余内容、注入前校验锚点，找不到锚点 fail loud）/
+  `--self-test` 在临时目录模拟新机器；`--host-root` 可参数化。
+  端到端实测：干净工作树拷贝 → 自检 RC=1 → 安装器接入 → 自检 RC=0，
+  宿主 `bash -n` 语法完好；真实宿主已从 legacy 手写块迁移为可校验 marker 块。
+- **S-E71 `self_gate --self-test` 对此假绿**：干净 clone 里报「✅ 自测全通过」，
+  但它只校验仓库内清单，从不检查「自己是否会被调用」——与 S-E62 同型。
+  现消费 `install_gate_hooks.verify_host()` **同一判据**，未接入/漂移即自测失败；
+  CI 环境可设 `TRIZ_GATE_SKIP_HOST_CHECK=1` 显式跳过（打印留痕，不静默）。
+  另加 `TRIZ_GATE_BASELINE_ROOT` 参数化，让「基线目录缺失」分支有可触发的
+  判别力场景（变异 S4 靶点）。
+
+### P1
+- **S-E72 文档缺首次部署步骤**：`docs/OPERATIONS.md` 补「换机/新 clone 后
+  首次部署（必做）」三条命令 + 宿主不在仓库内的风险说明 + CI 跳过开关；
+  工具表补 `install_gate_hooks.py`；顺手**删掉上轮又写死的「14 项」**
+  （新增安装器后实际 15 项）——根治文档手抄数字。
+
+### 验证（全量闭环）
+- `self_gate` **15/15** + `--self-test`（13 门禁清单 + 2 基线 +
+  2 项元判别力 + 宿主接入）；双向差集为空；工具表 22/22 零遗漏零幽灵
+- 三用例回归零回退 · preflight RC=0 · CI 门禁 · 契约全员 · 18 JSON
+  · 22 脚本 `--help` 零异常 · 台账 verify · 宿主 release-sync **4/4 gate**
+- **变异 10/10 零逃逸**（临时副本上跑，工作树零风险；4 种环境：
+  宿主已接入 / 未接入 / CI 跳过 / 基线缺失；含 canary 触发漏挂场景）
+- 调试中修正 3 个自测自身缺陷：双重缩进导致漂移误判、锚点缺失时拒绝
+  安装（补 fallback 锚点）、变异脚本直接改工作树导致 SIGTERM 污染源码
+  （改为全程临时副本）——方法论已沉淀
+
+### 宿主环境改动（不在本仓库）
+`~/.workbuddy/git-hooks/pre-commit`、`~/.workbuddy/bin/release-sync.sh`
+—— 已由安装器归一为可校验 marker 形态；备份 `.triz-gate.bak` 保留。
+
 ## [2.11.1] - 2026-11-09
 
 > **CYCLE-1 · 第 5 轮（全面排查 → 诊断 → 修复 → 测试 → 再诊断 → 收敛）**。

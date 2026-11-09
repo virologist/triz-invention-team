@@ -184,3 +184,25 @@
     均补强用例后重测通过。
   - **本轮登记**：版本 2.11.0 → **2.11.1**；宿主门禁链升为 **4 gate**
     （第 4 项 = `self_gate.py`）；新增 `scripts/self_gate.py` 工具。
+
+- **第6轮终局复核新增 3 条（S-E70…S-E72）· 全部清偿（v2.11.2 · 2026-11-10）**
+  （起始动作 = 独立终态核验、历史结论作废；上轮「无遗留」结论被实测推翻）：
+  - **P0 S-E70 宿主门禁改动未版本化**：第5轮 S-E62 落在
+    `~/.workbuddy/git-hooks/pre-commit` 与 `release-sync.sh`，两文件**不在仓库**；
+    实测干净 `git clone . /tmp/fresh-clone` 后 grep 宿主接入指引零命中
+    → 换机后门禁退回 3 gate，幽灵执行点复现。新增
+    `scripts/install_gate_hooks.py`（marker 唯一真源 + `--verify` / `--install`
+    幂等 / `--self-test` / `--host-root` 参数化 + 漂移检测 + 锚点 fallback），
+    真实宿主已迁移为可校验形态。端到端：新机器自检 RC=1 → 安装 → RC=0。
+  - **P0 S-E71 `self_gate --self-test` 假绿**：干净 clone 里报全绿，
+    但从不检查「自己是否会被调用」。现消费安装器 `verify_host()` 同一判据，
+    未接入/漂移即失败；CI 用 `TRIZ_GATE_SKIP_HOST_CHECK=1` 显式跳过（留痕）；
+    `TRIZ_GATE_BASELINE_ROOT` 参数化让基线缺失分支可测。
+  - **P1 S-E72**：OPERATIONS 补首次部署三条命令 + 宿主不在仓库的风险说明；
+    工具表补安装器；删掉上轮又写死的「14 项」（现已 15 项）。
+  - **判别力验收**：变异 **10/10 零逃逸**（**全程临时副本**，4 环境：
+    宿主已接入/未接入/CI 跳过/基线缺失 + canary 触发漏挂）。
+    调试中暴露并修正 3 个自测自身缺陷：双重缩进致漂移误判、
+    锚点缺失拒绝安装、变异脚本直接改工作树被 SIGTERM 污染源码。
+  - **本轮登记**：版本 2.11.1 → **2.11.2**；门禁汇总 14 → **15 项**；
+    新增 `scripts/install_gate_hooks.py` 工具。S-E01…S-E72 共 **72 项**全部清偿。
