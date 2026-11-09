@@ -2,6 +2,69 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.1] - 2026-11-09
+
+> **CYCLE-1 · 第 5 轮（全面排查 → 诊断 → 修复 → 测试 → 再诊断 → 收敛）**。
+> 历史结论一律作废，全部从代码与实测重新取证。新增 **8 项** S-E62…S-E69，
+> 其中 **3 项 P0**（幽灵执行点 / fail-open / 自测假绿）、**4 项 P1/P2**、
+> **1 项 C4 再诊断新增**。两路子智能体审计超时失效，改由主线程独立取证。
+
+### P0（假放行 / 假绿）
+- **S-E62 判别力门禁无机械执行点**：全仓 grep 显示 `boundary_guard.py` 仅命中
+  文档与脚本自身；`~/.workbuddy/git-hooks/pre-commit` 四层门禁、
+  `~/.workbuddy/bin/release-sync.sh` 三 gate **均未调用**，
+  且 10 个带 `--self-test` 的脚本只有 `agent_ci_gate` 被覆盖
+  → `OPERATIONS.md`「每次 VERIFY 收产出前」是幽灵条款（形态 A）。
+  新增 **`scripts/self_gate.py` 门禁汇总唯一入口**（12 脚本自测 +
+  2 真实基线越界复核 = 14 项），pre-commit 与 release-sync 条件式接入
+  （仅自带该文件的包生效，其余 5 包零影响）。
+  端到端实测：short-circuit `c3_should_trigger` → 门禁 1/4 未通过 → 禁止推送。
+- **S-E63 `boundary_guard` 空集 / 不可判定 fail-open**：实测目录有产出但
+  文件名不匹配 `T-*__*.md` → 打印警告后 **RC=0**；产出全为 `unknown_role`
+  → 打印「不可判定 1 份」后 **RC=0**，与脚本自身第 18 行「无法判定 ≠ 放过」
+  直接矛盾。新增 `judge_exit_code()` 唯一真源、默认 fail-closed
+  （空集/不可判定 → RC=2；越界 → 1；全 clean → 0），
+  `--allow-undetermined` 为显式人工确认逃生阀（打印留痕）。
+  顺带消除逻辑双份（`main()` 的「越界→return 1」第二份判定移除）。
+- **S-E64 `evolution_log.py self-test` 恒 RC=1 + 探针假绿**：四个探针共用
+  固定时间戳 `2026-11-09T00:00:00`，台账末行 `14:06:52` → 全部触发「时间倒序」：
+  合规样本被误判为违规，另三个违规探针**全靠时间倒序被检出**、
+  没测到各自声称的判据。更深层根因：`probe()` 复刻了一份判定逻辑、
+  从未调用真实 `cmd_verify`（形态 C 自指模拟）。
+  抽出 `validate_rows()` 唯一真源，探针改纯内存构造 + 动态时间戳 +
+  逐条校验**特定判据关键词**；补 7 类判据探针。变异 8/8 全捕获
+  （含原缺陷回归靶点 V8）。
+
+### P1 / P2
+- **S-E65 `threat_grade.scan_member_grades` unreadable 被 determined 覆盖**：
+  实测 1 份不可读 + 1 份正常 → `verdict=determined`，损坏产出被静默吞掉。
+  改严重度优先（unreadable 锁死不可覆盖）+ 落 `detail["unreadable_files"]`。
+- **S-E66 `OPERATIONS.md:68-74` 四个幽灵 self-test 条目**：
+  `diagnosis_trigger` / `evolution_log` / `verify_triz_data` /
+  `query_triz_matrix` 实测全部 `RC=2 unrecognized arguments: --self-test`。
+- **S-E68 文档数字漂移（根治）**：文档写 `boundary_guard 20 用例`（实 22）、
+  `patent_knowledge 17 断言`（实 25 ✅ 行）。根因是文档手抄用例数 = 第二份真源。
+  **彻底删除手抄数字**，只指向 `self_gate.py:GATES`；工具表补 `self_gate.py`
+  （21/21 覆盖，零遗漏零幽灵）。
+- **S-E69（C4 再诊断新增）`self_gate` 清单单向校验**：注入一个带
+  `--self-test` 的 canary 脚本后自测仍 RC=0、输出不提 canary → 漏挂不会被发现。
+  与 S-E54 同型，解法同为**双向差集**：新增 `discover_selftest_scripts()`
+  机械发现全仓自测脚本，漏挂/陈旧任一非空即 FAIL；顺带修掉子命令形态
+  条目跳过参数校验的缺口（`verify_triz_data --strict` 列为显式例外）。
+
+### 验证（全量闭环，全部实测）
+- `self_gate.py` **14/14** + `--self-test` 双向差集为空
+- 三用例回归零回退：a-01 7/7 · b-01 7/8+1INFO · c-01 8/8；benchmark RC=0
+- preflight RC=0（C3 X=5 正确触发）· CI 门禁 · 契约全员 · 18 JSON
+  · 21 脚本 `--help` 零异常
+- **全套变异 32/32 零逃逸**（evolution_log 8 + boundary_guard fail-closed 8
+  + threat_grade/boundary_guard 关键真源 16）
+- 宿主门禁链：pre-commit 与 release-sync 均升为 **4 gate**（第 4 项=self_gate）
+
+### 宿主环境改动（不在本仓库）
+`~/.workbuddy/git-hooks/pre-commit`、`~/.workbuddy/bin/release-sync.sh`
+—— 条件式接入 `self_gate.py`，仅对自带该文件的包生效。
+
 ## [2.11.0] - 2026-11-09
 
 > **CYCLE-1 · 第 4 轮（AI agent 开发/测试工程师视角全面排查 + 修复与 debug）**。

@@ -148,3 +148,39 @@
   - **判别力验收**：boundary_guard 变异 19/19 + threat_grade 变异 12/12 全捕获（首轮 3 项逃逸 →
     补强用例后重测通过——「引用上游评级」用例系假绿：文本形态不匹配评级正则，从未经过引用排除分支）。
   - **本轮登记**：版本 2.10.0 → **2.11.0**；preflight 第 8 项判据升级（宽松正则 → 唯一真源聚合）。
+
+- **第5轮全面排查新增 8 条（S-E62…S-E69）· 全部清偿（v2.11.1 · 2026-11-09）**
+  （历史结论一律作废，全部从代码与实测重新取证；两路子智能体审计超时失效 → 主线程独立取证）：
+  - **P0 幽灵执行点**：**S-E62** 全仓 grep `boundary_guard` 仅命中文档与脚本自身，
+    pre-commit 四层门禁 / release-sync 三 gate 均未调用；10 个 `--self-test` 脚本
+    仅 `agent_ci_gate` 被覆盖 → 新增 `scripts/self_gate.py` 汇总 14 项门禁，
+    宿主 hook 与 release-sync 条件式接入（其余 5 包零影响）。端到端实测改坏
+    `c3_should_trigger` → 门禁 1/4 未通过 → 禁止推送。
+  - **P0 fail-open**：**S-E63** `boundary_guard` 空集（产出命名不符 glob）与
+    全 `unknown_role` 均 RC=0，与脚本第 18 行「无法判定 ≠ 放过」矛盾 →
+    抽 `judge_exit_code()` 真源、默认 fail-closed（RC=2），
+    显式逃生阀 `--allow-undetermined`；顺带消除「越界→return 1」逻辑双份。
+  - **P0 自测假绿**：**S-E64** `evolution_log.py self-test` 恒 RC=1——
+    四探针共用固定早时间戳 `2026-11-09T00:00:00`（台账末行 `14:06:52`），
+    合规样本被「时间倒序」误判，另三探针也全靠时间倒序被检出、
+    **没测到各自声称的判据**；更深层是 `probe()` 复刻判定逻辑、
+    从不调用真实 `cmd_verify`（形态 C）。抽 `validate_rows()` 唯一真源，
+    探针改纯内存 + 动态时间戳 + 逐条校验特定判据关键词（7 类）。
+  - **P1/P2**：**S-E65** `scan_member_grades` 的 unreadable 被 determined
+    后写覆盖（实测 1 坏 1 好 → verdict=determined，损坏产出静默吞掉）→
+    严重度优先 + `unreadable_files` 落 detail ·
+    **S-E66** `OPERATIONS.md:68-74` 四个幽灵 self-test 条目（实测全 RC=2）→
+    改指向 `self_gate.py:GATES` 唯一真源 ·
+    **S-E68** 文档手抄用例数漂移（20 用例 vs 实 22）→ **彻底删除手抄数字**，
+    工具表补 `self_gate.py`（21/21 覆盖）。
+  - **C4 再诊断新增**：**S-E69** `self_gate` 清单只做单向校验——注入带
+    `--self-test` 的 canary 脚本后自测仍 RC=0 → 漏挂不会被发现。
+    与 S-E54 同型，解法同为**双向差集**（`discover_selftest_scripts()`），
+    顺带修掉子命令形态条目跳过参数校验的缺口。实测注入 canary → RC=1
+    且精确点名文件，移除 → RC=0。
+  - **判别力验收**：全套变异 **32/32 零逃逸**（evolution_log 8 +
+    boundary_guard fail-closed 8 + threat_grade/boundary_guard 关键真源 16）；
+    首轮 W3/W8 逃逸分别定位出「逻辑双份」与「自测自身可短路」，
+    均补强用例后重测通过。
+  - **本轮登记**：版本 2.11.0 → **2.11.1**；宿主门禁链升为 **4 gate**
+    （第 4 项 = `self_gate.py`）；新增 `scripts/self_gate.py` 工具。
