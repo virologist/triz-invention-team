@@ -252,6 +252,31 @@ def scan_run_dir(run_dir):
     return results
 
 
+# ── 退出码判定唯一真源（CYCLE-1 · S-E63）────────────────────────────
+# 旧实现只在 n_viol 时返回 1，其余一律 0 → 两个 **fail-open** 缺口：
+#   ① 目录里有产出但文件名不匹配 `T-*__*.md` → results 空集 → 打印一句
+#      「⚠️ 目录内无成员产出」后 RC=0（幽灵验证项形态 B：扫描目标恒为空集）
+#   ② 产出全是 unknown_role / unreadable → 打印「不可判定 N 份」后 RC=0
+#   ② 与本文档第 18 行「无法判定 → 明确报不可判定**而非放过**」直接矛盾：
+#      报了，但退出码 0 就是放过。
+# 按 S-E53/S-E60 已确立的「假放行比假阻断危险」纪律，现改为 fail-closed：
+#   空集 / 任何不可判定 → RC=2（不可判定，禁止据此声称「无越界」）
+#   越界 → RC=1；全部 clean → RC=0。
+# 逃生阀 --allow-undetermined 保留给主理人显式人工确认的场景（会打印留痕）。
+def judge_exit_code(results, allow_undetermined=False):
+    """返回 (rc, verdict_label)。供 main() 与自测共同消费，避免两处手抄。"""
+    if not results:
+        return (0 if allow_undetermined else 2), "no_output"
+    n_viol = sum(1 for r in results if r["verdict"] == "violation")
+    n_und = sum(1 for r in results
+                if r["verdict"] in ("unknown_role", "unreadable"))
+    if n_viol:
+        return 1, "violation"
+    if n_und:
+        return (0 if allow_undetermined else 2), "undetermined"
+    return 0, "clean"
+
+
 # ─────────────────────────────────────────────────────────────────────
 # 判别力自测
 # ─────────────────────────────────────────────────────────────────────
@@ -392,10 +417,71 @@ def _self_test():
         if not ok:
             fails.append(m)
 
+    # ── S-E63：实跑 CLI 读**真实退出码**（判别力验收）──
+    # 教训来自 S-E56：只验 judge_exit_code() 函数、不验 main() 的退出码，
+    # 等于没测到「放行/阻断」这个真正的契约面。
+    print("\n  ── S-E63 真实 CLI 退出码（fail-closed 防线）──")
+    import subprocess
+    import tempfile
+    _cli_fails = []
+    with tempfile.TemporaryDirectory() as td:
+        # 场景 1：目录有 .md 产出但文件名不匹配 glob → 必须 RC=2
+        d1 = os.path.join(td, "unmatched"); os.makedirs(d1)
+        with open(os.path.join(d1, "产出.md"), "w", encoding="utf-8") as f:
+            f.write("# 权利要求书\n\n1. 一种装置\n")
+        # 场景 2：全部产出 unknown_role → 必须 RC=2
+        d2 = os.path.join(td, "unknown"); os.makedirs(d2)
+        with open(os.path.join(d2, "T-20261109-X01__ghost-member.md"),
+                  "w", encoding="utf-8") as f:
+            f.write("# 权利要求书\n\n1. 一种装置\n")
+        # 场景 3：全 clean → RC=0
+        d3 = os.path.join(td, "clean"); os.makedirs(d3)
+        with open(os.path.join(d3, "T-20261109-A01__contradiction-analyst.md"),
+                  "w", encoding="utf-8") as f:
+            f.write("## 矛盾矩阵\n\n| # | 矛盾 |\n|---|---|\n| 1 | 强度与成本 |\n")
+        # 场景 4：有越界 → RC=1
+        d4 = os.path.join(td, "violation"); os.makedirs(d4)
+        with open(os.path.join(d4, "T-20261109-A01__contradiction-analyst.md"),
+                  "w", encoding="utf-8") as f:
+            f.write("# 权利要求书\n\n1. 一种装置\n")
+        cases = [
+            ("空集(产出命名不符)-必须阻断", d1, [], 2),
+            ("全 unknown_role-必须阻断", d2, [], 2),
+            ("全 clean-放行", d3, [], 0),
+            ("有越界-阻断", d4, [], 1),
+            ("空集显式逃生阀-放行", d1, ["--allow-undetermined"], 0),
+            ("unknown 显式逃生阀-放行", d2, ["--allow-undetermined"], 0),
+            # 元判别力负例：期望值故意写错（999），自测**必须**判定它不匹配。
+            # 若有人把 `ok = (p.returncode == expect_rc)` 短路成 `ok = True`，
+            # 上面 6 条会全部假绿，而本条会立刻暴露（变异 W8 的靶点）。
+            ("元判别力-故意写错期望", d3, [], 999),
+        ]
+        for name, dirpath, extra, expect_rc in cases:
+            p = subprocess.run([sys.executable, os.path.abspath(__file__),
+                                "--run-dir", dirpath] + extra,
+                               capture_output=True, text=True)
+            ok = (p.returncode == expect_rc)
+            if expect_rc == 999:
+                meta_ok = not ok  # 必须识别为「不匹配」
+                print("  %s 自测元判别力：故意写错的期望%s"
+                      % ("✅" if meta_ok else "❌",
+                         "被正确识别为不匹配" if meta_ok else "竟被判通过（ok 被短路？）"))
+                if not meta_ok:
+                    _cli_fails.append("自测元判别力")
+                continue
+            print("  %s %-34s 期望RC=%d | 实得RC=%d"
+                  % ("✅" if ok else "❌", name, expect_rc, p.returncode))
+            if not ok:
+                _cli_fails.append(name)
+
+    if _cli_fails:
+        fails.extend(_cli_fails)
+
     if fails:
         print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
         return 1
-    print("\n✅ 自测全通过")
+    print("\n✅ 自测全通过（%d 用例 + 7 成员角色矩阵 + 6 项真实 CLI 退出码）"
+          % len(_SELF_TEST_CASES))
     return 0
 
 
@@ -404,6 +490,8 @@ def main():
     ap.add_argument("--run-dir", help="成员产出目录")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--allow-undetermined", action="store_true",
+                    help="显式人工确认后放行「空集/不可判定」（会打印留痕；默认 fail-closed）")
     args = ap.parse_args()
 
     if args.self_test:
@@ -416,12 +504,23 @@ def main():
         return 2
 
     results = scan_run_dir(args.run_dir)
-    if not results:
-        print("⚠️  目录内无成员产出（T-*__*.md）")
-        return 0
-
+    rc, label = judge_exit_code(results, args.allow_undetermined)
     n_viol = sum(1 for r in results if r["verdict"] == "violation")
-    n_unknown = sum(1 for r in results if r["verdict"] == "unknown_role")
+    n_unknown = sum(1 for r in results
+                    if r["verdict"] in ("unknown_role", "unreadable"))
+
+    if not results:
+        import glob
+        others = [os.path.basename(p) for p in
+                  sorted(glob.glob(os.path.join(args.run_dir, "*.md")))]
+        print("❌ 目录内未识别到任何成员产出（T-*__*.md）——**无法判定是否越界**，"
+              "禁止当作「无越界」放行", file=sys.stderr)
+        if others:
+            print("   目录内其他 .md（疑似命名不符，需人工核对）：%s"
+                  % ", ".join(others[:8]), file=sys.stderr)
+        print("   如确已人工确认，可加 --allow-undetermined 显式放行（留痕）",
+              file=sys.stderr)
+        return rc
 
     if args.json:
         print(json.dumps({"run_dir": args.run_dir, "scanned": len(results),
@@ -442,9 +541,19 @@ def main():
               % (n_viol, n_unknown, len(results)))
 
     if n_viol:
+        # S-E63：此处**只打印**不再 `return 1`——退出码唯一由 judge_exit_code()
+        # 决定。旧实现在这里另写了一份「越界→1」逻辑，导致把真源的 violation
+        # 分支改坏时 main() 仍靠第二份逻辑兜住（变异 W3 逃逸）→ 逻辑双份。
         print("❌ 存在越界产出——禁止边界不是文档条款，是运行时红线", file=sys.stderr)
-        return 1
-    return 0
+    if label == "undetermined":
+        print("❌ %d 份产出不可判定（unknown_role / unreadable）——"
+              "**无法判定 ≠ 未越界**，默认阻断" % n_unknown, file=sys.stderr)
+        print("   如确已人工确认，可加 --allow-undetermined 显式放行（留痕）",
+              file=sys.stderr)
+    if args.allow_undetermined and label in ("no_output", "undetermined"):
+        print("⚠️  已按 --allow-undetermined 显式放行（label=%s）——"
+              "此放行需由主理人承担责任" % label, file=sys.stderr)
+    return rc
 
 
 if __name__ == "__main__":

@@ -85,8 +85,16 @@ def cmd_backfill(args):
     return 0
 
 
-def cmd_verify(args):
-    rows = read_rows()
+def validate_rows(rows):
+    """台账行校验的**唯一真源**（CYCLE-1 · S-E64）。
+
+    此前 cmd_verify() 与 cmd_self_test().probe() 各自复刻了一份判定逻辑：
+      - 自测那份**少检了**「列数不符」「commit 为空」两条判据
+      - 且它自己算自己、**从不调用真实判定函数** → 幽灵验证项形态 C（自指模拟）
+      - 真实校验器改了，自测不跟随，仍报「全绿」
+    现把判定抽为纯函数，verify 与 self-test 共同消费；改坏任一条判据，
+    自测的对应探针必然失败（判别力验收见 cmd_self_test）。
+    """
     problems = []
     prev = ""
     for i, r in enumerate(rows, 2):
@@ -107,11 +115,16 @@ def cmd_verify(args):
             problems.append(f"L{i}: commit='{c}' 非确定标识（应为完整/短 hash）")
         elif not re.fullmatch(r"[0-9a-f]{7,40}", c):
             problems.append(f"L{i}: commit='{c}' 非 hex hash 形态")
+    return problems
+
+
+def cmd_verify(args):
+    problems = validate_rows(read_rows())
     if problems:
         for p in problems:
             print(f"  ❌ {p}")
         return 1
-    print(f"✅ 台账校验通过：{len(rows)} 行，格式/时间序/无编造值/commit 确定")
+    print(f"✅ 台账校验通过：{len(read_rows())} 行，格式/时间序/无编造值/commit 确定")
     return 0
 
 
@@ -123,62 +136,95 @@ def cmd_tail(args):
 
 
 def cmd_self_test(args):
-    """双向自测：注入违规样本 → 期望被检出（exit 1）；基线 → 期望通过（exit 0）。"""
-    import shutil
-    import tempfile
+    """判别力自测（CYCLE-1 · S-E64 重写）。
+
+    旧实现有**两个**缺陷，均由本轮第5轮排查实测暴露：
+      1) 探针把违规样本 append 到真实 TSV 再自己复刻一份判定逻辑算 problems
+         → **从未调用真实判定函数**（幽灵验证项形态 C）；且复刻版漏了两条判据。
+      2) 四个探针都用固定时间戳 `2026-11-09T00:00:00`，而台账末行是
+         `2026-11-09T14:06:52` → 每一行都触发「时间倒序」：
+         · 合规样本被误判为违规 → **自测恒 FAIL（RC=1）**
+         · 三个违规探针其实全靠「时间倒序」被检出，**没测到各自声称的判据**
+           → 判别力假绿（把对应判据删掉，自测照样 PASS）
+
+    现改为：
+      - 判定统一走 `validate_rows()` 唯一真源（含 verify 的全部 5 类判据）
+      - 纯内存构造行，**不写盘**（旧实现会临时污染真实台账）
+      - 探针时间戳动态取「台账末行 + 1 秒」，保证不误触发时间倒序
+      - 每个探针必须检出**自己那一条判据关键词**（不是「有问题就算过」）
+      - 合规样本必须 `problems == []`
+    """
     ok = True
     baseline = read_rows()
 
-    def probe(label, mutate, expect_fail):
-        """在临时副本上注入样本，验证 verify 的判定逻辑真能检出"""
-        nonlocal ok
-        bak = TSV + ".selftest.bak"
-        shutil.copy2(TSV, bak)
+    # 基线本身必须干净，否则所有探针都会被既有问题污染 → 假绿
+    base_problems = validate_rows(baseline)
+    if base_problems:
+        print("  ❌ 台账基线本身不合规，自测前提不成立：%s" % base_problems[:2])
+        return 1
+    print("  ✅ 台账基线干净（%d 行，validate_rows 零问题）" % len(baseline))
+
+    # 动态时间戳：严格大于台账末行，避免「时间倒序」把探针全带走
+    last_ts = baseline[-1]["timestamp"] if baseline else ""
+    stamp = datetime.datetime.now().replace(microsecond=0)
+    if last_ts:
         try:
-            with open(TSV, "a", encoding="utf-8") as f:
-                f.write(mutate)
-            rows = read_rows()
-            problems = []
-            prev = ""
-            for i, r in enumerate(rows, 2):
-                t = r.get("timestamp", "")
-                if t and t < prev:
-                    problems.append(f"L{i}: 时间倒序")
-                prev = t or prev
-                c = (r.get("commit") or "").strip()
-                if not c:
-                    problems.append(f"L{i}: commit 为空")
-                elif c.upper() in ("HEAD", "HEAD~1", "LATEST", "CURRENT"):
-                    problems.append(f"L{i}: commit 非确定标识")
-                elif not re.fullmatch(r"[0-9a-f]{7,40}", c):
-                    problems.append(f"L{i}: commit 非 hex hash")
-                if r.get("eval_mode") == "real" and r.get("new_score") in ("", "-", None):
-                    problems.append(f"L{i}: eval_mode=real 却无实测分")
-            detected = len(problems) > 0
-            if detected != expect_fail:
-                print(f"  ❌ {label}: 期望检出={expect_fail} 实测={detected}")
-                ok = False
-            else:
-                print(f"  ✅ {label}: {'检出' if detected else '放行'}（符合预期）")
-        finally:
-            shutil.move(bak, TSV)
+            last = datetime.datetime.fromisoformat(last_ts)
+            if stamp <= last:
+                stamp = last + datetime.timedelta(seconds=1)
+        except ValueError:
+            pass
+    ts = stamp.isoformat(timespec="seconds")
 
-    print("== 自测：台账校验器双向断言 ==")
+    def compliant_row(**overrides):
+        """构造一行**完全合规**的台账行；overrides 只改被测的那一个字段。"""
+        row = {"timestamp": ts, "commit": "abc1234", "skill": "system",
+               "old_score": "-", "new_score": "实测分", "status": "keep",
+               "dimension": "探针", "note": "探针", "eval_mode": "real",
+               "gate": "全套门禁"}
+        row.update(overrides)
+        return row
+
+    def probe(label, row, expect_fragment=None):
+        """注入一行，断言**特定判据**被（或不被）检出。"""
+        nonlocal ok
+        problems = validate_rows(baseline + [row])
+        # 只关心注入行产生的问题（基线已断言干净）
+        hits = [p for p in problems if expect_fragment and expect_fragment in p]
+        if expect_fragment:
+            passed = bool(hits)
+            print("  %s %-38s 期望命中「%s」 | 实得 %s"
+                  % ("✅" if passed else "❌", label, expect_fragment,
+                     hits[0] if hits else "未命中（problems=%s）" % problems[:2]))
+        else:
+            passed = (len(problems) == 0)
+            print("  %s %-38s 期望零问题 | 实得 %s"
+                  % ("✅" if passed else "❌", label,
+                     "零问题" if passed else problems[:2]))
+        if not passed:
+            ok = False
+
+    print("== 自测：台账校验器判别力（唯一真源 validate_rows）==")
+    probe("合规样本（动态时间戳 %s）" % ts, compliant_row())
     probe("注入 commit=HEAD 非确定标识",
-          "2026-11-09T00:00:00\tHEAD\tsystem\t-\tx\tkeep\t探针\t探针\treal\t-\n", True)
-    probe("注入 eval_mode=real 但无实测分",
-          "2026-11-09T00:00:00\tabc1234\tsystem\t-\t-\tkeep\t探针\t探针\treal\t-\n", True)
+          compliant_row(commit="HEAD"), "非确定标识")
+    probe("注入 commit 为空",
+          compliant_row(commit=""), "commit 为空")
+    probe("注入 commit 非 hex hash",
+          compliant_row(commit="XYZ-NOT-HEX"), "非 hex hash")
+    probe("注入 eval_mode=real 却无实测分",
+          compliant_row(new_score="-"), "却无实测分")
     probe("注入时间倒序",
-          "2020-01-01T00:00:00\tabc1234\tsystem\t-\tx\tkeep\t探针\t探针\treal\t-\n", True)
-    probe("注入合规样本",
-          "2026-11-09T00:00:00\tabc1234\tsystem\t-\tx\tkeep\t探针\t探针\treal\t-\n", False)
+          compliant_row(timestamp="2000-01-01T00:00:00"), "时间倒序")
+    probe("注入列数不符（缺 gate 列）",
+          {k: v for k, v in compliant_row().items() if k != "gate"}, "列数不符")
 
-    # 基线复核：还原后必须通过
+    # 不写盘复核：自测全程未触碰台账
     if read_rows() != baseline:
-        print("  ❌ 自测未还原台账")
+        print("  ❌ 自测污染了台账")
         ok = False
     else:
-        print("  ✅ 台账已还原，行数一致")
+        print("  ✅ 台账未被写盘（纯内存探针）")
     print("self-test ✅" if ok else "self-test ❌")
     return 0 if ok else 1
 
