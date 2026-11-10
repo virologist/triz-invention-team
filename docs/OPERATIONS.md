@@ -64,6 +64,7 @@
 | `scripts/boundary_guard.py` | **成员产出越界红线机械拦截**（B1-B5 信号 + 角色矩阵 + verdict 四态 + 默认 fail-closed） | 每次 VERIFY 收产出前（验收侧红线）；已由 self_gate 机械触发 |
 | `scripts/self_gate.py` | **判别力门禁唯一汇总入口**（清单见 `GATES`；含真实基线越界复核 + 宿主接入自检） | pre-commit hook + release-sync gate 自动（S-E62） |
 | `scripts/install_gate_hooks.py` | **宿主门禁接入安装器**（`--verify` / `--install` / `--self-test`，幂等 + 漂移检测） | **每次换机 / 新 clone 后首次部署必跑**（S-E70） |
+| `scripts/harness.py` | **统一工作入口**（`map` 工作地图 / `verify` 阶段验收+证据 / `feedback` 反馈闭环 / `--self-test`） | 每阶段 VERIFY + 交付前；工作地图见 `docs/WORK_MAP.md` |
 | `scripts/diagnosis_trigger.py` | 诊断触发器 T1/T2/T3 机械判定（preflight 第9项自动调用） | 每次建队前（preflight 内自动） |
 | `scripts/evolution_log.py` | 自进化台账唯一写入口（append/backfill/verify/tail/self-test） | 每次批次收口（C5 登记收敛） |
 

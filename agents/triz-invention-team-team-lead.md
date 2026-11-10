@@ -598,3 +598,31 @@ TASK_STATE: { task_id, phase: 0-5, domain, invention_name, search_rounds: 0-3, v
 > 即 S-E25 墙钟双轨制**未下沉到状态块模板**；成员照此输出 → 墙钟永远缺失 →
 > `agent_ci_gate.check_wall_clock()` 只能对每份产出发 WARN，永远收不到回填后的墙钟。
 > 同时补 `evidence`（Workflow D 前置闸证据源）· `conditions`（二审对账源）· `loopback_count`（回流上限）。
+
+## 工作系统入口（增补 · 2026-11-10，不改动以上任何 SOP/红线/契约条款）
+
+> 本节只做**入口引用**，不新增流程要求、不改写上文条款。
+> 背景：真实运行（2026-11-10 17:05/17:48，routing-log R-20261110-001~005）暴露
+> 平台错误降级只留在决策叙述里、未进入反馈闭环；且 22 个脚本中 13 个未出现在
+> 操作说明中。以下两个资产由管家节点确认后增补，用于把「该跑什么 / 拿什么证明」
+> 从 AI 自觉转成结构化清单与机械检查。
+
+- **结构化工作地图**：`docs/WORK_MAP.md`（阶段 → 输入 → 命令 → 验收 → 证据 → 人工确认点；
+  含四种状态定义与 C1-C8 自动/人工边界）。
+- **统一 CLI 入口**：`python3 scripts/harness.py`
+  - `map` — 打印/结构化输出工作地图
+  - `verify --stage <N> --run-dir <RUN_DIR>` — 阶段验收，**逐项记录检查对象/结果/证据**，
+    缺输入或证据一律标 `UNVERIFIED`（退出码 3），**不得当作通过**；
+    `--all` 全流程；`--sample tests/cases/runtime-platform-502.md` 跑认可样例
+  - `verify` 自动比对检查对象 sha256 指纹（`.harness/verify_state.json`），
+    内容变化后重新验证时把变化项标 `STALE`
+  - `feedback add` — 反馈记录；`--scope once` 只记录（单次要求），
+    `--scope rule`（长期规则）**必须**同时给 `--convert-to` 与 `--check-id`，
+    否则拒绝，防止规则无限膨胀；`feedback list --open` 查未闭环项
+- **四种状态**（报告必须逐项标注）：`AUTO_PASS` 自动验证通过 / `AI_PASS` AI 评估通过 /
+  `HUMAN_PASS` 人工确认通过 / `UNVERIFIED` 尚未验证。
+  **自动检查只判「有没有、格式对不对」，不判「对不对」**；C1-C8 技术含义、
+  红黄裁决、仲裁、语义与审美一律保留人工确认，自动全通过 ≠ 用户确认完成。
+
+> 既有 22 个脚本、6 阶段 SOP、4 Workflow、JSON Schema 契约、preflight 15 项、
+> 三用例回归与变异测试、failure 索引、U2 两级门禁全部保留，本入口只做编排与复用。
