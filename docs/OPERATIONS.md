@@ -65,6 +65,7 @@
 | `scripts/self_gate.py` | **判别力门禁唯一汇总入口**（清单见 `GATES`；含真实基线越界复核 + 宿主接入自检） | pre-commit hook + release-sync gate 自动（S-E62） |
 | `scripts/install_gate_hooks.py` | **宿主门禁接入安装器**（`--verify` / `--install` / `--self-test`，幂等 + 漂移检测） | **每次换机 / 新 clone 后首次部署必跑**（S-E70） |
 | `scripts/harness.py` | **统一工作入口**（`map` 工作地图 / `verify` 阶段验收+证据 / `feedback` 反馈闭环 / `--self-test`） | 每阶段 VERIFY + 交付前；工作地图见 `docs/WORK_MAP.md` |
+| `scripts/version_consistency.py` | **版本号一致性门禁**（4 个版本位必须相等；缺字段/文件缺失 fail loud） | 每次 bump 版本后 + self_gate 自动（S-E73） |
 | `scripts/diagnosis_trigger.py` | 诊断触发器 T1/T2/T3 机械判定（preflight 第9项自动调用） | 每次建队前（preflight 内自动） |
 | `scripts/evolution_log.py` | 自进化台账唯一写入口（append/backfill/verify/tail/self-test） | 每次批次收口（C5 登记收敛） |
 

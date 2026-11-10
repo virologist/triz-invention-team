@@ -2,6 +2,56 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] - 2026-11-11
+
+> **CYCLE-1 · 第 7 轮（工作系统改造后的复核轮）**。
+> 上一轮（2026-11-10）把专家团从「散文操作说明」升级为「结构化工作地图 + 统一入口
+> `harness.py` + 反馈闭环」。本轮**不重构，只复核**：全量回归零回退的前提下，
+> 用实测找出并清偿 3 项真实缺陷——其中 2 项属「假绿」类，会让不完美的产出冒充通过。
+
+### P0
+- **S-E73 版本号三处漂移且无任何门禁拦截**：实测发现 `.codebuddy-plugin/marketplace.json`
+  的 version 停在 **2.10.0**，而 `.codebuddy-plugin/plugin.json` 与
+  `.claude-plugin/marketplace.json` 已是 **2.11.2**——**已连续漂移两轮**。
+  根因有二：① 历次 bump 提交（如 `1b41fe1`）只改 `.claude-plugin/marketplace.json` 两处
+  + `plugin.json` 一处，**漏掉 `.codebuddy-plugin/marketplace.json`**；
+  ② `preflight_check.py` 与 `self_gate.py` **均无版本一致性判据**，漏改不会被拦下。
+  新增 **`scripts/version_consistency.py`**：校验 **4 个版本位**（WorkBuddy 插件清单 ·
+  WorkBuddy 市场清单插件项 · Claude 市场清单 metadata · Claude 市场清单插件项）必须相等，
+  缺字段/文件缺失一律 fail loud（RC=1，禁止发布）；带 `--self-test` 判别力自测
+  （单点改小→检出漂移 · 缺字段→报缺字段 · 文件缺失→报缺失）。
+  已挂进 `self_gate.py` 的 `GATES`（清单 15→**16 项**，汇总 16→**17 项**），
+  并补入 `docs/OPERATIONS.md` 工具表（双向差集实测 13/13 为空，无幽灵）。
+- **S-E74 认可样例存在退出码假绿**：`harness.py verify --sample` 在样例含
+  `UNVERIFIED:` 断言时**仍返回 RC=0**，与本包自身「退出码 3 = 无 FAIL 但存在
+  UNVERIFIED，禁止宣称验证通过」的契约直接冲突——即真实运行产出未落盘时，
+  工具却对外报「通过」。已修为：含未验证项 → **RC=3**；有 FAIL → RC=1；
+  全通过 → RC=0。与 `verify --run-dir` 语义统一。补 2 条自测用例锁死
+  （样例含 UNVERIFIED→RC=3 / 全命中→RC=0），变异测试 **2/2 零逃逸**。
+
+### P1
+- **S-E75 样例输出标签重复**：未验证项输出为 `UNVERIFIED UNVERIFIED: ...`
+  （正文已含 `UNVERIFIED:` 前缀又叠加状态标签），改为剥离前缀后输出。
+- **self_gate 自测汇总的基线数改为动态**（取自 `BASELINE_SUBDIRS` 唯一真源），
+  根治「增删基线目录即漂移」的手抄数字隐患（S-E72 同型）。
+- `docs/WORK_MAP.md` §四 补**退出码契约表**（0/1/2/3 与「能否宣称验证通过」），
+  `docs/DELIVERY_WORK_SYSTEM.md` §四/§六 同步新退出码语义与自测项数。
+
+### 验证（全量闭环）
+- `self_gate` **17/17**（清单 16 项 + 2 基线 + 2 项元判别力 + 宿主接入）·
+  `self_gate --self-test` 全通过（双向差集 13/13 为空）
+- `harness.py --self-test` **8 项**全通过（新增 2 条样例退出码判别力）
+- `version_consistency.py --self-test` 全通过 · **变异 2/2 零逃逸**（临时副本）
+- 三用例回归 a 7/7 · b 7/8+1INFO · c 8/8 全 RC=0（零回退）
+- benchmark L1 **1.000** · preflight RC=0 · CI 门禁 100% 合规 · 契约 RC=0
+- 版本号 4 个版本位一致（2.12.0）
+
+### 尚未验证（如实标注，不得当作通过）
+- 2026-11-10 真实运行的产出与 `state.json` 本机仍未检索到 → 认可样例第 5 条
+  恒为 `UNVERIFIED`（`verify --sample` 因此返回 RC=3，**这是正确行为**）；
+  G1-G5 真值检查在基线目录上同样为 `UNVERIFIED`。
+- 未发起新的真实端到端业务任务，本轮全部验证基于既有基线 + 真实运行记录回归。
+
 ## [2.11.2] - 2026-11-10
 
 > **CYCLE-1 · 第 6 轮（终局复核发现真实遗留 → 修复 → 收敛）**。

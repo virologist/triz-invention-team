@@ -8,13 +8,13 @@
   },
   "metadata": {
     "description": "Private marketplace for the TRIZ Invention Team (v2.11.2) — cross-domain multi-agent invention workflow",
-    "version": "2.11.2"
+    "version": "2.12.0"
   },
   "plugins": [
     {
       "name": "triz-invention-team",
       "description": "Cross-domain TRIZ invention team: contradiction analysis, three-round patent search, examination simulation with second-opinion review, disclosure and patent application drafting for CN invention patents.",
-      "version": "2.11.2",
+      "version": "2.12.0",
       "author": {
         "name": "TZUVet",
         "email": "54756814+virologist@users.noreply.github.com",

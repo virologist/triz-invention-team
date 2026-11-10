@@ -1,7 +1,7 @@
 {
   "name": "triz-invention-team",
-  "version": "2.11.2",
-  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.10: contract-drift eradication (task_id unified across both schemas, routing-log column contract check, Claude Code marketplace single-repo install fix, scaffold crash fix).",
+  "version": "2.12.0",
+  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.12: structured work map + unified harness entry (map/verify/feedback), machine-verifiable stage acceptance with AUTO_PASS/AI_PASS/HUMAN_PASS/UNVERIFIED status, closed-loop feedback, and version-consistency release gate.",
   "author": {
     "name": "TZUVet",
     "email": "tzuvet@example.com"

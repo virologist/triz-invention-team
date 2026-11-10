@@ -71,6 +71,8 @@ GATES = [
      "新机器可移植性 + 漂移/幂等/元判别力"),
     ("统一工作入口", "harness.py", ["--self-test"],
      "阶段验收不假绿 + 门禁真值 + 反馈护栏 + 元判别力"),
+    ("版本号一致性", "version_consistency.py", ["--self-test"],
+     "4 个版本位必须相等（历史漂移 2.10.0 vs 2.11.2 的根因护栏）"),
 ]
 
 # 真实基线扫描（对已入库产出做 fail-closed 越界复核）——
@@ -279,8 +281,10 @@ def self_test():
     if fails:
         print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
         return 1
-    print("\n✅ 自测全通过（%d 门禁清单 + 2 基线 + 2 项元判别力 + 宿主接入）"
-          % len(GATES))
+    # 基线数取自 BASELINE_SUBDIRS（唯一真源），不写死数字——
+    # 否则增删基线目录时本行会漂移（S-E72 同型问题，此处一并根治）
+    print("\n✅ 自测全通过（%d 门禁清单 + %d 基线 + 2 项元判别力 + 宿主接入）"
+          % (len(GATES), len(BASELINE_SUBDIRS)))
     return 0
 
 

@@ -433,7 +433,8 @@ def verify_sample(path):
         # 绝不把它当通过（符合「没有证据不宣称验证通过」）。
         if "UNVERIFIED:" in desc:
             unverified += 1
-            print("  ⚠️  UNVERIFIED %s" % desc[:80])
+            # 去掉正文里的 "UNVERIFIED:" 前缀，避免输出 "UNVERIFIED UNVERIFIED: ..."
+            print("  ⚠️  UNVERIFIED %s" % desc.split("UNVERIFIED:", 1)[1].strip()[:80])
             continue
         hit = False
         if "CHECK-RT-001" in desc:
@@ -452,7 +453,13 @@ def verify_sample(path):
             bad.append(desc)
     print("\n认可样例：%d 项，自动验证通过 %d，失败 %d，尚未验证 %d"
           % (len(items), len(items) - len(bad) - unverified, len(bad), unverified))
-    return 1 if bad else 0
+    if unverified:
+        print("⚠️  存在尚未验证项——按 WORK_MAP §一，不得宣称验证通过")
+    # 退出码语义与 verify --run-dir 保持一致：
+    # 0=全通过 · 1=有 FAIL · 2=用法错 · 3=无 FAIL 但存在 UNVERIFIED（禁止宣称验证通过）
+    if bad:
+        return 1
+    return 3 if unverified else 0
 
 
 def self_test():
@@ -517,6 +524,27 @@ def self_test():
         meta = (rc == 999)
         print("  %s 自测元判别力：故意写错的期望被正确识别" % ("❌" if meta else "✅"))
         if meta: fails.append("元判别力")
+
+        # 认可样例退出码契约：含 UNVERIFIED 断言 → 必须 RC=3（不得假绿）；
+        # 全部断言命中且无 UNVERIFIED → RC=0。锁死「没有证据不宣称通过」。
+        samp_unver = os.path.join(td, "s_unver.md")
+        io.open(samp_unver, "w", encoding="utf-8").write(
+            "- [x] CHECK-RT-003: 工作地图 docs/WORK_MAP.md 存在\n"
+            "- [ ] UNVERIFIED: 该次运行产出未落盘（本机未检索到）\n")
+        rc_s = verify_sample(samp_unver)
+        ok6 = (rc_s == 3)
+        print("  %s 认可样例含 UNVERIFIED → 退出码 3（禁止假绿）| 实得 %d"
+              % ("✅" if ok6 else "❌", rc_s))
+        if not ok6: fails.append("样例 UNVERIFIED 假绿")
+
+        samp_ok = os.path.join(td, "s_ok.md")
+        io.open(samp_ok, "w", encoding="utf-8").write(
+            "- [x] CHECK-RT-003: 工作地图 docs/WORK_MAP.md 存在\n")
+        rc_o = verify_sample(samp_ok)
+        ok7 = (rc_o == 0)
+        print("  %s 认可样例全部命中且无 UNVERIFIED → 退出码 0 | 实得 %d"
+              % ("✅" if ok7 else "❌", rc_o))
+        if not ok7: fails.append("样例全通过误报")
 
     if fails:
         print("\n❌ 自测失败：%s" % fails); return 1
