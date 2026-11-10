@@ -1,7 +1,7 @@
 {
   "name": "triz-invention-team",
-  "version": "2.14.0",
-  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.14: structured work map + unified harness entry (map/verify/feedback), machine-verifiable stage acceptance with AUTO_PASS/AI_PASS/HUMAN_PASS/UNVERIFIED status, closed-loop feedback, version-consistency release gate, and versioned host-defect repair blocks (zsh PIPESTATUS push-failure false-green fixed with regression detection).",
+  "version": "2.15.0",
+  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.15: structured work map + unified harness entry (map/verify/feedback), machine-verifiable stage acceptance with AUTO_PASS/AI_PASS/HUMAN_PASS/UNVERIFIED status, closed-loop feedback, version-consistency release gate, and versioned host-defect repair blocks (zsh PIPESTATUS push-failure false-green fixed with regression detection).",
   "author": {
     "name": "TZUVet",
     "email": "tzuvet@example.com"

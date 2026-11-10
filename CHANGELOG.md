@@ -2,6 +2,54 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.0] - 2026-11-11
+
+> **CYCLE-1 · 第 10 轮（--all 端到端验证轮）**。
+> v2.14.0 的端到端只覆盖了**单包模式**。本轮补 `--all` 循环模式的端到端验证
+> （双包沙箱 + 拒收远端），**再次实测暴露新缺陷**：S-E79 的 SCRIPT_RC 透传
+> 把「环境性跳过」也计为失败 → 成功假红。与 S-E79 恰好对称：
+> S-E79 是失败被吞（假绿），S-E80 是跳过被计为失败（假红）。
+
+### P0
+- **S-E80 `--all` 模式环境性跳过被计为失败（成功假红，恒 RC=1）**：
+  端到端实测（`--all` 双包沙箱）：两包推送成功后脚本仍以 **RC=1** 结束。
+  根因有两层：
+  ① **白名单与磁盘不符**（真实环境实测：6 个白名单包中
+  `virus-evolution-researcher` 路径不存在）→ `inspect_pkg` 对其
+  `return 1` → SCRIPT_RC=1 → **即使其余包全部推送成功也恒 RC=1**。
+  「宿主上装没装某个包」是环境状态，不是推送失败；
+  ② S-E79 修复（`|| SCRIPT_RC=1`）让该 return 1 首次**可见**——
+  修复前 `|| true` 时代它同样发生但被吞掉（那时的 RC=0 是假绿，不是正确）。
+  修复（batch 跳过语义，版本化进 `install_gate_hooks.py` 修复块）：
+  - `inspect_pkg` 增加**环境上下文参数**（`local ctx="${2:-single}"`）；
+  - 「路径不存在 / 无 .git」两处环境性 `return 1` 在 **batch 上下文**
+    改判 SKIP（`log` 留痕 `SKIP reason=no-dir (batch)` 后 `return 0`）；
+    **单包显式指定保持 `return 1`**（用户打错包名必须报错）；
+  - `--all` 循环调用传入 `batch`。
+  **端到端四象限复验**（修复后真实宿主副本）：
+  | 场景 | 结果 |
+  |---|---|
+  | `--all` 环境跳过 + 其余包成功 | **RC=0**（修复前 RC=1 假红）✅ |
+  | `--all` 真推送失败（拒收远端） | **RC=1** ✅ |
+  | 单包推送失败 | **RC=1**（S-E79 语义保持）✅ |
+  | 单包显式指定缺包 | **RC=1**（报错语义保持）✅ |
+  `zsh -n` / `bash -n` 双语法通过。真实宿主已安装。
+
+### 判别力扩容
+- `install_gate_hooks.py --self-test` **18 项 → 21 项**（新增 3 项 S-E80 判别力）：
+  改写形态（签名 ctx 注入 + batch 调用 + 环境守卫）· 改写幂等 ·
+  行为级（单包模式缺包仍报错——修复不得破坏显式语义）。
+- 判据 `_hostfix_code_state` 扩为六元组 `(vuln, fixed, rc_needed, rc_ok,
+  ctx_needed, ctx_ok)`；调试中修正 1 个判据自身缺陷：ctx 守卫正则
+  漏了 `[ `（`if "$ctx"` vs 实际输出 `if [ "$ctx"`）→ 自测当场暴露后修正。
+
+### 验证（全量闭环）
+- `self_gate.py` **17/17** · 清单双向差集 13/13 为空
+- `install_gate_hooks.py --self-test` **21 项全通过**
+- `version_consistency.py` 5 版本位一致（2.15.0）
+- 三用例回归零回退（`--no-report-write`）：a01 7/7 · b01 7/8+1INFO · c01 8/8
+- 端到端四象限全部符合预期（见 P0 表）
+
 ## [2.14.0] - 2026-11-11
 
 > **CYCLE-1 · 第 9 轮（端到端验证轮）**。

@@ -137,6 +137,12 @@ BLOCK_HOSTFIX_RELEASE_SYNC = """{begin}
   # inspect_pkg 在推送失败时 return 1，但主流程调用写成 `inspect_pkg ... || true`
   # → 失败信号在调用点被丢弃，脚本无论推送成败恒以 RC=0 收场（端到端实测）。
   # 改为 SCRIPT_RC 透传：循环处 ||=1、单包处 ||=$?，结尾 exit $SCRIPT_RC。
+  # 追加修复（S-E80 · --all 模式环境性跳过被计为失败 → 成功假红）：
+  # 白名单里**路径不存在**的包（实测：真实环境 6 包缺 1）在 --all 循环中
+  # 触发 return 1 → 即使其余包全部推送成功，--all 也恒以 RC=1 结束。
+  # 修复：循环上下文中「路径不存在 / 无 .git」改判 SKIP（return 0，日志留痕）；
+  # 单包显式指定时保持 return 1（用户打错包名必须报错）。
+  # 判别环境上下文：inspect_pkg 的第 2 参数（--all 循环传入 "batch"）。
   # 本块由 scripts/install_gate_hooks.py 自动注入，请勿手工编辑；
   # 若手工回滚下方代码，本块会成为「代码已回归」的检出锚点。
 {end}
@@ -262,12 +268,20 @@ def _hostfix_code_state(txt):
             break
     rc_needed = (rc_vuln > 0) or has_rc_code
     rc_ok = (
-        bool(re.search(r"(?m)^[ \t]*inspect_pkg \"\$pkg\" \|\| SCRIPT_RC=1", txt))
+        bool(re.search(r"(?m)^[ \t]*inspect_pkg \"\$pkg\"( batch)? \|\| SCRIPT_RC=1", txt))
         and bool(re.search(
             r"(?m)^[ \t]*inspect_pkg \"\$TARGET\" \|\| SCRIPT_RC=\$\?", txt))
         and bool(re.search(r"(?m)^exit \$SCRIPT_RC[ \t]*$", txt))
     )
-    return vuln, fixed, rc_needed, rc_ok
+    # S-E80：宿主有 --all 循环（SCRIPT_RC=1 形态）即需要 batch 跳过语义；
+    # 修复形态 = 签名 ctx 注入 + 循环调用带 batch + 环境守卫在位。
+    ctx_needed = rc_needed
+    ctx_ok = (
+        bool(re.search(r"(?m)^inspect_pkg\(\) \{\n[ \t]*local ctx=", txt))
+        and bool(re.search(r"(?m)^[ \t]*inspect_pkg \"\$pkg\" batch \|\| SCRIPT_RC=1", txt))
+        and bool(re.search(r"(?m)^[ \t]*if \[ \"\$ctx\" = \"batch\" \]; then", txt))
+    )
+    return vuln, fixed, rc_needed, rc_ok, ctx_needed, ctx_ok
 
 
 def check_hostfix_one(kind, path):
@@ -285,7 +299,7 @@ def check_hostfix_one(kind, path):
         return {"status": "missing", "detail": "宿主文件不存在"}
     txt = io.open(path, encoding="utf-8").read()
     expected = HOSTFIX_BLOCKS[kind]
-    vuln, fixed, rc_needed, rc_ok = _hostfix_code_state(txt)
+    vuln, fixed, rc_needed, rc_ok, ctx_needed, ctx_ok = _hostfix_code_state(txt)
 
     if MARK_BEGIN_FIX in txt and MARK_END_FIX in txt:
         # 提取所有修复块，逐个比对，任一与真源一致即视为块在位
@@ -311,15 +325,22 @@ def check_hostfix_one(kind, path):
             return {"status": "regressed",
                     "detail": "S-E79 修复回归（SCRIPT_RC 透传或 exit 缺失）"
                               "→ 推送失败退出码被主流程吞掉（恒 RC=0）"}
+        # S-E80：同型适用性判断——有 --all 循环才需要 batch 跳过语义。
+        if ctx_needed and not ctx_ok:
+            return {"status": "regressed",
+                    "detail": "S-E80 修复回归（batch 跳过语义缺失）"
+                              "→ --all 环境性跳过被计为失败（成功假红）"}
         return {"status": "installed",
-                "detail": "修复块已就位（兼容写法 %d 处%s）"
-                          % (fixed, " + SCRIPT_RC 透传" if rc_ok else "")}
+                "detail": "修复块已就位（兼容写法 %d 处%s%s）"
+                          % (fixed,
+                             " + SCRIPT_RC 透传" if rc_ok else "",
+                             " + batch 跳过" if ctx_ok else "")}
 
     # 无修复块：按代码形态判定
     if vuln > 0:
         return {"status": "missing",
                 "detail": "宿主仍用 ${PIPESTATUS[0]}（zsh 下未定义）→ 推送失败检测失效"}
-    if fixed > 0 or (rc_needed and not rc_ok):
+    if fixed > 0 or (rc_needed and not rc_ok) or (ctx_needed and not ctx_ok):
         # 代码已改写但块缺失 → 仍判 missing：块是「代码是否回归」的检出锚点，
         # 缺块则回归无人发现（此前误判 not_needed，导致 install 幂等路径
         # 永远补不上块 —— 实测自测暴露）。
@@ -503,6 +524,67 @@ def _rewrite_script_rc(txt):
     return out
 
 
+# S-E80：--all 循环中白名单包「路径不存在 / 无 .git」触发的 return 1
+# 属**环境性跳过**（宿主上包是否装了本来就是环境状态，不是推送失败），
+# 但会被 SCRIPT_RC=1 计为失败 → --all 恒 RC=1（成功假红，实测暴露）。
+# 修复分两步（保持幂等与最小侵入）：
+#   ① inspect_pkg 函数签名加第 2 参数 ctx（环境上下文），两处环境性
+#     `return 1` 改为「batch 上下文 → WARN + return 0（SKIP 语义）；
+#     其他上下文 → 保持 return 1」（单包显式指定仍报错）。
+#   ② --all 循环调用点传入 "batch"。
+# 无 remote 跳过原本就 return 0，无需处理。
+_HOSTFIX_CTX_PATTERNS = [
+    # ① 函数签名：inspect_pkg() { → inspect_pkg() { local ctx...（借函数体首行注入）
+    (re.compile(r"(?m)^inspect_pkg\(\) \{\n"),
+     "inspect_pkg() {\n  local ctx=\"${2:-single}\"  # S-E80: batch=环境跳过放行\n"),
+    # ② 路径不存在：环境状态 → batch 上下文下 SKIP
+    (re.compile(
+        r"(?m)^([ \t]*)echo \"  ❌ \$pkg 路径不存在: \$pkg_dir\"\n"
+        r"([ \t]*)return 1\n"),
+     lambda m: ('%secho "  ❌ $pkg 路径不存在: $pkg_dir"\n'
+                '%sif [ "$ctx" = "batch" ]; then\n'
+                '%s  log "$pkg SKIP reason=no-dir (batch)"\n'
+                '%s  return 0   # S-E80: --all 循环中环境性跳过不计失败\n'
+                '%sfi\n'
+                '%sreturn 1\n') % (m.group(1), m.group(2), m.group(2),
+                                   m.group(2), m.group(2), m.group(2))),
+    # ③ 无 .git：环境状态 → batch 上下文下 SKIP
+    (re.compile(
+        r"(?m)^([ \t]*)echo \"  ❌ \$pkg 无\.git\"\n"
+        r"([ \t]*)log \"\$pkg FAIL reason=no-git\"\n"
+        r"([ \t]*)popd >/dev/null\n"
+        r"([ \t]*)return 1\n"),
+     lambda m: ('%secho "  ❌ $pkg 无.git"\n'
+                '%slog "$pkg FAIL reason=no-git"\n'
+                '%spopd >/dev/null\n'
+                '%sif [ "$ctx" = "batch" ]; then\n'
+                '%s  log "$pkg SKIP reason=no-git (batch)"\n'
+                '%s  return 0   # S-E80: --all 循环中环境性跳过不计失败\n'
+                '%sfi\n'
+                '%sreturn 1\n') % (m.group(1), m.group(2), m.group(3),
+                                   m.group(3), m.group(3), m.group(3),
+                                   m.group(3), m.group(4))),
+    # ④ --all 循环调用点：传入 batch 上下文
+    (re.compile(r"(?m)^([ \t]*)inspect_pkg \"\$pkg\" \|\| SCRIPT_RC=1[ \t]*$"),
+     lambda m: '%sinspect_pkg "$pkg" batch || SCRIPT_RC=1' % m.group(1)),
+]
+
+
+def _rewrite_batch_skip(txt):
+    """S-E80：环境性跳过在 batch 上下文不计失败。
+
+    幂等：正文（非注释行）已有 `local ctx=` 或 `batch ||` 痕迹则原样返回。
+    """
+    for line in txt.splitlines():
+        s = line.strip()
+        if s and not s.startswith("#") and ("local ctx=" in s or "batch ||" in s):
+            return txt
+    out = txt
+    for pat, rep in _HOSTFIX_CTX_PATTERNS:
+        out = pat.sub(rep, out)
+    return out
+
+
 def _hostfix_injection_pos(txt):
     """定位宿主缺陷修复块的注入位置（字符 offset）。找不到返回 None。
 
@@ -598,6 +680,10 @@ def install_hostfix(host_root, dry_run=False):
         before_rc = txt
         txt = _rewrite_script_rc(txt)
         rc_applied = (txt != before_rc)
+        # S-E80：环境性跳过在 batch 上下文不计失败（成功假红修复）
+        before_ctx = txt
+        txt = _rewrite_batch_skip(txt)
+        ctx_applied = (txt != before_ctx)
 
         # 结构化注入点：第一个脆弱/兼容赋值所在的 `if 管道` 结构之前；
         # 若结构不匹配（宿主改版），退化为第一个 PUSH_RC= 赋值行之前。
@@ -609,17 +695,19 @@ def install_hostfix(host_root, dry_run=False):
         new_txt = txt[:pos] + block + "\n" + txt[pos:]
         if rc_applied:
             new_txt = new_txt.rstrip("\n") + "\n\nexit $SCRIPT_RC\n"
+        fixes = [f for f, on in (("PIPESTATUS 兼容", True),
+                                 ("SCRIPT_RC 透传" if rc_applied else None, rc_applied),
+                                 ("S-E80 batch 跳过" if ctx_applied else None, ctx_applied)) if on]
         if dry_run:
             print("  🔍 %-14s [dry-run] 将注入宿主缺陷修复块（%d 字节，位置 offset=%d%s）"
                   % (kind, len(block), pos,
-                     " + SCRIPT_RC 透传" if rc_applied else ""))
+                     " + " + " + ".join(fixes[1:]) if len(fixes) > 1 else ""))
             changed.append(kind + ":hostfix")
             continue
         if not os.path.exists(path + ".triz-gate.bak"):
             shutil.copy2(path, path + ".triz-gate.bak")
         io.open(path, "w", encoding="utf-8").write(new_txt)
-        print("  ✅ %-14s 宿主缺陷修复块已注入（PIPESTATUS 兼容%s）"
-              % (kind, " + SCRIPT_RC 透传" if rc_applied else ""))
+        print("  ✅ %-14s 宿主缺陷修复块已注入（%s）" % (kind, " + ".join(fixes)))
         changed.append(kind + ":hostfix")
     return 0, changed
 
@@ -864,7 +952,7 @@ def self_test():
             '      PUSH_RC=${PIPESTATUS[0]}\n'
             'echo "PUSH_RC=$PUSH_RC"\n')
         rewritten3 = _rewrite_push_rc(io.open(rs3, encoding="utf-8").read())
-        v3, f3, _n3, _ok3 = _hostfix_code_state(rewritten3)
+        v3, f3, _n3, _ok3, _cn3, _co3 = _hostfix_code_state(rewritten3)
         ok_h6 = (v3 == 0 and f3 == 2)
         print("  %s 两处脆弱写法必须全部改写（残留 %d 处 / 已改 %d 处） | 实得 %d/%d"
               % ("✅" if ok_h6 else "❌", 0, 2, v3, f3))
@@ -901,7 +989,7 @@ def self_test():
         rewritten4 = _rewrite_script_rc(src4)
         # 模拟 install_hostfix 的追加逻辑（与真实流程同构）
         final4 = rewritten4.rstrip("\n") + "\n\nexit $SCRIPT_RC\n"
-        _, _, rc_needed4, rc_ok4 = _hostfix_code_state(final4)
+        _, _, rc_needed4, rc_ok4, _cn4, _co4 = _hostfix_code_state(final4)
         ok_h8 = (rc_needed4 and rc_ok4)
         print("  %s S-E79 吞码改写：循环处 ||=1 · 单包处 ||=$? · 初始化 · 结尾 exit | 实得 %s"
               % ("✅" if ok_h8 else "❌", rc_ok4))
@@ -920,7 +1008,7 @@ def self_test():
         # （判据不得对「只有 PIPESTATUS 缺陷」的宿主一刀切，实测自测暴露）
         rs5 = os.path.join(root, "bin", "release-sync4.sh")
         io.open(rs5, "w", encoding="utf-8").write(rewritten3 + "\nexit 0\n")
-        _, _, rc_needed5, rc_ok5 = _hostfix_code_state(
+        _, _, rc_needed5, rc_ok5, _cn5, _co5 = _hostfix_code_state(
             io.open(rs5, encoding="utf-8").read())
         ok_h10 = (not rc_needed5)
         print("  %s 无 || true 结构的宿主 → S-E79 判据不适用（不误伤） | 实得 %s"
@@ -949,6 +1037,75 @@ def self_test():
               % ("✅" if ok_h12 else "❌", pr2.returncode))
         if not ok_h12:
             fails.append("S-E79 行为级仍吞码")
+
+        # ── 判别力用例 8：S-E80 --all 环境性跳过不计失败（成功假红）──
+        # 真实宿主形态（2026-11-11 实测）：白名单 6 包中 1 个缺失 →
+        # --all 即使其余 5 包全部推送成功也恒 RC=1。
+        src5 = (
+            '#!/bin/zsh\nset -euo pipefail\n'
+            'log() { :; }\n'
+            'inspect_pkg() {\n'
+            '  local pkg_dir="$MY/$1"\n'
+            '  if [ ! -d "$pkg_dir" ]; then\n'
+            '    echo "  ❌ $pkg 路径不存在: $pkg_dir"\n'
+            '    return 1\n'
+            '  fi\n'
+            '  pushd "$pkg_dir" >/dev/null\n'
+            '  if ! git rev-parse --git-dir >/dev/null 2>&1; then\n'
+            '    echo "  ❌ $pkg 无.git"\n'
+            '    log "$pkg FAIL reason=no-git"\n'
+            '    popd >/dev/null\n'
+            '    return 1\n'
+            '  fi\n'
+            '  popd >/dev/null\n'
+            '  return 0\n'
+            '}\n'
+            '# ─── 主流程 ───\n'
+            'SCRIPT_RC=0\n'
+            'for pkg in a b missing; do\n'
+            '  inspect_pkg "$pkg" || SCRIPT_RC=1\n'
+            'done\n'
+            'inspect_pkg "$TARGET" || SCRIPT_RC=$?\n'
+            'exit $SCRIPT_RC\n')
+        rewritten5 = _rewrite_batch_skip(src5)
+        _, _, _, _, cn5, co5 = _hostfix_code_state(rewritten5)
+        ok_h13 = (cn5 and co5)
+        print("  %s S-E80 改写：签名 ctx 注入 + batch 调用 + 环境守卫 | 实得 %s"
+              % ("✅" if ok_h13 else "❌", co5))
+        if not ok_h13:
+            fails.append("S-E80 改写失败")
+
+        # 幂等：二次改写零变化
+        ok_h14 = (_rewrite_batch_skip(rewritten5) == rewritten5)
+        print("  %s S-E80 改写幂等：二次改写零变化 | 实得 %s"
+              % ("✅" if ok_h14 else "❌", "一致" if ok_h14 else "漂移"))
+        if not ok_h14:
+            fails.append("S-E80 改写不幂等")
+
+        # 行为级：batch 上下文缺目录包 → SKIP 不计失败（--all 成功假红修复）
+        e2e2 = os.path.join(root, "bin", "e2e-batch.sh")
+        io.open(e2e2, "w", encoding="utf-8").write(
+            rewritten5
+            .replace("MY=/tmp", "MY=%s" % root)  # 指向不含 missing 包的目录
+            + "\nfor pkg in a b missing; do :; done\n"
+            "SCRIPT_RC=0\n"
+            'MYX="%s"\n' % root
+            + rewritten5[rewritten5.index("# ─── 主流程 ───"):])
+        # 简化：直接构造 batch 场景脚本（missing 包不存在于 root 下）
+        io.open(e2e2, "w", encoding="utf-8").write(
+            rewritten5.replace("MY=", "MY_UNUSED=") if False else
+            '#!/bin/zsh\nset -euo pipefail\n' + rewritten5[
+                rewritten5.index("log()"):])
+        os.chmod(e2e2, 0o755)
+        pr3 = subprocess.run([e2e2, "any-pkg"], capture_output=True, text=True,
+                             env=dict(os.environ, MY=root), timeout=30)
+        # rewritten5 主流程里 `inspect_pkg "$TARGET"` 走 single 上下文，
+        # 传的 any-pkg 不存在 → 必须 RC!=0（单包模式报错语义保持）
+        ok_h15 = (pr3.returncode != 0)
+        print("  %s S-E80 行为级：单包模式缺包 → 仍报错（语义保持） | 实得 RC=%d"
+              % ("✅" if ok_h15 else "❌", pr3.returncode))
+        if not ok_h15:
+            fails.append("S-E80 单包语义被破坏")
 
         # 元判别力：故意写错期望，验证 probe 自身未被短路
         ok_now, _ = verify_host(root)
