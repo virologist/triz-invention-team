@@ -133,6 +133,10 @@ BLOCK_HOSTFIX_RELEASE_SYNC = """{begin}
   # （小写、1 起索引）；② zsh 的 pipestatus 在 if 之后已被重置 → 只换变量名
   # 修不好，必须改取值位置；③ 最终用 `if 管道; then RC=0; else RC=$?; fi`，
   # 不依赖 shell 特有数组，zsh / bash 通用（配合宿主 set -o pipefail）。
+  # 追加修复（S-E79 · 主流程吞掉 inspect_pkg 的失败退出码）：
+  # inspect_pkg 在推送失败时 return 1，但主流程调用写成 `inspect_pkg ... || true`
+  # → 失败信号在调用点被丢弃，脚本无论推送成败恒以 RC=0 收场（端到端实测）。
+  # 改为 SCRIPT_RC 透传：循环处 ||=1、单包处 ||=$?，结尾 exit $SCRIPT_RC。
   # 本块由 scripts/install_gate_hooks.py 自动注入，请勿手工编辑；
   # 若手工回滚下方代码，本块会成为「代码已回归」的检出锚点。
 {end}
@@ -237,10 +241,33 @@ def _hostfix_code_state(txt):
     只认**赋值语句行**，不认注释行 —— 宿主注释里出现 PIPESTATUS[0]
     是历史说明（含在修复块的说明文字里），不是可执行缺陷。
     按子串匹配会把注释误判为缺陷（实测自测暴露的误报来源）。
+
+    返回 (vuln, fixed, rc_needed, rc_ok)：
+      vuln     —— 脆弱赋值（PUSH_RC=${PIPESTATUS[0]}）处数
+      fixed    —— 兼容赋值（PUSH_RC=$_triz_push_rc）处数
+      rc_needed —— S-E79 判据是否适用（宿主含 `|| true` 脆弱调用，
+                   或已有 SCRIPT_RC 改写痕迹）；两皆无 → False（不适用，
+                   不纳入判定，否则会误伤「只有 PIPESTATUS 缺陷」的宿主）
+      rc_ok    —— S-E79 修复形态是否完整（透传 + 初始化 + 结尾 exit）
     """
     vuln = len(re.findall(r"(?m)^[ \t]*PUSH_RC=.*\$\{PIPESTATUS\[0\]\}", txt))
     fixed = len(re.findall(r"(?m)^[ \t]*PUSH_RC=\$_triz_push_rc", txt))
-    return vuln, fixed
+    rc_vuln = len(_HOSTFIX_RC_PATTERNS[0][0].findall(txt)) + \
+        len(_HOSTFIX_RC_PATTERNS[1][0].findall(txt))
+    has_rc_code = False
+    for line in txt.splitlines():
+        s = line.strip()
+        if s and not s.startswith("#") and "SCRIPT_RC" in s:
+            has_rc_code = True
+            break
+    rc_needed = (rc_vuln > 0) or has_rc_code
+    rc_ok = (
+        bool(re.search(r"(?m)^[ \t]*inspect_pkg \"\$pkg\" \|\| SCRIPT_RC=1", txt))
+        and bool(re.search(
+            r"(?m)^[ \t]*inspect_pkg \"\$TARGET\" \|\| SCRIPT_RC=\$\?", txt))
+        and bool(re.search(r"(?m)^exit \$SCRIPT_RC[ \t]*$", txt))
+    )
+    return vuln, fixed, rc_needed, rc_ok
 
 
 def check_hostfix_one(kind, path):
@@ -258,7 +285,7 @@ def check_hostfix_one(kind, path):
         return {"status": "missing", "detail": "宿主文件不存在"}
     txt = io.open(path, encoding="utf-8").read()
     expected = HOSTFIX_BLOCKS[kind]
-    vuln, fixed = _hostfix_code_state(txt)
+    vuln, fixed, rc_needed, rc_ok = _hostfix_code_state(txt)
 
     if MARK_BEGIN_FIX in txt and MARK_END_FIX in txt:
         # 提取所有修复块，逐个比对，任一与真源一致即视为块在位
@@ -278,19 +305,26 @@ def check_hostfix_one(kind, path):
         if fixed == 0:
             return {"status": "regressed",
                     "detail": "修复块在位但兼容写法已消失 → 推送失败检测失效"}
+        # S-E79：仅当宿主确有 `|| true` 脆弱调用（或已有改写痕迹）时才判定。
+        # 一刀切会误伤「只有 PIPESTATUS 缺陷」的宿主形态（实测自测暴露）。
+        if rc_needed and not rc_ok:
+            return {"status": "regressed",
+                    "detail": "S-E79 修复回归（SCRIPT_RC 透传或 exit 缺失）"
+                              "→ 推送失败退出码被主流程吞掉（恒 RC=0）"}
         return {"status": "installed",
-                "detail": "修复块已就位（兼容写法 %d 处）" % fixed}
+                "detail": "修复块已就位（兼容写法 %d 处%s）"
+                          % (fixed, " + SCRIPT_RC 透传" if rc_ok else "")}
 
     # 无修复块：按代码形态判定
     if vuln > 0:
         return {"status": "missing",
                 "detail": "宿主仍用 ${PIPESTATUS[0]}（zsh 下未定义）→ 推送失败检测失效"}
-    if fixed > 0:
+    if fixed > 0 or (rc_needed and not rc_ok):
         # 代码已改写但块缺失 → 仍判 missing：块是「代码是否回归」的检出锚点，
         # 缺块则回归无人发现（此前误判 not_needed，导致 install 幂等路径
         # 永远补不上块 —— 实测自测暴露）。
         return {"status": "missing",
-                "detail": "兼容写法已就位但修复块缺失（缺回归检出锚点）"}
+                "detail": "修复形态不完整或修复块缺失（缺回归检出锚点）"}
     return {"status": "not_needed", "detail": "宿主文件无该缺陷"}
 
 
@@ -431,6 +465,44 @@ def _rewrite_push_rc(txt):
     return pat.sub(_rep, txt)
 
 
+# S-E79：主流程 `inspect_pkg ... || true` 吞掉失败退出码。
+# 改写规则（按行替换，两条形态）：
+#   `  inspect_pkg "$pkg" || true`     → `  inspect_pkg "$pkg" || SCRIPT_RC=1`
+#   `  inspect_pkg "$TARGET" || true`  → `  inspect_pkg "$TARGET" || SCRIPT_RC=$?`
+# 为什么两处不同：--all 循环要求**一个包失败不影响其余包遍历**，
+#   故只记 1（最终退出码非零即可）；单包模式则透传真实退出码，
+#   让调用方能区分失败类型（如 1=推送失败 / 2=用法错）。
+# 幂等：SCRIPT_RC 已出现在主流程（非注释行）则整体跳过。
+# SCRIPT_RC 需在主流程前初始化（SCRIPT_RC=0），否则 set -u 下未定义中止。
+_HOSTFIX_RC_PATTERNS = [
+    (re.compile(r"(?m)^([ \t]*)inspect_pkg \"\$pkg\" \|\| true[ \t]*$"),
+     lambda m: '%sinspect_pkg "$pkg" || SCRIPT_RC=1' % m.group(1)),
+    (re.compile(r"(?m)^([ \t]*)inspect_pkg \"\$TARGET\" \|\| true[ \t]*$"),
+     lambda m: '%sinspect_pkg "$TARGET" || SCRIPT_RC=$?' % m.group(1)),
+]
+
+
+def _rewrite_script_rc(txt):
+    """把主流程的 `inspect_pkg ... || true` 改写为 SCRIPT_RC 透传。
+
+    幂等：正文（非注释行）已有 `SCRIPT_RC=` 赋值或引用则原样返回。
+    注释行不受影响（修复块的说明注释里会出现 SCRIPT_RC 字样）。
+    """
+    for line in txt.splitlines():
+        s = line.strip()
+        if s and not s.startswith("#") and "SCRIPT_RC" in s:
+            return txt
+    out = txt
+    for pat, rep in _HOSTFIX_RC_PATTERNS:
+        out = pat.sub(rep, out)
+    # 在主流程标记前初始化 SCRIPT_RC（set -u 下未定义会中止）
+    init = "SCRIPT_RC=0\n"
+    anchor = "# ─── 主流程 ───"
+    if anchor in out and init not in out:
+        out = out.replace(anchor, anchor + "\n" + init, 1)
+    return out
+
+
 def _hostfix_injection_pos(txt):
     """定位宿主缺陷修复块的注入位置（字符 offset）。找不到返回 None。
 
@@ -517,6 +589,16 @@ def install_hostfix(host_root, dry_run=False):
         # 必须一次全改 —— re.sub 默认替换全部匹配。
         txt = _rewrite_push_rc(txt)
 
+        # S-E79：主流程 `|| true` 吞掉 inspect_pkg 的失败退出码 →
+        # 脚本无论推送成败恒以 RC=0 收场（端到端实测暴露）。
+        # 同轮修复：改写调用点 + 结尾 exit $SCRIPT_RC。
+        # 改写器内部幂等；是否追加 exit 由「真的匹配到 || true 结构」决定
+        # —— 对没有该结构的宿主盲目追加，会在 set -u 下引用未初始化的
+        # SCRIPT_RC 反而破坏脚本（实测自测暴露）。
+        before_rc = txt
+        txt = _rewrite_script_rc(txt)
+        rc_applied = (txt != before_rc)
+
         # 结构化注入点：第一个脆弱/兼容赋值所在的 `if 管道` 结构之前；
         # 若结构不匹配（宿主改版），退化为第一个 PUSH_RC= 赋值行之前。
         pos = _hostfix_injection_pos(txt)
@@ -525,15 +607,19 @@ def install_hostfix(host_root, dry_run=False):
             continue
 
         new_txt = txt[:pos] + block + "\n" + txt[pos:]
+        if rc_applied:
+            new_txt = new_txt.rstrip("\n") + "\n\nexit $SCRIPT_RC\n"
         if dry_run:
-            print("  🔍 %-14s [dry-run] 将注入宿主缺陷修复块（%d 字节，位置 offset=%d）"
-                  % (kind, len(block), pos))
+            print("  🔍 %-14s [dry-run] 将注入宿主缺陷修复块（%d 字节，位置 offset=%d%s）"
+                  % (kind, len(block), pos,
+                     " + SCRIPT_RC 透传" if rc_applied else ""))
             changed.append(kind + ":hostfix")
             continue
         if not os.path.exists(path + ".triz-gate.bak"):
             shutil.copy2(path, path + ".triz-gate.bak")
         io.open(path, "w", encoding="utf-8").write(new_txt)
-        print("  ✅ %-14s 宿主缺陷修复块已注入（PIPESTATUS → zsh/bash 兼容）" % kind)
+        print("  ✅ %-14s 宿主缺陷修复块已注入（PIPESTATUS 兼容%s）"
+              % (kind, " + SCRIPT_RC 透传" if rc_applied else ""))
         changed.append(kind + ":hostfix")
     return 0, changed
 
@@ -778,7 +864,7 @@ def self_test():
             '      PUSH_RC=${PIPESTATUS[0]}\n'
             'echo "PUSH_RC=$PUSH_RC"\n')
         rewritten3 = _rewrite_push_rc(io.open(rs3, encoding="utf-8").read())
-        v3, f3 = _hostfix_code_state(rewritten3)
+        v3, f3, _n3, _ok3 = _hostfix_code_state(rewritten3)
         ok_h6 = (v3 == 0 and f3 == 2)
         print("  %s 两处脆弱写法必须全部改写（残留 %d 处 / 已改 %d 处） | 实得 %d/%d"
               % ("✅" if ok_h6 else "❌", 0, 2, v3, f3))
@@ -792,6 +878,77 @@ def self_test():
               % ("✅" if ok_h7 else "❌", "残留" if stale else "已清理"))
         if not ok_h7:
             fails.append("过时注释残留")
+
+        # ── 判别力用例 7：S-E79 主流程吞码改写（端到端实测暴露）──────
+        # 真实宿主形态：主流程两处 `inspect_pkg ... || true` + 结尾无 exit。
+        # 改写后：循环处 ||=1、单包处 ||=$?；exit 由 install 流程追加
+        # （改写器只负责调用点与初始化，exit 追加的前提 = 真的匹配到结构）。
+        rs4 = os.path.join(root, "bin", "release-sync3.sh")
+        io.open(rs4, "w", encoding="utf-8").write(
+            '#!/bin/zsh\nset -euo pipefail\n'
+            'inspect_pkg_all() {\n'
+            '  for pkg in a b; do\n'
+            '    inspect_pkg "$pkg" || true\n'
+            '  done\n'
+            '}\n'
+            '# ─── 主流程 ───\n'
+            'if [ $TARGET_ALL -eq 1 ]; then\n'
+            '  inspect_pkg "$pkg" || true\n'
+            'elif [ -n "$TARGET" ]; then\n'
+            '  inspect_pkg "$TARGET" || true\n'
+            'fi\n')
+        src4 = io.open(rs4, encoding="utf-8").read()
+        rewritten4 = _rewrite_script_rc(src4)
+        # 模拟 install_hostfix 的追加逻辑（与真实流程同构）
+        final4 = rewritten4.rstrip("\n") + "\n\nexit $SCRIPT_RC\n"
+        _, _, rc_needed4, rc_ok4 = _hostfix_code_state(final4)
+        ok_h8 = (rc_needed4 and rc_ok4)
+        print("  %s S-E79 吞码改写：循环处 ||=1 · 单包处 ||=$? · 初始化 · 结尾 exit | 实得 %s"
+              % ("✅" if ok_h8 else "❌", rc_ok4))
+        if not ok_h8:
+            fails.append("S-E79 吞码改写失败")
+
+        # 幂等：二次改写零变化
+        rewritten4b = _rewrite_script_rc(rewritten4)
+        ok_h9 = (rewritten4b == rewritten4)
+        print("  %s S-E79 改写幂等：二次改写零变化 | 实得 %s"
+              % ("✅" if ok_h9 else "❌", "一致" if ok_h9 else "漂移"))
+        if not ok_h9:
+            fails.append("S-E79 改写不幂等")
+
+        # 不适用场景判别力：无 `|| true` 结构的宿主 → rc_needed 必须 False
+        # （判据不得对「只有 PIPESTATUS 缺陷」的宿主一刀切，实测自测暴露）
+        rs5 = os.path.join(root, "bin", "release-sync4.sh")
+        io.open(rs5, "w", encoding="utf-8").write(rewritten3 + "\nexit 0\n")
+        _, _, rc_needed5, rc_ok5 = _hostfix_code_state(
+            io.open(rs5, encoding="utf-8").read())
+        ok_h10 = (not rc_needed5)
+        print("  %s 无 || true 结构的宿主 → S-E79 判据不适用（不误伤） | 实得 %s"
+              % ("✅" if ok_h10 else "❌", rc_needed5))
+        if not ok_h10:
+            fails.append("S-E79 判据误伤不适用场景")
+
+        # 判据判别力：`|| true` 在位但未改写 → 必须判 missing（需修复）
+        st_rc = check_hostfix_one("release-sync", rs4)
+        ok_h11 = (st_rc["status"] == "missing")
+        print("  %s 含 || true 脆弱调用未改写 → 判缺失（需 install） | 实得 %s"
+              % ("✅" if ok_h11 else "❌", st_rc["status"]))
+        if not ok_h11:
+            fails.append("S-E79 缺失未检出")
+
+        # 行为级端到端：模拟宿主「推送失败 → 脚本退出码」——
+        # SCRIPT_RC 透传后，单包模式下 inspect_pkg 失败必须让脚本以非零退出。
+        e2e = os.path.join(root, "bin", "e2e-rc.sh")
+        io.open(e2e, "w", encoding="utf-8").write(
+            '#!/bin/zsh\nset -euo pipefail\n'
+            'inspect_pkg() { return 1; }\n' + final4)
+        os.chmod(e2e, 0o755)
+        pr2 = subprocess.run([e2e, "x"], capture_output=True, text=True, timeout=30)
+        ok_h12 = (pr2.returncode != 0)
+        print("  %s S-E79 行为级：inspect_pkg 失败 → 脚本非零退出 | 实得 RC=%d"
+              % ("✅" if ok_h12 else "❌", pr2.returncode))
+        if not ok_h12:
+            fails.append("S-E79 行为级仍吞码")
 
         # 元判别力：故意写错期望，验证 probe 自身未被短路
         ok_now, _ = verify_host(root)

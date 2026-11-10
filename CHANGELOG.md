@@ -2,6 +2,57 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] - 2026-11-11
+
+> **CYCLE-1 · 第 9 轮（端到端验证轮）**。
+> v2.13.0 的 CHANGELOG 明确登记了「尚未验证：真实 git push 失败场景的端到端验证」。
+> 本轮把它做掉——方法：沙箱 bare 远端 + pre-receive 策略性拒收钩子模拟远端拒绝，
+> 宿主脚本仅替换 `MY_EXPERTS`/`LOG` 两行指向沙箱（其余逐字节一致），在真实
+> zsh + `set -euo pipefail` 下跑完整流程。**端到端实测暴露了一个新缺陷**：
+> S-E76 的修复在函数内正确判定失败，但失败信号在主流程调用点被丢弃。
+
+### P0
+- **S-E79 主流程吞掉 `inspect_pkg` 的失败退出码（恒 RC=0 假绿）**：
+  端到端实测（v2.13.0 修复后宿主 + 拒收远端）：`inspect_pkg` 内部正确返回 1、
+  输出正确报「❌ 推送失败（git push exit 1）」、日志正确留痕 `PUSH FAILED rc=1`
+  ——但脚本**最终退出码是 0**。根因：主流程两处调用写作
+  `inspect_pkg "$pkg" || true` / `inspect_pkg "$TARGET" || true`，
+  失败信号在调用点被丢弃。这是 S-E76 的同型缺陷：S-E76 修了「函数内判定」，
+  本条是「函数外传播」断链——调用方（AI 会话/上层脚本）看 RC=0 仍会误判成功。
+  修复（SCRIPT_RC 透传，版本化进 `install_gate_hooks.py` 修复块）：
+  - `--all` 循环处：`inspect_pkg "$pkg" || SCRIPT_RC=1`
+    （一个包失败不影响其余包遍历，仅记非零）；
+  - 单包处：`inspect_pkg "$TARGET" || SCRIPT_RC=$?`（透传真实退出码，
+    调用方可区分失败类型）；
+  - 主流程前 `SCRIPT_RC=0` 初始化（`set -u` 下未定义会中止）；
+  - 脚本结尾新增 `exit $SCRIPT_RC`。
+  **端到端复验（双分支）**：拒收远端 → 最终 **RC=1** ✅（修复前 RC=0）；
+  恢复正常远端 → `✅ 已推送` + 最终 **RC=0** ✅（成功分支零回归）。
+  日志留痕：失败 `PUSH FAILED rc=1` / 成功 `PUSH ok new=<sha>`。
+  `zsh -n` / `bash -n` 双语法通过。真实宿主已安装。
+
+### 判别力扩容
+- `install_gate_hooks.py --self-test` **13 项 → 18 项**（新增 5 项 S-E79 判别力）：
+  吞码改写形态 · 改写幂等 · 「无 `|| true` 结构不误伤」（判据适用性双向断言）·
+  「含 `|| true` 未改写判缺失」 · 行为级端到端（`inspect_pkg` 失败 → 脚本非零退出）。
+- 判据层 `_hostfix_code_state` 扩为四元组 `(vuln, fixed, rc_needed, rc_ok)`：
+  `rc_needed` 区分 S-E79 判据是否适用——一刀切会误伤「只有 PIPESTATUS 缺陷」
+  的宿主形态（实测自测暴露后修正）。
+
+### 验证（全量闭环）
+- `self_gate.py` **17/17** · `self_gate.py --self-test` 全通过（含宿主接入自检）
+- 清单双向差集 **13/13 为空**
+- `install_gate_hooks.py --self-test` **18 项全通过**
+- `harness.py --self-test` 8 项 · `version_consistency.py` 5 版本位一致（2.14.0）
+- 三用例回归**零回退**（`--no-report-write` 保持基线零污染）：
+  a01 **7/7** · b01 **7/8 + 1 INFO** · c01 **8/8**
+- 端到端双分支：失败 **RC=1** / 成功 **RC=0** · `zsh -n` + `bash -n` 双语法通过
+
+### 尚未验证（明确不宣称）
+- GitHub 真实远端（HTTPS + OAuth App）的拒绝行为与沙箱 pre-receive 拒收
+  不完全同构（真实拒绝发生在远端 API 层，但 git 客户端退出码语义相同）；
+  本轮已用与 git 协议一致的退出码路径覆盖，风险残余极低。
+
 ## [2.13.0] - 2026-11-11
 
 > **CYCLE-1 · 第 8 轮（宿主缺陷复核轮）**。
