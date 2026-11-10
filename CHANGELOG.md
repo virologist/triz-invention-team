@@ -2,6 +2,70 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0] - 2026-11-11
+
+> **CYCLE-1 · 第 8 轮（宿主缺陷复核轮）**。
+> 上一轮（2.12.0）清偿了版本漂移与退出码假绿。本轮把 **S-E76 的修复真正落到
+> 真实宿主**（`~/.workbuddy/bin/release-sync.sh`），并在落地过程中实测暴露
+> **修复器自身 4 个缺陷**——其中一个是判据假绿：修复块在位就判通过，
+> 即使代码已被人工回滚。全部当场清偿。
+
+### P0
+- **S-E76 宿主 `release-sync.sh` 推送失败检测整段失效（假绿）**：
+  宿主 shebang 为 **zsh**，却用 **bash 数组**语法 `PUSH_RC=${PIPESTATUS[0]}`；
+  宿主顶部 `set -euo pipefail` → `${PIPESTATUS[0]}` 触发
+  「parameter not set」→ 脚本在**判断推送结果之前**就中止。
+  后果：git push 明确失败（如 OAuth App 缺 workflow scope）时，
+  「推送失败检测」整段永不执行，脚本仍以退出码 0 收场，
+  台账会记「已推送」而实际没推上去——**比缺功能更危险**。
+  修复：`if 管道; then RC=0; else RC=$?; fi`——在 if **内部**捕获退出码，
+  不依赖任何 shell 特有数组，zsh / bash 通用（配合宿主 `set -o pipefail`）。
+  实测关键事实：zsh 下换成 `${pipestatus[1]}` 在 if 之后仍取到 0
+  （zsh 的 pipestatus 在 if 条件求值后被重置），**只换变量名修不好**。
+  修复以**第二类 marker 块**（`triz-hostfix`）版本化进 `install_gate_hooks.py`，
+  与门禁块 marker 区分（两类块并存不再互相误判 drifted），换机/新 clone 可复现。
+  真实宿主已安装并复验：`hostfix:release-sync installed`（兼容写法 2 处），
+  `zsh -n` / `bash -n` 双语法通过；新旧写法对照实测——
+  旧写法 `parameter not set` 立即中止，新写法正确取到 `PUSH_RC=1` 并报失败。
+
+### P1
+- **S-E77 修复器自身 4 个缺陷（本轮实测暴露并当场清偿）**：
+  ① **判据假绿**：`check_hostfix_one` 只看 marker 块在不在就判 installed，
+     不校验代码是否被回滚 → 人工把代码改回 `${PIPESTATUS[0]}` 仍判通过。
+     新增 `regressed` 状态：块在位但代码回归 → 判失败（verify 整体失败）。
+  ② **幂等粒度过粗**：`_rewrite_push_rc` 开头「文件含 `_triz_push_rc=` 就早退」
+     → 真实宿主有**两处**推送结构，只回滚其中一处时，另一处已修好的会
+     挡住这处的修复 → re-install 无法自愈。现把幂等下沉到**正则层**
+     （逐结构判定），局部回滚可自愈。
+  ③ **锚点自毁**：注入锚点依赖注释文本，而同一轮又要改写那段注释
+     → 锚点自毁、且与措辞强耦合（换个人改写措辞就找不到 → 静默跳过）。
+     现改为**结构性定位**（回溯到脆弱赋值所属的管道 if，与措辞解耦）。
+  ④ **过时注释误导**：改写后宿主原注释仍写着「用 PIPESTATUS[0] 取退出码」
+     → 成为**过时且误导**的文档（注释错比代码错更隐蔽）。改写时同步替换。
+- **S-E78 版本门禁盲区**：v2.13.0 bump 时实测发现
+  `.claude-plugin/marketplace.json` 的 `metadata.description` 里
+  **硬编码 `(v2.11.2)`**——4 个 version 字段全对，描述文字里落后两轮。
+  说明「版本号」不止存在于 version 字段。现把描述内嵌版本号纳入
+  `version_consistency.py`（**4 位 → 5 位**），并补对应变异自测用例。
+
+### 验证（全量闭环）
+- `self_gate.py` **17/17 通过** · `self_gate.py --self-test` 全通过
+  （15 门禁清单 + 2 基线 + 2 项元判别力 + 宿主接入自检）
+- 清单双向差集 **13/13 为空**（无漏挂、无幽灵执行点）
+- `install_gate_hooks.py --self-test` **13 项全通过**
+  （新增：回归检出 · 回归后自愈 · 多处脆弱写法全改 · 过时注释清理）
+- `version_consistency.py --self-test` **5 项全通过**（新增：描述内嵌版本号漂移）
+- `harness.py --self-test` **8 项** · `boundary_guard.py --self-test` 22 用例
+- `contract_enforce.py --self-test` 变异测试通过（真实判定短路后探针失去判别力）
+- 三用例回归**零回退**：a01 **7/7** · b01 **7/8 + 1 INFO** · c01 **8/8**
+- `preflight_check.py` RC=0 · `install_gate_hooks.py --verify` → `hostfix:release-sync installed`
+- 真实宿主双语法检查：`zsh -n` ✅ / `bash -n` ✅
+- 版本一致性：**5 个版本位全部 2.13.0**
+
+### 尚未验证（明确不宣称）
+- 真实 git push 失败场景的**端到端**验证尚未在本轮执行（仅以等价的
+  zsh 管道失败片段完成对照实测）；下次实际推送前仍需观察宿主脚本的真实行为。
+
 ## [2.12.0] - 2026-11-11
 
 > **CYCLE-1 · 第 7 轮（工作系统改造后的复核轮）**。

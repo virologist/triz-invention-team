@@ -207,3 +207,69 @@
     锚点缺失拒绝安装、变异脚本直接改工作树被 SIGTERM 污染源码。
   - **本轮登记**：版本 2.11.1 → **2.11.2**；门禁汇总 14 → **15 项**；
     新增 `scripts/install_gate_hooks.py` 工具。S-E01…S-E72 共 **72 项**全部清偿。
+
+- **第7轮全面排查新增 3 条（S-E73…S-E75）· 全部清偿（v2.12.0 · 2026-11-11）**
+  （角色 = 复核，不重构只复核；起始动作 = 全量回归零回退前提下的独立排查）：
+  - **P0 S-E73 版本号三处漂移且无门禁拦截**：实测发现 `.codebuddy-plugin/
+    marketplace.json` 停在 2.10.0，另两处已 2.11.2——连续漂移两轮。
+    根因：历次 bump 漏改一个版本位 + `preflight`/`self_gate` 均无一致性判据。
+    新增 `scripts/version_consistency.py`（4 版本位必须相等，缺字段/文件缺失
+    fail loud）+ 挂进 `self_gate.GATES`（清单 15→16，汇总 16→17）+ 补工具表。
+  - **P0 S-E74 认可样例退出码假绿**：`harness.py verify --sample` 含
+    `UNVERIFIED:` 断言仍返回 RC=0，与本包「退出码 3 = 禁止宣称验证通过」的
+    契约直接冲突（真实产出未落盘却对外报通过）。改为含未验证项 → RC=3，
+    有 FAIL → RC=1，全通过 → RC=0，与 `verify --run-dir` 语义统一。
+    补 2 条自测锁死，变异 2/2 零逃逸。
+  - **P1 S-E75** 样例输出标签重复（`UNVERIFIED UNVERIFIED:`）→ 剥离正文前缀。
+  - **判别力验收**：self_gate 17/17 · 清单双向差集 13/13 为空 · harness 自测
+    8 项 · version_consistency 自测 4 项全通过 · 变异 2/2 零逃逸 ·
+    三用例零回退（a01 7/7 · b01 7/8+1INFO · c01 8/8）· benchmark 1.000。
+  - **本轮登记**：版本 2.11.2 → **2.12.0**；门禁汇总 16 → **17 项**；
+    新增 `scripts/version_consistency.py` 工具。
+
+- **第8轮宿主缺陷复核新增 2 条（S-E76…S-E77）· 全部清偿（v2.13.0 · 2026-11-11）**
+  （起始动作 = 把 S-E76 的修复真正落到真实宿主；复核中发现修复器自身 4 个缺陷）：
+  - **P0 S-E76 宿主 `release-sync.sh` 推送失败检测整段失效（假绿）**：
+    宿主 shebang 为 **zsh**，却用 **bash 数组**语法 `PUSH_RC=${PIPESTATUS[0]}`；
+    宿主顶部 `set -euo pipefail` → `${PIPESTATUS[0]}` 触发
+    「parameter not set」→ 脚本在**判断推送结果之前**就中止 ⇒
+    git push 明确失败（如 OAuth App 缺 workflow scope）时，
+    「推送失败检测」整段永不执行，脚本仍以退出码 0 收场，
+    台账会记「已推送」而实际没推上去。**比缺功能更危险**。
+    实测对照（旧写法 vs 新写法）：旧写法 `parameter not set` 立即中止；
+    新写法正确取到 `PUSH_RC=1` 并报失败。
+    修复方式：`if 管道; then RC=0; else RC=$?; fi`——在 if **内部**捕获退出码，
+    不依赖任何 shell 特有数组，zsh / bash 通用（配合宿主 `set -o pipefail`）。
+    实测关键事实：zsh 下换成 `${pipestatus[1]}` 在 if 之后仍取到 0
+    （zsh 的 pipestatus 在 if 条件求值后被重置），**只换变量名修不好**。
+    修复以**第二类 marker 块**（`triz-hostfix`）版本化进 `install_gate_hooks.py`，
+    与门禁块 marker 区分（两类块并存时不再互相误判 drifted），
+    换机/新 clone 可复现。真实宿主已安装并复验：`hostfix:release-sync installed`
+    （兼容写法 2 处），`zsh -n` / `bash -n` 双语法通过。
+  - **P1 S-E77 修复器自身 4 个缺陷（本轮实测暴露并当场清偿）**：
+    ① **判据假绿**：`check_hostfix_one` 只要看到 marker 块就判 installed，
+    **不校验代码是否被回滚** → 人工把代码改回 `${PIPESTATUS[0]}` 仍判通过。
+    现新增 `regressed` 状态：块在位但代码回归 → 判失败（verify 整体失败）。
+    ② **幂等粒度过粗**：`_rewrite_push_rc` 开头「文件含 `_triz_push_rc=` 就早退」
+    → 真实宿主有**两处**推送结构，只回滚其中一处时，
+    另一处已修好的会挡住这处的修复 → re-install 无法自愈。
+    现把幂等下沉到**正则层**（逐结构判定），局部回滚可自愈。
+    ③ **锚点自毁**：注入锚点依赖注释文本，而同一轮又要改写那段注释
+    → 锚点自毁、且与措辞强耦合。现改为**结构性定位**
+    （回溯到脆弱赋值所属的管道 if，与注释措辞解耦）。
+    ④ **过时注释误导**：改写后宿主原注释仍写着「用 PIPESTATUS[0] 取退出码」
+    → 改写后成为**过时且误导**的文档（注释错比代码错更隐蔽）。
+    改写时同步替换该注释。
+  - **P1 S-E78 版本门禁盲区**：v2.13.0 bump 时实测发现
+    `.claude-plugin/marketplace.json` 的 `metadata.description` 里
+    **硬编码 `(v2.11.2)`**——4 个 version 字段全对，描述文字里落后两轮。
+    说明「版本号」不止存在于 version 字段。现把描述内嵌版本号纳入
+    `version_consistency.py`（4 位 → **5 位**），并补对应变异自测用例。
+  - **判别力验收**：self_gate 17/17 · 清单双向差集 13/13 为空 ·
+    install_gate_hooks 自测 **13 项全通过**（新增：回归检出 · 回归后自愈 ·
+    多处脆弱写法全改 · 过时注释清理）· version_consistency 自测 **5 项**
+    （新增：描述内嵌版本号漂移）· harness 自测 8 项 · boundary_guard 22 用例 ·
+    三用例零回退（a01 7/7 · b01 7/8+1INFO · c01 8/8）· preflight RC=0。
+  - **本轮登记**：版本 2.12.0 → **2.13.0**；
+    `install_gate_hooks.py` 新增**宿主缺陷修复块**机制（第二类 marker）；
+    `version_consistency.py` 4 位 → 5 位。S-E01…S-E78 共 **78 项**全部清偿。
