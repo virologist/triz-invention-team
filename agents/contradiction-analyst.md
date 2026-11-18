@@ -8,7 +8,7 @@ displayName:
 profession:
   en: "TRIZ Contradiction Analyst"
   zh: "TRIZ矛盾分析师"
-skills: ['triz-matrix']  # P0-S1-1 真实化（与产出实际引用一致）
+skills: [triz-matrix]  # P0-S1-1 真实化（与产出实际引用一致）
 maxTurns: 50
 
 

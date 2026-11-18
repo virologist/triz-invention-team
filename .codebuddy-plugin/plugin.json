@@ -1,7 +1,7 @@
 {
   "name": "triz-invention-team",
-  "version": "2.15.0",
-  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.15: structured work map + unified harness entry (map/verify/feedback), machine-verifiable stage acceptance with AUTO_PASS/AI_PASS/HUMAN_PASS/UNVERIFIED status, closed-loop feedback, version-consistency release gate, and versioned host-defect repair blocks (zsh PIPESTATUS push-failure false-green fixed with regression detection).",
+  "version": "2.16.0",
+  "description": "Cross-domain TRIZ invention team: contradiction analysis, patent search, examination simulation and patent drafting for CN invention patents v2.16: structured work map + unified harness entry (map/verify/feedback), machine-verifiable stage acceptance with AUTO_PASS/AI_PASS/HUMAN_PASS/UNVERIFIED status, closed-loop feedback, version-consistency release gate, and versioned host-defect repair blocks (zsh PIPESTATUS push-failure false-green fixed with regression detection).",
   "author": {
     "name": "TZUVet",
     "email": "tzuvet@example.com"
@@ -13,7 +13,10 @@
     "./agents/patent-examiner-sim.md",
     "./agents/disclosure-architect.md",
     "./agents/patent-attorney-writer.md",
-    "./agents/second-opinion-reviewer.md"
+    "./agents/second-opinion-reviewer.md",
+    "./agents/evidence-curator.md",
+    "./agents/quality-diagnostician.md",
+    "./agents/knowledge-steward.md"
   ],
   "skills": [
     "./skills/triz-matrix",
@@ -30,7 +33,10 @@
       "patent-examiner-sim",
       "disclosure-architect",
       "patent-attorney-writer",
-      "second-opinion-reviewer"
+      "second-opinion-reviewer",
+      "evidence-curator",
+      "quality-diagnostician",
+      "knowledge-steward"
     ]
   },
   "displayName": {
@@ -170,6 +176,42 @@
         "zh": "独立二审员"
       },
       "avatar": "avatars/second-opinion-reviewer.jpg",
+      "role": "member"
+    },
+    {
+      "id": "evidence-curator",
+      "displayName": {
+        "en": "Zheng Guidang",
+        "zh": "证归档"
+      },
+      "profession": {
+        "en": "Evidence Curator",
+        "zh": "证据归档员"
+      },
+      "role": "member"
+    },
+    {
+      "id": "quality-diagnostician",
+      "displayName": {
+        "en": "Heng Zixin",
+        "zh": "衡自新"
+      },
+      "profession": {
+        "en": "Quality Diagnostician",
+        "zh": "质量诊断师"
+      },
+      "role": "member"
+    },
+    {
+      "id": "knowledge-steward",
+      "displayName": {
+        "en": "Zhi Xucun",
+        "zh": "知续存"
+      },
+      "profession": {
+        "en": "Knowledge Steward",
+        "zh": "知识管家"
+      },
       "role": "member"
     }
   ]

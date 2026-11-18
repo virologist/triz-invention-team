@@ -11,7 +11,7 @@
 （语义级/交叉验证级），由主理人 VERIFY 阶段人工执行——**禁止**文档列出却无标注的"幽灵验证项"
 （S-Q2 根因：文档承诺超出机械能力=验收标准虚高）。
 
-## 6 成员契约清单
+## 9 成员契约清单（C14 · 2026-11-16 扩员）
 
 ### contradiction-analyst
 **禁止触发词**（真源=frontmatter，此处为展示镜像）：
@@ -79,6 +79,33 @@
 2. **权利要求禁用词零命中** `[机械已实现]`：`_check_claims_banned`（8 词全检，只扫 A 区权项+说明书+摘要）
 3. **独立权项须含交底书必要特征（LCS≥60%）** `[暂缓·人工执行]`：已另有独立机械工具 `scripts/check_claim_scope.py`（特征→权项 LCS 映射，阈值 12 字符），本门禁不重复实现；主理人在 Phase 5b 后调用该脚本——此为工具分工，非缺失
 
+### evidence-curator（证归档 · C14 新增）
+**禁止触发词**（真源=frontmatter，此处为展示镜像）：
+- `凭记忆|应该没问题|大约|未核实来源`
+
+**强制验证**：
+1. **交付包核验清单节** `[机械已实现]`：产出含「交付包核验」节且逐文件列出（存在/缺失）——`re.search(r'交付包核验', out)` ∧ `re.search(r'存在|缺失', out)`
+2. **引用三要素抽查** `[机械已实现]`：`re.search(r'(专利号|公开号).{0,80}(标题|名称)', out, re.S)` ∧ `re.search(r'(专利号|公开号|标题|名称).{0,80}(关系|相关)', out, re.S)`（三要素：专利号/公开号 + 标题/名称 + 关系/相关）
+3. **证据真实性判定** `[暂缓·人工执行]`：来源路径抽查（判定所附路径真实存在且指向声称的文献）超出 grep 能力——主理人 VERIFY 抽查
+
+### quality-diagnostician（衡自新 · C14 新增）
+**禁止触发词**（真源=frontmatter，此处为展示镜像）：
+- `凭印象|应该没问题|大概齐`
+
+**强制验证**：
+1. **门禁输出引用** `[机械已实现]`：`re.search(r'(self_gate|18/18|PASS|FAIL)', out)` 必须命中——门禁解读须原文摘录而非转述
+2. **诊断结论分级** `[机械已实现]`：`re.search(r'(P0|P1|P2|P3)', out)`——诊断结论必须按 P0-P3 分级
+3. **根因判定正确性** `[暂缓·人工执行]`：根因初判是否成立是语义判断——诊断报告草案由主理人审核后方可登记 §六 登记表
+
+### knowledge-steward（知续存 · C14 新增）
+**禁止触发词**（真源=frontmatter，此处为展示镜像）：
+- `未核实|我记得|差不多`
+
+**强制验证**：
+1. **知识库条目引用** `[机械已实现]`：`re.search(r'(patent-family|triz-matrix|references|VENDOR)', out)`——治理对象必须落到具体知识库条目
+2. **维护建议清单** `[机械已实现]`：`re.search(r'(outdated|去重|同步|巡检)', out)`——产出必须是可执行的维护建议清单
+3. **数据一致性判定** `[暂缓·人工执行]`：一致性巡检结论（是否真漂移、建议是否合理）——主理人 VERIFY 审核后执行写库
+
 ## 运行方式
 
 ```bash
@@ -112,15 +139,15 @@ python3 scripts/contract_enforce.py --member <id> --output <file> --llm-review
 
 ## 维护
 
-- **禁词唯一真源 = 各成员 frontmatter `forbidden_phrases`**（2026-11-07 单源化）：改禁词只改 frontmatter，本文件展示镜像与脚本解析自动跟随；`--self-test` 自测1会校验 6 成员表可解析非空
+- **禁词唯一真源 = 各成员 frontmatter `forbidden_phrases`**（2026-11-07 单源化）：改禁词只改 frontmatter，本文件展示镜像与脚本解析自动跟随；`--self-test` 自测1会校验 9 成员表可解析非空
 - **三源一致性已兑现为真校验（CYCLE-1 · S-E06/S-E17 · 2026-11-08）**：此前 `DOCS` 变量定义却从不读取，「三源一致性」是幽灵验证项；现自测1 真读取本文件镜像段与 frontmatter 逐条比对，任一漂移即 FAIL
 - **DRIFT_PROBE 反向验证已兑现为真实探针（CYCLE-1 第2轮交叉验证 · 2026-11-09 · S-E21）**：此前本行仅**声称**「反向验证：注入 `DRIFT_PROBE` → exit 1」，但全仓 grep 仅命中本行本身，脚本内并无该探针——即该反向验证**从未被真实执行**（幽灵验证项·违反哲学④）。现 `contract_enforce.py` **自测4** 落地真实探针：① 基线一致（未注入 → 无漂移）② 注入 `DRIFT_PROBE_CANARY` → 三源比对必须检出漂移（期望 exit 1）③ 镜像同步后 → 无漂移（期望 exit 0，证明探针有判别力、非恒真）。实测：`python3 scripts/contract_enforce.py --self-test` → 自测4 三项全 ✅，exit 0
-- **禁止边界下沉契约 `[机械已实现]`（CYCLE-1 · S-E11 · 2026-11-09）**：`task_payload.schema.json` 增 `forbidden_boundary`（非 required，不破历史信封）；**自测1b** 校验 ① schema 含该字段 ② `docs/architecture.md` §二 角色矩阵覆盖 6 成员 ③ 禁止边界非空 ④ 角色归类（Analyzer/Executor/Reviewer）与矩阵一致。真源 = 角色矩阵「禁止边界」列
+- **禁止边界下沉契约 `[机械已实现]`（CYCLE-1 · S-E11 · 2026-11-09）**：`task_payload.schema.json` 增 `forbidden_boundary`（非 required，不破历史信封）；**自测1b** 校验 ① schema 含该字段 ② `docs/architecture.md` §二 角色矩阵覆盖 9 成员（C14 扩员）③ 禁止边界非空 ④ 角色归类（Analyzer/Executor/Reviewer）与矩阵一致。真源 = 角色矩阵「禁止边界」列
 - **Workflow D 前置闸机械校验已落地（CYCLE-1 第2轮交叉验证 · 2026-11-09 · S-E21）**：主理人 MD 曾声称「由 `preflight_check.py` 第9项机械校验」，实测 preflight 全文不含 G1/G2/G3/search_3rounds/trinity 任一字符串——**该机械校验从未存在**（幽灵验证项）。现落地为 `preflight_check.py` **第 12 项**（真源 = `state_store.GATE_ALIASES`）：G1/G2/G3 全关 ∧ `state.evidence` 的查新/裁决落盘文件真实存在 → 才放行；否则 BLOCK
-- **frontmatter 契约字段完整性 `[机械已实现]`（CYCLE-1 · S-E07 · 2026-11-08）**：6 成员必须含 `schema_version / contract_owner / verified_at / forbidden_phrases / must_verify / declared_skills` 六字段，缺任一 → 自测 FAIL；此前这 6 字段零机械消费者（声明与机械能力脱钩）
+- **frontmatter 契约字段完整性 `[机械已实现]`（CYCLE-1 · S-E07 · 2026-11-08）**：9 成员必须含 `schema_version / contract_owner / verified_at / forbidden_phrases / must_verify / declared_skills` 六字段，缺任一 → 自测 FAIL；此前这 6 字段零机械消费者（声明与机械能力脱钩）
 - **失败即失败（CYCLE-1 · S-E15 · 2026-11-08）**：违规默认即 `exit 1`，无需 `--exit-on-fail`；此前无该开关时违规也返回 0（fail-open），与本文件「0=全过 · 1=至少一个成员违反」的契约相悖
 - **禁止边界的**验收侧**机械拦截已落地（CYCLE-1 第4轮 · S-E59 · 2026-11-09）**：S-E11 只把 `forbidden_boundary` 下沉到**下发侧**（`task_payload.schema.json`），**验收侧零机械校验**——成员写出申请文件正文 / 越权出具授权断言 / 自我评价 / 越权改写方案，**没有任何脚本会报错**。现落地 `scripts/boundary_guard.py`：
-  - **角色矩阵真源** = `docs/architecture.md` §二（Analyzer 2 / Executor 2 / Reviewer 2 / Orchestrator 1）
+  - **角色矩阵真源** = `docs/architecture.md` §二（Analyzer 3 / Executor 3 / Reviewer 3 / Orchestrator 1；C14 扩员后）
   - **5 个越界信号**：B1 撰写申请文件正文（权项书/说明书）· B2 肯定性授权断言 · B3 自我评价质量 · B4 越权修改方案 · B5 非职责角色出具三性评级
   - **判据基于产出结构**（章节标题 / 裁决字段 / 改写措辞），**不基于成员自述**；同一份产出**按其 agent_id 角色**判（Executor 本就要写权项书，Analyzer 写了才叫越界）
   - **verdict 四态**：`clean` / `violation` / `unknown_role`（成员不在矩阵内）/ `unreadable`——**不可判定 ≠ 放过**

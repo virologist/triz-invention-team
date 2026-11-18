@@ -8,7 +8,8 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
 同一失效模式）。本脚本把 4 项里**可机械判定**的部分变成一次命令，
 并把 failure-007 教训（权威数据未经校验就注入上下文）也纳入必检。
 
-检查项（共 15 项，S-E34 补全至与实现一致，S-E48 补第 14 项，S-E49 补第 15 项）：
+检查项（共 15 项，其中第 8 项按 --outputs-dir 条件触发；
+S-E34 补全至与实现一致，S-E48 补第 14 项，S-E49 补第 15 项）：
   1. 失败索引可查（expert-failures 目录 + index.md 可读 + 按关键词命中相关记录）
   2. docs/routing-log.md 可写（路由决策落盘点）
   3. 预算估算：成员数 × 单成员预估 token ≤ 全局预算 120K
@@ -17,7 +18,7 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
   6. 装配器可用：scripts/assemble_spawn_prompt.py 存在且可执行（shared-core 可达）
   7. 成员声明的预加载 skills 在磁盘上确实存在（防"声明了但路径是编的"）
   8. 成员信封 schema 契约版本可解析（agent-protocol / result_envelope）
-  9. 成员数口径核对（6 成员 + 1 主理人 = 7，防派单漏人/多派人）
+  9. 成员数口径核对（9 成员 + 1 主理人 = 10，防派单漏人/多派人；C14 扩员）
   10. docs/diagnosis-protocol.md §六 诊断登记表结构完整（表头 + 数据行列数一致）
   11. README.zh.md 结构图与 git 实际入库顶层项一致（按 .gitignore 解析后比对）
   12. Workflow D 入口前置闸：G1/G2/G3 全关 + 查新与裁决证据文件真实落盘
@@ -37,7 +38,6 @@ preflight_check.py — 团队启动前检查清单脚本化（2026-10-14 建立�
 """
 
 import argparse
-import glob
 import json
 import os
 import re
@@ -50,6 +50,7 @@ PKG = os.path.dirname(HERE)
 GLOBAL_TOKEN_BUDGET = 120_000          # H3.5 全流程 token 上限
 # 经验值（2026-11-07 Batch3 · 修 S-R1）：按 L2 实测 83.8K 校准（原值偏差 ~1.3×，
 # 6 成员常态触 92% 预警，信噪比下降）。校准口径：tests/baselines/l2-full-a01 metrics.jsonl 汇总。
+# （历史注释保留：C14 扩员后成员 9 名，新 3 成员值见下方标注，暂无实测校准数据）
 DEFAULT_MEMBER_TOKENS = {
     # 与成员 MD 的 maxTurns 量级对应（L2 实测均值·仅用于预算估算，非计量）
     "patent-search-scout": 19_000,      # maxTurns 80，检索型最重
@@ -58,6 +59,11 @@ DEFAULT_MEMBER_TOKENS = {
     "second-opinion-reviewer": 13_000,  # maxTurns 40
     "disclosure-architect": 10_000,     # maxTurns 30
     "patent-attorney-writer": 10_000,   # maxTurns 30
+    # C14 新增 3 成员（2026-11-16）：无 L2 实测数据，按 maxTurns 量级与新职责
+    # 产出体量（核验清单/诊断报告/维护建议，均为中轻量产出）估算
+    "evidence-curator": 10_000,         # maxTurns 25
+    "quality-diagnostician": 12_000,    # maxTurns 35，诊断报告含门禁输出摘录
+    "knowledge-steward": 9_000,         # maxTurns 30
 }
 FALLBACK_TOKENS = 15_000
 
@@ -214,7 +220,6 @@ def check_state_template_consistency():
       T3 SOP 真源 主理人 MD 状态块模板中的字段名
     任一缺失 → BLOCK（这是**契约漂移**，不是文档整洁度问题，必须阻断）。
     """
-    import json as _json
     import re as _re
 
     def _read_text(path):
@@ -850,39 +855,94 @@ def check_assembler():
             % (r.stderr or r.stdout).strip()[:200])
         return
     n = len([x for x in r.stdout.split("\n") if x.strip()])
-    # S-E39：明确口径——白名单 = 6 个**执行成员**（不含主理人）。
-    # 全仓「7」口径 = 1 主理人 + 6 成员，两者并列易生歧义，此处显式标注。
-    ok("6. 装配器可用，成员白名单 %d 个（= 6 执行成员，不含主理人；"
-       "全仓 7 = 1 主理人 + 6 成员）" % n)
+    # S-E39：明确口径——白名单 = 9 个**执行成员**（不含主理人；C14 扩员 2026-11-16）。
+    # 全仓「10」口径 = 1 主理人 + 9 成员，两者并列易生歧义，此处显式标注。
+    ok("6. 装配器可用，成员白名单 %d 个（= 9 执行成员，不含主理人；"
+       "全仓 10 = 1 主理人 + 9 成员）" % n)
 
 
 def check_declared_skills():
-    """7. 成员声明的预加载 skills 是否存在（防声明了但路径是编的）"""
+    """7. 成员声明的预加载 skills 是否存在（防声明了但路径是编的）
+
+    C11 补齐 frontmatter 真源：成员技能声明写在 frontmatter `skills: [...]`，
+    装配器 resolve_skill_paths 消费同一列表；正文反引号
+    `skills/<name>/SKILL.md` 是历史补充形态，二者都纳入校验。
+    装配器对不存在的 skill 是**静默跳过**（既不报错也不阻断），
+    故本项是「声明了不存在技能」的唯一守卫；只扫正文会恒 checked=0，
+    等于守卫不存在（幽灵验证项形态 B）。
+    """
     agents = os.path.join(PKG, "agents")
     if not os.path.isdir(agents):
         blk("7. agents/ 目录缺失")
         return
     missing = []
     checked = 0
+    unresolved = []
+    quoted = []  # C13 · U13（修 A）：带引号形态声明（联邦装配器无法一致解析）
     for f in sorted(os.listdir(agents)):
         if not f.endswith(".md"):
             continue
         txt = open(os.path.join(agents, f), encoding="utf-8").read()
-        for m in re.finditer(r"`(skills/[^`]+/SKILL\.md)`", txt):
-            rel = m.group(1)
+
+        # (a) frontmatter `skills: [...]`（与装配器 parse_frontmatter 同形态）
+        fm_raw = ""
+        if txt.startswith("---"):
+            parts = txt.split("---", 2)
+            if len(parts) >= 3:
+                fm_raw = parts[1]
+        m = re.search(r"^skills:\s*\[(.+?)\]", fm_raw, re.M)
+        if m:
+            for raw in m.group(1).split(","):
+                sk = raw.strip()
+                if not sk:
+                    continue
+                # C13 · U13（修 A）单侧加固：preflight 此前 `strip("'\"")` 会剥引号，
+                # 而联邦装配器 resolve_skill_paths 只 `strip('"')` —— 单引号形态下
+                # 本项 ✅ 绿灯、装配器却 resolved=0 空注入（复合假绿，主理人已复现）。
+                # 本包内不动联邦真源，改为：检测到带引号形态（单/双引号）直接 BLOCK。
+                # 双引号形态虽装配器能解析，但两工具解析规则必须一致才可宣称「守卫通过」，
+                # 统一按联邦通行形态（无引号列表）要求，消除规则分叉的温床。
+                if (sk.startswith("'") and sk.endswith("'")) or \
+                   (sk.startswith('"') and sk.endswith('"')):
+                    quoted.append((f, sk))
+                    continue
+                checked += 1
+                rel = "skills/%s/SKILL.md" % sk
+                if not os.path.isfile(os.path.join(PKG, rel)):
+                    missing.append((f, rel))
+        elif re.search(r"^skills:", fm_raw, re.M):
+            # 有声明但形态不支持 → 显式告警，避免「解析不到 = 静默放过」的新假绿
+            unresolved.append(f)
+
+        # (b) 正文反引号路径（原有判据，原样保留）
+        for mb in re.finditer(r"`(skills/[^`]+/SKILL\.md)`", txt):
+            rel = mb.group(1)
             checked += 1
             if not os.path.isfile(os.path.join(PKG, rel)):
                 missing.append((f, rel))
+
     if missing:
         blk("7. 成员 MD 声明了 %d 个不存在的 skill 路径：" % len(missing)
             + "; ".join("%s→%s" % x for x in missing))
+    elif quoted:
+        # C13 · U13（修 A）：引号形态 = 联邦装配器 strip('"') 解析不了单引号
+        # →「preflight 绿灯 + 装配器空注入」复合假绿。显式判红，要求改用联邦通行形态。
+        blk("7. 成员 MD 的 `skills:` 声明含带引号形态（%s）——"
+            "引号形态联邦装配器无法解析（单引号会被原样注入致 resolved=0 空注入），"
+            "请改用无引号列表 `skills: [name1, name2]`（联邦通行形态）"
+            % ("、".join("%s:%s" % x for x in quoted)))
     elif checked == 0:
         # CYCLE-1 · S-E16：此前 checked=0 也输出「全部存在」= 未检查却报通过（假绿）
-        wrn("7. 成员 MD 中未发现 `skills/.../SKILL.md` 形态引用（checked=0）——"
-            "本项实际未校验任何路径；成员技能声明真源在 frontmatter `skills:`，"
-            "请核对 assemble_spawn_prompt.py 的 resolve_skill_paths 结果")
+        wrn("7. 成员 MD 中未发现 frontmatter `skills:` 或 `skills/.../SKILL.md` "
+            "形态引用（checked=0）——本项实际未校验任何路径")
+    elif unresolved:
+        # 只要有声明无法解析就不宣称「全部存在」——避免 ✅/⚠️ 同时出现的语义含混
+        wrn("7. 成员 MD 的 `skills:` 声明形态未被解析：%s——本项无法完整校验"
+            "（已校验 %d 处），请改用 `[...]` 列表或人工核对"
+            % ("、".join(unresolved), checked))
     else:
-        ok("7. 成员声明的 %d 处 skill 路径全部存在于磁盘" % checked)
+        ok("7. 成员声明的 %d 处 skill 全部存在于磁盘"
+           "（frontmatter + 正文两源；仅校验路径存在性，不覆盖装配器注入结果）" % checked)
 
 
 def check_c3_trigger(member_id, outputs_dir, x_count, c3_path, e_count=0):
@@ -946,6 +1006,90 @@ def scan_x_grade(member_id, outputs_dir):
     return TG.scan_member_grades(member_id, outputs_dir)
 
 
+def self_test():
+    """C13 · U9（修 D）：preflight 自身判据的自测（此前 24 脚本中唯一无 --self-test，
+    self_gate 双向差集会因此报「漏挂」——补本分支即闭环）。
+
+    判别力策略（能红变异，全部在 tempdir 完成，**绝不写真实仓库**）：
+    构造最小临时包（仅 agents/fixture-member.md + skills/ghost-skill/SKILL.md），
+    以 --expert-dir 指向临时包跑完整 preflight 子进程，抓取第 7 项
+    （frontmatter 技能真源守卫，U13/修 A 加固后）输出行做三组双向断言：
+      V1 单引号形态 `skills: ['ghost-skill']` + 路径真实存在 → 必须 BLOCK
+        （引号形态联邦装配器无法解析；本项若绿灯即「守卫绿 + 空注入」复合假绿）
+      V2 无引号形态 `skills: [ghost-skill]` + 路径真实存在 → 必须放行（✅）
+      V3 无引号形态 + 路径不存在 → 必须 BLOCK（声明了编造路径）
+    注：临时包只含第 7 项所需文件，其余检查项会因文件缺失另行 BLOCK/WARN——
+    本自测只断言第 7 项输出行，与其它项解耦、互不干扰。
+    退出码语义与其它脚本一致：0=全过 1=有失败。
+    """
+    import shutil
+    import tempfile
+
+    md_tmpl = """---
+name: fixture-member
+maxTurns: 40
+skills: %s
+---
+
+# fixture 正文（self-test 专用，不含 skills 反引号引用）
+"""
+
+    def _run_variant(skills_line, with_skill_file):
+        """在 tempdir 构造最小临时包并跑完整 preflight，返回第 7 项输出行。"""
+        tmp = tempfile.mkdtemp(prefix="triz-preflight-selftest-")
+        try:
+            os.makedirs(os.path.join(tmp, "agents"))
+            with open(os.path.join(tmp, "agents", "fixture-member.md"),
+                      "w", encoding="utf-8") as f:
+                f.write(md_tmpl % skills_line)
+            if with_skill_file:
+                sk_dir = os.path.join(tmp, "skills", "ghost-skill")
+                os.makedirs(sk_dir)
+                with open(os.path.join(sk_dir, "SKILL.md"),
+                          "w", encoding="utf-8") as f:
+                    f.write("# fixture skill\n")
+            r = subprocess.run(
+                [sys.executable, os.path.abspath(__file__), "--expert-dir", tmp],
+                capture_output=True, text=True, timeout=60)
+            line7 = ""
+            for ln in (r.stdout + r.stderr).splitlines():
+                s = ln.strip()
+                if re.match(r"^(?:✅|❌|⚠️)\s*7\.", s):
+                    line7 = s
+                    break
+            return line7
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    print("🧪 preflight 判据自测（U9 修 D · tempdir 能红变异，不触碰真实仓库）\n")
+    fails = []
+    cases = [
+        ("V1 单引号形态 → 必须 BLOCK（联邦装配器无法解析，防复合假绿 U13）",
+         "['ghost-skill']", True,
+         lambda ln: "❌" in ln and "引号形态" in ln),
+        ("V2 无引号形态 + 路径存在 → 必须放行（第 7 项 ✅）",
+         "[ghost-skill]", True,
+         lambda ln: "✅" in ln),
+        ("V3 声明不存在的技能 → 必须 BLOCK",
+         "[ghost-skill]", False,
+         lambda ln: "❌" in ln and "不存在" in ln),
+    ]
+    for name, line, with_file, assert_fn in cases:
+        ln = _run_variant(line, with_file)
+        good = bool(ln) and assert_fn(ln)
+        print("  %s %s" % ("✅" if good else "❌", name))
+        print("     实得：%s" % (ln or "(第 7 项无输出行)"))
+        if not good:
+            fails.append(name)
+
+    if fails:
+        print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
+        return 1
+    print("\n✅ 自测全通过（第 7 项判据 3 组能红/放行双向断言；"
+          "其余 14 项由 self_gate GATES 与真实 preflight 覆盖）")
+    return 0
+
+
 def main():
     global PKG, HERE, args
     ap = argparse.ArgumentParser(description="团队启动前检查（preflight）")
@@ -958,7 +1102,12 @@ def main():
     ap.add_argument("--c3-confirmation-path", default="", help="[P0-S3-1] C3 确认文件路径（X 级出现时强制要求）")
     ap.add_argument("--state-path", default="",
                     help="[CYCLE-1/S-E02] state.json 路径——启用第12项 Workflow D 前置闸机械校验")
+    ap.add_argument("--self-test", action="store_true",
+                    help="[C13/U9] 判据自测：tempdir 能红变异验证第 7 项判别力（不触碰真实仓库）")
     args = ap.parse_args()
+
+    if args.self_test:
+        return self_test()
 
     PKG = os.path.abspath(args.expert_dir)
     HERE = os.path.join(PKG, "scripts")
@@ -1012,6 +1161,10 @@ def main():
         elif x_count > 0 or e_count > 0:
             check_c3_trigger(after_member, args.outputs_dir, x_count,
                              args.c3_confirmation_path, e_count)
+    else:
+        # C13 · U10（修 G）：默认（未传 --outputs-dir）此前静默不输出第 8 项——
+        # docstring 声称 15 项、实际只出 14 个编号。显式告警消除口径漂移。
+        wrn("8. 未传 --outputs-dir，跳过 C3 检查点（查新后条件项）")
 
     print("\n———— 结果 ————")
     for m in OK:

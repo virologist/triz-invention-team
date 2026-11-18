@@ -28,7 +28,9 @@
 │ contradiction│ disclosure   │ examiner-sim │
 │ -analyst     │ -architect   │ second-      │
 │ search-scout │ attorney     │ opinion      │
-│              │ -writer      │ -reviewer    │
+│ knowledge-   │ -writer      │ -reviewer    │
+│ steward      │ evidence-    │ quality-     │
+│              │ curator      │ diagnostician│
 └──────────────┴──────────────┴──────────────┘
 ```
 
@@ -39,9 +41,9 @@
 | 角色 | 成员 | 能力边界（能做什么） | 禁止边界（不能做什么） | 输入契约 | 输出契约 |
 |------|------|-------------------|---------------------|---------|---------|
 | **Orchestrator**<br>编排者 | triz-invention-team-team-lead | 任务解析、子任务拆解、成员调度、门禁裁决、冲突仲裁、结果聚合 | ❌ 代写任何成员的专业产出<br>❌ 跳过门禁推进<br>❌ spawn自己 | 用户请求 | 任务计划 + 最终交付包 |
-| **Analyzer**<br>分析者 | contradiction-analyst<br>patent-search-scout | 调查、建模、检索、产出分析结论 | ❌ 撰写申请文件<br>❌ 做最终授权判断 | task_payload + 领域上下文 | analysis_artifact（模型卡/查新报告） |
-| **Executor**<br>执行者 | disclosure-architect<br>patent-attorney-writer | 基于分析产出生成交付文档 | ❌ 虚构实验数据<br>❌ 修改已确认的技术特征<br>❌ 自我评价质量 | analysis_artifact + 确认记录 | document（交底书/申请文件） |
-| **Reviewer**<br>审查者 | patent-examiner-sim<br>second-opinion-reviewer | 攻击、复核、出具裁决 | ❌ 修改方案（只出裁决+修复建议）<br>❌ 与其他成员直连 | document/analysis + 证据 | verdict（绿/黄/红 + 问题清单） |
+| **Analyzer**<br>分析者 | contradiction-analyst<br>patent-search-scout<br>knowledge-steward | 调查、建模、检索、产出分析结论；知识底座治理（权威数据复算解读/族谱维护建议/技能声明巡检/VENDOR 同步提醒） | ❌ 撰写申请文件<br>❌ 做最终授权判断<br>❌ 直接修改族谱库/矩阵数据（只出维护建议清单） | task_payload + 领域上下文 | analysis_artifact（模型卡/查新报告） |
+| **Executor**<br>执行者 | disclosure-architect<br>patent-attorney-writer<br>evidence-curator | 基于分析产出生成交付文档；交付包证据链核验与合规归档（逐文件完整性/引用三要素/信封对账/48h 回检登记） | ❌ 虚构实验数据<br>❌ 修改已确认的技术特征<br>❌ 自我评价质量<br>❌ 凭记忆认定引用真实性（必须附来源路径） | analysis_artifact + 确认记录 | document（交底书/申请文件） |
+| **Reviewer**<br>审查者 | patent-examiner-sim<br>second-opinion-reviewer<br>quality-diagnostician | 攻击、复核、出具裁决；团队自诊断（门禁输出解读/回归根因初判/B1-B5 信号分析/T1-T3 复算/诊断报告草案） | ❌ 修改方案（只出裁决+修复建议）<br>❌ 与其他成员直连<br>❌ 直接登记诊断结论（草案须主理人审核）<br>❌ 修改门禁脚本或判据 | document/analysis + 证据 | verdict（绿/黄/红 + 问题清单） |
 
 **职责不可越界原则**：Analyzer不做Executor的活，Executor不自我评价（评价权归Reviewer），Reviewer不修改只裁决。
 

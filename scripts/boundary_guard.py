@@ -42,6 +42,10 @@ ROLE_BY_MEMBER = {
     "patent-attorney-writer": "Executor",
     "patent-examiner-sim": "Reviewer",
     "second-opinion-reviewer": "Reviewer",
+    # C14 新增 3 成员（2026-11-16）：evidence=Executor / diagnostician=Reviewer / steward=Analyzer
+    "evidence-curator": "Executor",
+    "quality-diagnostician": "Reviewer",
+    "knowledge-steward": "Analyzer",
     "triz-invention-team-team-lead": "Orchestrator",
 }
 
@@ -480,8 +484,8 @@ def _self_test():
     if fails:
         print("\n❌ 自测失败 %d 项：%s" % (len(fails), fails))
         return 1
-    print("\n✅ 自测全通过（%d 用例 + 7 成员角色矩阵 + 6 项真实 CLI 退出码）"
-          % len(_SELF_TEST_CASES))
+    print("\n✅ 自测全通过（%d 用例 + %d 成员角色矩阵 + 6 项真实 CLI 退出码）"
+          % (len(_SELF_TEST_CASES), len(ROLE_BY_MEMBER)))
     return 0
 
 

@@ -8,7 +8,7 @@ Team 型（多角色协作团队）
 
 ## 团队构成
 
-7 名智能体 = 1 主理人 + 6 成员。
+10 名智能体 = 1 主理人 + 9 成员。
 
 | 成员 | ID | 职责 |
 |------|-----|------|
@@ -19,6 +19,9 @@ Team 型（多角色协作团队）
 | 审外审 | second-opinion-reviewer | 独立二审复核（含利益冲突边界，自动捕捉确认偏误） |
 | 谭无隐 | disclosure-architect | 技术交底书五要素结构化 |
 | 权要达 | patent-attorney-writer | 权利要求书+说明书+摘要撰写 |
+| 证归档 | evidence-curator | 交付包证据链核验与合规归档（C14 新增） |
+| 衡自新 | quality-diagnostician | 团队自诊断：门禁解读+回归根因初判+诊断报告草案（C14 新增） |
+| 知续存 | knowledge-steward | 知识底座治理：族谱维护建议+技能声明巡检+VENDOR 同步（C14 新增） |
 
 ## 工作流程（7 阶段节点 SOP）
 
@@ -40,7 +43,7 @@ Team 型（多角色协作团队）
 python3 scripts/agent_ci_gate.py --strict                  # 信封 schema 门禁
 python3 scripts/contract_enforce.py --self-test            # 契约自测（三源一致性 + 豁免双向断言）
 python3 scripts/state_store.py self-test                   # 门禁状态机（G1-G5 别名归一 + 回流重置）
-python3 scripts/preflight_check.py                         # 建队前 13 项 preflight
+python3 scripts/preflight_check.py                         # 建队前 15 项 preflight
 python3 scripts/run_regression.py --list                   # 3 个回归用例
 ```
 

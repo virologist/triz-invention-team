@@ -29,6 +29,7 @@ TRIZ 矛盾矩阵查询器（确定性工程 · 防幻觉）
   1 = 查到但该交叉点无推荐原理（no preferred / see physical contradiction）
   2 = 参数无法识别
   3 = 数据文件缺失
+  （本脚本退出码独立于 harness.py 的 0/1/2/3 证据语义，见 docs/WORK_MAP.md 退出码契约。）
 """
 
 import argparse

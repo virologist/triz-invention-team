@@ -43,6 +43,8 @@ PKG = os.path.dirname(HERE)
 # 注意：evolution_log 用**子命令** `self-test`（非 `--self-test`）；
 # verify_triz_data 无自测，用 `--strict` 跑真实数据校验。
 GATES = [
+    ("建队前检查", "preflight_check.py", ["--self-test"],
+     "preflight 15 项判据自测（frontmatter 技能真源 + C3 条件项）"),
     ("契约三源漂移探针", "contract_enforce.py", ["--self-test"],
      "禁词真源/DRIFT_PROBE 反向验证"),
     ("信封 schema 自测", "agent_ci_gate.py", ["--self-test"],
@@ -72,7 +74,7 @@ GATES = [
     ("统一工作入口", "harness.py", ["--self-test"],
      "阶段验收不假绿 + 门禁真值 + 反馈护栏 + 元判别力"),
     ("版本号一致性", "version_consistency.py", ["--self-test"],
-     "4 个版本位必须相等（历史漂移 2.10.0 vs 2.11.2 的根因护栏）"),
+     "5 个版本位必须相等（含描述内嵌版本号；历史漂移 2.10.0 vs 2.11.2 的根因护栏）"),
 ]
 
 # 真实基线扫描（对已入库产出做 fail-closed 越界复核）——

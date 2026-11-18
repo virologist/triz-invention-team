@@ -8,7 +8,7 @@ displayName:
 profession:
   en: "Patent Attorney Writer"
   zh: "专利代理师"
-skills: ['claims-drafting', 'patent-law']  # P0-S1-1 真实化（与产出实际引用一致）
+skills: [claims-drafting, patent-law]  # P0-S1-1 真实化（与产出实际引用一致）
 maxTurns: 30
 
 

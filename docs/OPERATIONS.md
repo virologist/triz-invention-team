@@ -40,11 +40,13 @@
 **不要写死版本号**。若某处仍报「Team 型必需 settings.json」，那是旧版缓存脚本，先核对脚本版本，
 而不是把文件加回来。
 
-## 三、工具清单（v2.10.0 · 18 个脚本）
+## 三、工具清单
+
+> 清单以脚本输出为准；当前脚本数与版本见 `python3 scripts/self_gate.py` 输出（本文件不写死数字，见下方约定）。
 
 | 脚本 | 用途 | 何时跑 |
 |---|---|---|
-| `scripts/preflight_check.py` | 建队前 15 项检查（失败索引/路由可写/预算/Phase0五参数/权威数据/装配器/skills路径/C3检查点/诊断触发器/登记表结构/README结构图/**Workflow D 前置闸**/**state 模板三处真源一致性**/**routing-log 列契约**/**task_id 契约五处一致 + 反幽灵契约**） | **每次建队前（强制）** |
+| `scripts/preflight_check.py` | 建队前 15 项检查（失败索引/路由可写/预算/Phase0五参数/权威数据/装配器/skills路径/C3检查点/诊断触发器/登记表结构/README结构图/**Workflow D 前置闸**/**state 模板三处真源一致性**/**routing-log 列契约**/**task_id 契约五处一致 + 反幽灵契约**）；`--self-test` 为判据自测形态（tempdir 能红变异，已列入 self_gate GATES） | **每次建队前（强制）** |
 | `scripts/assemble_spawn_prompt.py` | spawn 文案装配（shared-core shim + vendor 兜底） | 每次派单（强制） |
 | `scripts/failure_memory.py` | 失败记忆摘要注入（按成员/关键词筛 expert-failures） | 每次派单第2步（强制） |
 | `scripts/token_budget_check.py` | 预算估算（默认）/ 产出机械计量（`--meter --ledger`） | 建队前 + 每次交付后 |
@@ -53,7 +55,7 @@
 | `scripts/run_regression.py` | 回归测试集执行（--list/--scaffold/--case X --dir） | L1：日常改动后；L2：发布前 |
 | `scripts/agent_ci_gate.py` | 信封 schema 门禁（`--strict` / `--self-test`） | pre-commit 钩子内自动 + push 门禁 |
 | `scripts/state_store.py` | TASK_STATE 持久化与断点续接（init/update/show/resume） | 每次 VERIFY 后（强制·Batch2） |
-| `scripts/contract_enforce.py` | 6 成员契约门禁（禁词真源=frontmatter + 机械验证） | pre-commit 第④层 + VERIFY |
+| `scripts/contract_enforce.py` | 9 成员契约门禁（禁词真源=frontmatter + 机械验证） | pre-commit 第④层 + VERIFY |
 | `scripts/check_claim_scope.py` | 交底书必要特征→独立权项 LCS 映射 | Phase 5b 后 |
 | `scripts/skill_test_runner.py` | skills/*/test-prompts.json 回归 | 改 skill 后 |
 | `scripts/triz_benchmark.py` | A-Evolve benchmark 适配/独立求值（0.0-1.0 分） | 演化闭环 / 断言快照（Batch5B） |

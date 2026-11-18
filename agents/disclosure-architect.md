@@ -8,7 +8,7 @@ displayName:
 profession:
   en: "Invention Disclosure Architect"
   zh: "交底书架构师"
-skills: ['claims-drafting']  # P0-S1-1 真实化（与产出实际引用一致）
+skills: [claims-drafting]  # P0-S1-1 真实化（与产出实际引用一致）
 maxTurns: 30
 
 

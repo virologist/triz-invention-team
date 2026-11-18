@@ -8,7 +8,7 @@ displayName:
 profession:
   en: "Mock Patent Examiner"
   zh: "模拟审查员"
-skills: ['patent-law', 'triz-matrix']  # P0-S1-1 真实化（与产出实际引用一致）
+skills: [patent-law, triz-matrix]  # P0-S1-1 真实化（与产出实际引用一致）
 maxTurns: 40
 
 

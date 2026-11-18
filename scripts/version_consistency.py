@@ -27,7 +27,16 @@ version_consistency.py — 版本号一致性门禁（新增，2026-11-11；第8
   4. .claude-plugin/marketplace.json        → .plugins[0].version
   5. .claude-plugin/marketplace.json        → .metadata.description 内嵌 (vX.Y.Z)
 
-退出码：0=一致 · 1=不一致（有明确失败） · 2=用法/环境错（文件缺失或不可读）
+  C11 补修轮（2026-11-15）实测护栏可静默绕过：
+    描述位是「正则命中才追加」，若把 description 里的 (vX.Y.Z) **直接删掉**，
+    collect_versions() 只返回 4 个固定位，distinct 仍只有 1 个、missing=0，
+    main() 会输出「4 个版本位一致」且 RC=0 —— 第 5 位护栏形同虚设
+    （原判据只查 distinct==1 && missing==0，不校验检查位数量下限）。
+    现补「检查位数量下限」：4 个固定 version 字段位之外，描述内嵌版本号位
+    必须至少命中 1 处；位数是动态 4+N（其它清单描述也可能内嵌版本号），
+    故用 ≥ 而非 ==：正常 5 位、合法扩展 6 位均通过，删成 4 位即 fail loud 非零。
+
+退出码：0=一致 · 1=不一致 / 缺检查位（有明确失败） · 2=用法/环境错（文件缺失或不可读）
 """
 import argparse
 import io
@@ -41,6 +50,25 @@ PKG = os.path.dirname(HERE)
 
 # 描述文字里内嵌版本号的匹配形态：(v2.13.0) / v2.13.0 / for CN invention patents v2.13
 _DESC_VER_RE = re.compile(r"\bv(\d+\.\d+\.\d+)\b")
+
+# 固定 version 字段位（collect_versions 的真源表；提升为模块级只为了让位数下限
+# 由表长派生，取值顺序与内容逐字未变）。文件缺失时仍会追加一条带 error 的记录，
+# 故 collect_versions() 的返回恒为「len(FIXED_SITES) + 描述位命中数」。
+FIXED_SITES = [
+    ("WorkBuddy 插件清单", ".codebuddy-plugin/plugin.json", ("version",)),
+    ("WorkBuddy 市场清单·插件项", ".codebuddy-plugin/marketplace.json",
+     ("plugins", 0, "version")),
+    ("Claude 市场清单·metadata", ".claude-plugin/marketplace.json",
+     ("metadata", "version")),
+    ("Claude 市场清单·插件项", ".claude-plugin/marketplace.json",
+     ("plugins", 0, "version")),
+]
+
+# 描述内嵌版本号位至少命中 1 处（堵「直接删掉版本号 → 退回 4 位且门禁全绿」）。
+# 用 ≥ 而非固定 ==5：描述位是动态 4+N，塞第 2 个描述位得 6 位仍属合法。
+MIN_DESC_SITES = 1
+# 检查位数量下限（单一真源）：数字由结构派生，不在 self_gate.py 等处重复硬编码。
+MIN_VERSION_SITES = len(FIXED_SITES) + MIN_DESC_SITES
 
 
 def _read_json(path):
@@ -83,17 +111,8 @@ def _extract_desc_versions(root):
 def collect_versions(root=None):
     """返回 [(位名, 文件相对路径, 版本值或 None, 错误信息或 None)]。"""
     root = root or PKG
-    sites = [
-        ("WorkBuddy 插件清单", ".codebuddy-plugin/plugin.json", ("version",)),
-        ("WorkBuddy 市场清单·插件项", ".codebuddy-plugin/marketplace.json",
-         ("plugins", 0, "version")),
-        ("Claude 市场清单·metadata", ".claude-plugin/marketplace.json",
-         ("metadata", "version")),
-        ("Claude 市场清单·插件项", ".claude-plugin/marketplace.json",
-         ("plugins", 0, "version")),
-    ]
     out = []
-    for label, rel, path in sites:
+    for label, rel, path in FIXED_SITES:
         full = os.path.join(root, rel)
         if not os.path.isfile(full):
             out.append((label, rel, None, "文件不存在"))
@@ -118,11 +137,19 @@ def collect_versions(root=None):
 
 
 def check(root=None):
+    """返回 (sites, distinct, n_missing)，签名保持三元组不变（外部复现脚本依赖）。
+
+    n_missing 除「不可读的固定位」外，还计入「缺检查位」：描述内嵌版本号位
+    一个都没命中时，仅凭 distinct==1 && missing==0 会假绿（护栏被静默绕过）。
+    位数判据用 ≥（描述位动态 4+N），不把合法的 6 位扩展误判红。
+    """
     sites = collect_versions(root)
+    n_desc = len(sites) - len(FIXED_SITES)
     missing = [s for s in sites if s[3]]
     values = [s[2] for s in sites if s[2] is not None]
     distinct = sorted(set(values))
-    return sites, distinct, len(missing)
+    too_few = n_desc < MIN_DESC_SITES
+    return sites, distinct, len(missing) + (1 if too_few else 0)
 
 
 def main():
@@ -138,12 +165,15 @@ def main():
         return self_test(root)
 
     sites, distinct, n_missing = check(root)
+    # 描述内嵌版本号位命中数（固定位恒为 len(FIXED_SITES) 条，缺失也占位）。
+    n_desc = len(sites) - len(FIXED_SITES)
     if args.json:
         print(json.dumps({
             "sites": [{"label": s[0], "file": s[1], "version": s[2], "error": s[3]}
                       for s in sites],
             "distinct": distinct, "missing": n_missing,
-            "consistent": len(distinct) == 1 and n_missing == 0,
+            "consistent": len(distinct) == 1 and n_missing == 0
+                          and n_desc >= MIN_DESC_SITES,
         }, ensure_ascii=False, indent=2))
     else:
         print("🔢 版本一致性 — %s" % os.path.basename(root))
@@ -152,6 +182,18 @@ def main():
                 print("  ❌ %-26s %-34s %s" % (label, rel, err))
             else:
                 print("  ✅ %-26s %-34s %s" % (label, rel, ver))
+        if n_desc < MIN_DESC_SITES:
+            print("  ❌ %-26s %-34s %s"
+                  % ("描述内嵌版本号位·缺检查位", "(0 命中)",
+                     "缺检查位：期望至少 %d 处命中" % MIN_DESC_SITES))
+        # 缺检查位优先于不可读判据：这里必须明确报「缺检查位」，不能静默退回 4 位。
+        if n_desc < MIN_DESC_SITES:
+            print("\n❌ 缺检查位：仅检测到 %d 个版本位（期望 ≥%d = %d 个固定 version 字段位"
+                  " + ≥%d 个描述内嵌版本号位）——禁止发布（fail loud）"
+                  % (len(sites), MIN_VERSION_SITES, len(FIXED_SITES), MIN_DESC_SITES))
+            print("   修复：不能删掉 description 内嵌的 (vX.Y.Z) 版本号；"
+                  "bump 时须同步更新全部版本位")
+            return 1
         if n_missing:
             print("\n❌ %d 个版本位不可读——禁止发布（fail loud）" % n_missing)
             return 1
@@ -207,6 +249,33 @@ def self_test(root=None):
         if not ok4:
             fails.append("描述内嵌版本号漂移未检出")
         shutil.copyfile(os.path.join(root, ".claude-plugin/marketplace.json"), cp)
+
+        # 变异5（C11 补修轮新增，2026-11-15）：**直接删掉**描述内嵌版本号。
+        #   修复前：描述位 0 命中 → 门禁退回 4 位、distinct==1、missing==0
+        #   → 输出「4 个版本位一致」且 RC=0（S-E78 护栏被静默绕过）。
+        #   修复后：check() 必须报「缺检查位」（missing>0 且位数低于下限）。
+        data_c = _read_json(cp)
+        desc_backup = data_c["metadata"]["description"]
+        data_c["metadata"]["description"] = re.sub(
+            _DESC_VER_RE, "无版本号", desc_backup)
+        _write_json(cp, data_c)
+        sites5, distinct5, n_missing5 = check(td)
+        ok5 = (n_missing5 > 0 and len(sites5) < MIN_VERSION_SITES)
+        print("  %s 删描述内嵌版本号 → 报缺检查位 | 实得 %d 位 distinct=%s missing=%d（下限 %d）"
+              % ("✅" if ok5 else "❌", len(sites5), distinct5, n_missing5,
+                 MIN_VERSION_SITES))
+        if not ok5:
+            fails.append("删描述内嵌版本号未报缺检查位")
+        # 还原 → 必须恢复 PASS（含位数达标），证明判据不是一律判红
+        data_c["metadata"]["description"] = desc_backup
+        _write_json(cp, data_c)
+        sites5r, distinct5r, n_missing5r = check(td)
+        ok5r = (n_missing5r == 0 and len(distinct5r) == 1
+                and len(sites5r) - len(FIXED_SITES) >= MIN_DESC_SITES)
+        print("  %s 还原描述内嵌版本号 → 恢复 PASS | 实得 %d 位 distinct=%s missing=%d"
+              % ("✅" if ok5r else "❌", len(sites5r), distinct5r, n_missing5r))
+        if not ok5r:
+            fails.append("还原描述内嵌版本号未恢复 PASS")
 
         # 变异1：把其中一处改小 → 必须判为漂移
         p = os.path.join(td, ".codebuddy-plugin/marketplace.json")

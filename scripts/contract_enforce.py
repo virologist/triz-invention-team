@@ -3,7 +3,7 @@
 """
 contract_enforce.py — P0-S1-1 契约执行门禁
 
-按 docs/CONTRACT_ENFORCEMENT.md 的 6 成员契约清单，对成员产出做机器验证。
+按 docs/CONTRACT_ENFORCEMENT.md 的 9 成员契约清单，对成员产出做机器验证。
 
 用法：
   python3 scripts/contract_enforce.py --member contradiction-analyst --output <file>
@@ -14,7 +14,6 @@ contract_enforce.py — P0-S1-1 契约执行门禁
 """
 import argparse
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -23,7 +22,7 @@ HERE = Path(__file__).parent
 PKG = HERE.parent
 DOCS = PKG / "docs" / "CONTRACT_ENFORCEMENT.md"
 
-# 6 成员契约 —— forbidden_phrases 从各成员 frontmatter **解析**（唯一真源，2026-11-07 单源化）
+# 9 成员契约（C14 · 2026-11-16 扩员）—— forbidden_phrases 从各成员 frontmatter **解析**（唯一真源，2026-11-07 单源化）
 #   verifications 保留在本脚本（机械实现的归属地），与 docs/CONTRACT_ENFORCEMENT.md 同步维护。
 #   启动时解析失败/缺表 → 该成员 forbidden 回退空列表并告警（不静默吞错）。
 VERIFICATIONS = {
@@ -57,6 +56,28 @@ VERIFICATIONS = {
         ("摘要≤300+机械证据", lambda out: _check_abstract(out)),
         ("权利要求禁用词零命中", lambda out: _check_claims_banned(out)),
     ],
+    # ── C14 新增 3 成员（2026-11-16）──
+    # evidence-curator：交付包核验清单节 + 引用三要素（专利号/公开号×标题/名称×关系/相关）
+    "evidence-curator": [
+        ("交付包核验清单节", lambda out: bool(
+            re.search(r"交付包核验", out)
+            and re.search(r"存在|缺失", out))),
+        ("引用三要素抽查",  lambda out: bool(
+            re.search(r"(专利号|公开号).{0,80}(标题|名称)", out, re.S)
+            and re.search(r"(专利号|公开号|标题|名称).{0,80}(关系|相关)", out, re.S))),
+    ],
+    # quality-diagnostician：门禁输出原文引用 + P0-P3 分级结论
+    "quality-diagnostician": [
+        ("门禁输出引用",    lambda out: bool(re.search(r"self_gate|18/18|PASS|FAIL", out))),
+        ("诊断结论分级",    lambda out: bool(re.search(r"P[0-3]", out))),
+    ],
+    # knowledge-steward：知识库条目引用（族谱/矩阵/references/VENDOR）+ 维护建议清单
+    "knowledge-steward": [
+        ("知识库条目引用",  lambda out: bool(
+            re.search(r"patent-family|triz-matrix|references|VENDOR", out))),
+        ("维护建议清单",    lambda out: bool(
+            re.search(r"outdated|去重|同步|巡检", out))),
+    ],
 }
 
 MEMBER_IDS = list(VERIFICATIONS.keys())
@@ -73,6 +94,10 @@ SUMMARY_MUST_CONTAIN = {
     "second-opinion-reviewer": [r"同意|附条件|不同意|✅|⚠|🔴"],
     "disclosure-architect":    [r"必要特征|特征"],
     "patent-attorney-writer":  [r"摘要|\d+\s*字符"],
+    # C14 新增 3 成员（2026-11-16）
+    "evidence-curator":        [r"交付包|核验|清单"],
+    "quality-diagnostician":   [r"门禁|诊断|P[0-3]"],
+    "knowledge-steward":       [r"知识|族谱|巡检|维护"],
 }
 
 
@@ -558,7 +583,7 @@ def main():
             print(f"  ❌ frontmatter 契约字段缺失：{fm_missing}")
             ok_all = False
         else:
-            print(f"  ✅ 6 成员 frontmatter 契约字段 6/6 齐全 [机械已实现]")
+            print(f"  ✅ {len(MEMBER_IDS)} 成员 frontmatter 契约字段 6/6 齐全 [机械已实现]")
 
         # ── 自测1b：forbidden_boundary 契约字段与角色矩阵一致性（S-E11 · 2026-11-09）────
         # 真源 = docs/architecture.md §二 角色矩阵「禁止边界」列；schema 增 forbidden_boundary
@@ -571,6 +596,9 @@ def main():
             "contradiction-analyst": "Analyzer", "patent-search-scout": "Analyzer",
             "disclosure-architect": "Executor", "patent-attorney-writer": "Executor",
             "patent-examiner-sim": "Reviewer", "second-opinion-reviewer": "Reviewer",
+            # C14 新增 3 成员（2026-11-16）：evidence=Executor / diagnostician=Reviewer / steward=Analyzer
+            "evidence-curator": "Executor", "quality-diagnostician": "Reviewer",
+            "knowledge-steward": "Analyzer",
         }
         if not arch_path.is_file():
             print("  ❌ docs/architecture.md 不存在——角色矩阵真源缺失")
@@ -615,13 +643,13 @@ def main():
                 print(f"  ❌ 角色矩阵未覆盖成员：{missing_map}")
                 ok_all = False
             else:
-                print("  ✅ 角色矩阵覆盖 6 成员（真源=architecture.md §二）")
+                print(f"  ✅ 角色矩阵覆盖 {len(boundary_members)} 成员（真源=architecture.md §二）")
                 empty = [m for m, v in role_rows.items() if not v["forbids"]]
                 if empty:
                     print(f"  ❌ 成员禁止边界为空：{empty}")
                     ok_all = False
                 else:
-                    print("  ✅ 6 成员禁止边界均非空（下沉契约有内容来源）")
+                    print(f"  ✅ {len(boundary_members)} 成员禁止边界均非空（下沉契约有内容来源）")
                 role_mismatch = []
                 for mid, expect_role in boundary_members.items():
                     got = role_rows[mid]["role"]
@@ -631,7 +659,7 @@ def main():
                     print(f"  ❌ 成员角色归类不一致：{role_mismatch}")
                     ok_all = False
                 else:
-                    print("  ✅ 6 成员角色归类与矩阵一致（Analyzer/Executor/Reviewer）")
+                    print(f"  ✅ {len(boundary_members)} 成员角色归类与矩阵一致（Analyzer/Executor/Reviewer）")
         test_file = PKG / "tests" / "baselines" / "l2-full-a01" / "T-20261015-A07__patent-attorney-writer.md"
         if test_file.exists():
             text = test_file.read_text(encoding="utf-8")

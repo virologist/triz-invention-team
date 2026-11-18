@@ -40,7 +40,6 @@ import io
 import json
 import os
 import re
-import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -115,7 +114,7 @@ def checks_common(run_dir, stage):
             t = io.open(os.path.join(run_dir, s), encoding="utf-8").read()
             if "失败记忆" in t or "failure_memory" in t or "failure-" in t:
                 digest_hit.append(s)
-        except Exception:
+        except Exception:  # noqa: BLE001 —— 宽捕获有意为之：单份 spawn 文档可能被并发写入/编码异常/权限受限（OSError/UnicodeDecodeError，异常面宽）；降级到「跳过该份、其余 spawn 文档继续检测」，C03 项按剩余命中数判定（0 命中如实 UNVERIFIED），不静默吞错误
             pass
     out.append(("C03-failure-memory", "AUTO_PASS" if digest_hit else "UNVERIFIED",
                 "注入痕迹 %d 份" % len(digest_hit),

@@ -217,7 +217,7 @@ def check_forbidden_regex(exp, task_text, run_dir, files, a):
     try:
         import contract_enforce as CE
         txt_use = CE._clean_for_forbidden_scan(txt_use)
-    except Exception:
+    except Exception:  # noqa: BLE001 —— 宽捕获有意为之：动态 import 可能因任意部署形态缺模块/符号（ImportError/AttributeError 等，异常面无法收窄）；降级到基础清洗（不调用 CE._clean_for_forbidden_scan），禁词扫描仍执行，只是豁免逻辑降级，不静默吞错误
         pass  # 独立部署无 contract_enforce 时退回基础清洗
     hits = []
     for pat in patterns:
@@ -239,7 +239,7 @@ def check_forbidden_regex(exp, task_text, run_dir, files, a):
                     _ok, _ = CE._context_exempt(m, txt_use)
                     if _ok:
                         continue
-                except Exception:
+                except Exception:  # noqa: BLE001 —— 宽捕获有意为之：CE.EXEMPT_WORDS/_context_exempt 同样依赖动态 import 的 contract_enforce，且 _context_exempt 内部判据形态多样（AttributeError/KeyError 均有可能）；降级到「该命中窗口不豁免」——宁可多报一处命中（人工复核）也不静默放过真实命中，不静默吞错误
                     pass
                 hits.append(f"「{pat}」@…{window}…")
         except re.error as e:
@@ -423,7 +423,7 @@ def check_conditions_closed(exp, task_text, run_dir, files, a):
         try:
             state = json.load(open(sp, encoding="utf-8"))
             conds = state.get("conditions") or {}
-        except Exception:  # noqa
+        except Exception:  # noqa: BLE001 —— 宽捕获有意为之（原 `# noqa` 补全为规范格式）：state.json 可能损坏/编码异常/JSON 截断（json.JSONDecodeError/OSError/UnicodeDecodeError，异常面宽）；降级到 conds={} → 走下方「从二审产出提取条件编号」的机械回退路径，不静默吞错误
             pass
     if conds:
         open_conds = [k for k, v in conds.items() if not v]

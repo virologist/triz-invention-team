@@ -79,7 +79,10 @@ def main():
                 print(f"  {'✅' if ok else '❌'} {case['id']} {case['type']} {notes_str}")
             else:
                 ok, notes, preview = run_case(skill, case)
-                print(f"  {'✅' if ok else '❌'} {case['id']} {case['query'][-40:]} {' '.join(notes) or ''}")
+                # C13 · U8b（修 F）：此前 `case['query'][-40:]` 尾部切片把命令显示成
+                # 「…y_triz_matrix.py …」样截断形态，误导排查（C13 取证一度疑似执行 bug）。
+                # 执行用的是完整 query（run_case 内 q.split()），显示层改为完整命令消除歧义。
+                print(f"  {'✅' if ok else '❌'} {case['id']} {case['query']} {' '.join(notes) or ''}")
             if not ok:
                 FAIL = 1
 

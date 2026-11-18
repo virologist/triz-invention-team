@@ -28,6 +28,11 @@ MEMBER_SKILLS = {
                                 "skills/patent-law/references/patent-law.md"],
     "second-opinion-reviewer": ["skills/patent-law/references/patent-law.md",
                                 "skills/triz-matrix/references/triz-matrix.md"],
+    # C14 新增 3 成员（2026-11-16，与各自 frontmatter skills: 声明一致）
+    "evidence-curator":        ["skills/patent-law/references/patent-law.md"],
+    "quality-diagnostician":   ["skills/triz-matrix/references/triz-matrix.md"],
+    "knowledge-steward":       ["skills/patent-law/references/patent-law.md",
+                                "skills/triz-matrix/references/triz-matrix.md"],
 }
 
 # 典型task_payload（取自历史实测用例的均值，约1.2K字符）

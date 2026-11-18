@@ -2,6 +2,59 @@
 
 All notable changes to the **TRIZ Invention Team** will be documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.0] - 2026-11-18
+
+> **CYCLE-1 · 第 11 轮收口（C11–C15 五轮成果一次性发布）**。
+> 本版不新增缺陷编号（S-E01…S-E80 保持已全部清偿），聚焦「全项目审计 + 修复方案执行 + 团队扩充」三类增量；门禁汇总 **17/17 → 18/18**（新增 preflight `--self-test` 入 GATES）。
+
+### Added（新增）
+- **3 名支撑成员**：`evidence-curator` 证归档（Executor，交付包证据链核验）、
+  `quality-diagnostician` 衡自新（Reviewer，门禁解读与诊断草案）、
+  `knowledge-steward` 知续存（Analyzer，知识底座巡检）。
+  团队扩为 **1 主理人 + 9 成员**；11 类同步点全部落地
+  （成员 MD 六字段契约 / VERIFICATIONS / SUMMARY_MUST_CONTAIN /
+  boundary_members / ROLE_BY_MEMBER / MEMBER_SKILLS / DEFAULT_MEMBER_TOKENS /
+  architecture 角色矩阵 / 契约文档镜像 / plugin.json 三处登记 / 计数口径文档）。
+- `scripts/preflight_check.py` 新增 `--self-test`（3 组能红断言：单引号形态 BLOCK /
+  无引号放行 / 幽灵技能 BLOCK），并纳入 `self_gate` GATES（15→16 门禁清单）。
+- `WORK_MAP.md` 退出码契约新增 `query_triz_matrix` 的 RC=3 例外登记（数据缺失 ≠ UNVERIFIED）。
+
+### Fixed（修复）
+- **C11 审计（7 处）**：`self_gate.py:75` 4→5 版本位文案；`README.md` 13→15 项 preflight；
+  `README.zh.md` 18→24 脚本；`preflight` 第 7 项 `checked=0` 判据空转 → 补 frontmatter
+  `skills:` 真源校验；6 个成员 MD 的 `skills: ['x']` 单引号 → 无引号（装配器技能注入 resolved 0→2/3/5）；
+  `version_consistency` 描述内嵌版本号位可静默删除绕过护栏 → 加位数下限 + 变异自测；
+  `team-lead.md` 22→24 脚本。
+- **C12 代码库清理（8 处）**：删 5 个未使用 import（`agent_ci_gate`/`contract_enforce`/`harness`/
+  `preflight`×2）；`agent_ci_gate` 3 处 `open` 显式加 `encoding="utf-8"`（1 处顺带收进 `with`）。
+- **C13 方案执行（9 项）**：preflight 引号形态显式 BLOCK（堵「守卫绿灯 + 装配器空注入」复合假绿）；
+  `OPERATIONS.md:43` 去写死数字；U1 契约例外登记；U9+T5 打包扩容 18/18；
+  `diagnosis-protocol` 文档口径 + 去行号化交叉引用；`skill_test_runner` 完整命令打印；
+  preflight 第 8 项显式跳过告警（警告 4→5）；5 处宽捕获补降级注释 + `noqa: BLE001`。
+- **C14 团队扩充**：`OPERATIONS.md:58` 6→9 成员契约门禁口径修正（P3 抓到的假完成，已补）。
+
+### Changed（变更）
+- 门禁汇总 **17/17 → 18/18**；`self_gate --self-test` 16 门禁清单（双向差集空 + 宿主接入）。
+- 契约门禁覆盖 **9 成员 6/6**；`--list-members` 9 人；装配器 skills 注入 13 处全存在。
+
+### Verified（验证）
+- `self_gate` **18/18** · `--self-test` 双向差集空 + 宿主接入 · `version_consistency` 5 位一致 +
+  7 项自测 · `contract_enforce --self-test` 9 成员 · `boundary_guard --self-test` 22 用例 +
+  10 成员矩阵 · `preflight` RC=0 警告 5 项 + `--self-test` RC=0 · 24 脚本 `--help` 零异常 ·
+  三用例回归 7/7 · 7/8+1INFO · 8/8 · 跑前跑后源码哈希一致 · `git diff --check` 干净。
+- P3 独立对抗验证三轮全部 **PASS（0 阻断）**：C11（A2 判据形态 / B3 删位绕过 / B4 合法扩展 /
+  装配器 resolved）、C13（R1–R5 引号 BLOCK / 幽灵技能 / 漏挂护栏 / 完整打印 / C3 执行路径）、
+  C14（R1 删六字段 / R2 删矩阵行 / R3 三成员装配 / R4 白名单拒绝）。
+
+### 待审 / 未验证（如实保留，不宣称完成）
+- 明确不做（C13 方案既定）：U2 全仓 pathlib 统一（官方否决）、U4 全量 encoding（PEP 686 渐进）、
+  U6/U7 毫秒级性能优化、U11 历史 tag 批量回填（版本→commit 映射不可靠）、
+  D-1 跨包联邦装配器修复（5 包 + drift_guard，超范围需单独授权）。
+- 未验证：宿主真实 commit 链路钩子拦截、C3 三条 BLOCK 分支全组合、混合引号形态独立变异、
+  非 UTF-8 locale、新成员产出侧 lambda 对真实 spawn 产出实测。
+
+---
+
 ## [2.15.0] - 2026-11-11
 
 > **CYCLE-1 · 第 10 轮（--all 端到端验证轮）**。

@@ -71,6 +71,9 @@
 > `verify --sample` 与 `verify --run-dir` 语义一致：样例中只要有一条 `UNVERIFIED:` 断言，
 > 退出码即为 3。这是「没有证据不宣称验证通过」在工具层的落点，
 > 不允许出现「样例有未验证项但脚本返回 0」的假绿。
+>
+> 例外：`scripts/query_triz_matrix.py` 的退出码 3 表示「数据文件缺失」，与本表
+> `harness.py` 的 3（UNVERIFIED）不同源；该脚本是确定性查询器，不参与 verify 证据语义。
 
 
 ## 五、明确不改造（保留有效设计）

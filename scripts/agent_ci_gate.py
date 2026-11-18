@@ -18,7 +18,7 @@ agent_ci_gate.py — TRIZ发明专家团 CI/CD发布门禁脚本
 - 所有结果汇总到 CI_REPORT.json 便于追踪
 - 缺失字段标红但不强制fail（避免误报）
 """
-import sys, os, json, argparse, re, glob, datetime
+import sys, json, argparse, re, glob, datetime
 from pathlib import Path
 
 # 支持无jsonschema库的手动校验（与expert-failures一致：手动校验兼容）
@@ -159,7 +159,7 @@ def extract_envelopes(text: str) -> list:
                             env = json.loads(candidate)
                             if isinstance(env, dict) and 'agent_id' in env:
                                 results.append((env, True))
-                        except Exception:
+                        except Exception:  # noqa: BLE001 —— 宽捕获有意为之：候选串是扫描器括号配平切出的任意文本片段，绝大多数不是合法 JSON（json.JSONDecodeError 是主路径而非异常路径，此处天然高频）；降级到「跳过该候选、继续扫描下一位置」，非信封文本不构成门禁失败，不静默吞错误
                             pass
                         break
             i += 1
@@ -259,7 +259,7 @@ def process_results_file(results_path: Path, schema: dict) -> dict:
     if results_path.suffix == ".md":
         return _process_baseline_markdown(results_path, schema)
     try:
-        with open(results_path) as f:
+        with open(results_path, encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
         report["messages"].append(f"load error: {e}")
@@ -421,7 +421,8 @@ def main():
         print(f"❌ schema文件不存在: {schema_path}")
         return 1
 
-    schema = json.load(open(schema_path))
+    with open(schema_path, encoding="utf-8") as f:
+        schema = json.load(f)
     print(f"📋 schema: {schema.get('title')} v{schema.get('version', '?')}")
     print(f"📂 results_dir: {results_dir}")
 
@@ -527,7 +528,7 @@ def main():
         "pass_rate": pass_rate,
         "files": file_reports,
     }
-    with open(report_path, "w") as f:
+    with open(report_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
     print(f"  报告: {report_path}")
 

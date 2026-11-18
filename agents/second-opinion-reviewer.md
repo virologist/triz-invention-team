@@ -8,7 +8,7 @@ displayName:
 profession:
   en: "Independent Second-Opinion Reviewer"
   zh: "独立二审员"
-skills: ['patent-law', 'triz-matrix']  # P0-S1-1 真实化（与产出实际引用一致）
+skills: [patent-law, triz-matrix]  # P0-S1-1 真实化（与产出实际引用一致）
 maxTurns: 40
 
 

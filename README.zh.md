@@ -10,7 +10,7 @@ v2.2 起把代理间契约形式化为 JSON Schema（`agent-protocol`），并�
 
 ## ✨ 亮点
 
-- **7 名智能体（1 主理人 + 6 成员）**：每个代理都有明确的角色边界（ANALYZER / EXECUTOR / REVIEWER），并设有"禁止越界产出"的强制规则
+- **10 名智能体（1 主理人 + 9 成员）**：每个代理都有明确的角色边界（ANALYZER / EXECUTOR / REVIEWER），并设有"禁止越界产出"的强制规则
 - **TRIZ 39×39 矛盾矩阵 + 40 发明原理**（含越表矛盾对的降级路径）
 - **三轮专利查新**（关键词 → 分类号 → 差异化验证），附 X / Y / A / R / P 威胁分级
 - **模拟审查 + 独立二审**：自动捕捉确认偏误
@@ -96,6 +96,9 @@ cp -R <克隆下来的仓库根> <你的agent插件目录>/triz-invention-team
 | **审外审** | 独立二审员 · 含利益冲突边界 | `second-opinion-reviewer` |
 | **谭无隐** | 交底书架构师 · 五要素结构 · ≥3 类缺口 | `disclosure-architect` |
 | **权要达** | 专利代理师 · 权项+说明书+摘要 | `patent-attorney-writer` |
+| **证归档** | 证据归档员 · 交付包证据链核验（C14 新增） | `evidence-curator` |
+| **衡自新** | 质量诊断师 · 门禁解读+诊断报告草案（C14 新增） | `quality-diagnostician` |
+| **知续存** | 知识管家 · 族谱维护建议+声明巡检（C14 新增） | `knowledge-steward` |
 
 ---
 
@@ -120,10 +123,10 @@ triz-invention-team/                          # ← 仓库根 = 插件本体（�
 ├── .codebuddy-plugin/
 │   ├── marketplace.json                      # WorkBuddy 市场描述
 │   └── plugin.json                           # WorkBuddy 插件清单（version）
-├── agents/                                   # 7 个代理角色定义（Markdown）
+├── agents/                                   # 10 个代理角色定义（Markdown）
 ├── skills/                                   # 4 个技能包
 │   ├── triz-matrix/  patent-law/  claims-drafting/  agent-protocol/
-├── scripts/                                  # 18 个脚本（CI gate + 门禁 + 工具链）
+├── scripts/                                  # 24 个脚本（CI gate + 门禁 + 工具链）
 ├── docs/                                     # architecture · OPERATIONS · diagnosis-protocol
 │                                              # · CONTRACT_ENFORCEMENT · routing-log · evolution-log.tsv
 ├── tests/                                    # 回归用例 + 基线 + 联邦一致性测试
