@@ -47,8 +47,21 @@ All notable changes to the **TRIZ Invention Team** will be documented here. The 
   C14（R1 删六字段 / R2 删矩阵行 / R3 三成员装配 / R4 白名单拒绝）。
 
 ### 待审 / 未验证（如实保留，不宣称完成）
-- 明确不做（C13 方案既定）：U2 全仓 pathlib 统一（官方否决）、U4 全量 encoding（PEP 686 渐进）、
-  U6/U7 毫秒级性能优化、U11 历史 tag 批量回填（版本→commit 映射不可靠）、
+- **C13 剩余项收口（C16 实测更正）**：
+  - U4「全量 encoding」——**伪待办，实际已完成**：AST 复扫 24 脚本，文本模式 `open`
+    缺 `encoding` 为 **0 处**（124 处 open 调用 / 132 处 encoding=，差值均为二进制
+    `"rb"`/`"wb"` 或函数名 `_gates_open` 等，非文本读）。C12 报告中的「70+ 处」实为
+    **裸 `open`（未用 `with`）** 计数，C13 方案书误记为「缺 encoding」，导致 Batch 4
+    被列为待办。经交叉验证无需改动，关闭该项。
+  - U2 全仓 pathlib 统一——**否决代码改动，已落地文档裁决**：`OPERATIONS.md` 增
+    「代码风格约定」节（沿用所在文件既有风格 + 文本 open 显式 utf-8），不改任何源码。
+  - U11 历史 tag 批量回填——**否决自动化，登记为治理债**：12 个版本有 CHANGELOG 段无
+    git tag；`git log --grep` 误匹配（`1.0.0`→S-E73 commit、`2.5.4`→v2.6.0 commit），
+    按 CHANGELOG 日期反查更糟（2.6.0/2.7.0/2.8.0 全映射到 `1b8f0bd`），
+    「版本→正确 commit」无法机械建立。补 tag 技术可行但须人工逐个确认锚点，
+    **不自动批量补**，保留为已知治理债。
+- 明确不做（C13 方案既定）：U6/U7 毫秒级性能优化（收益/风险不匹配）、
+  U12/U5 归档基线与 CLI 近似选项（维持）、
   D-1 跨包联邦装配器修复（5 包 + drift_guard，超范围需单独授权）。
 - 未验证：宿主真实 commit 链路钩子拦截、C3 三条 BLOCK 分支全组合、混合引号形态独立变异、
   非 UTF-8 locale、新成员产出侧 lambda 对真实 spawn 产出实测。

@@ -71,6 +71,13 @@
 | `scripts/diagnosis_trigger.py` | 诊断触发器 T1/T2/T3 机械判定（preflight 第9项自动调用） | 每次建队前（preflight 内自动） |
 | `scripts/evolution_log.py` | 自进化台账唯一写入口（append/backfill/verify/tail/self-test） | 每次批次收口（C5 登记收敛） |
 
+> **代码风格约定（C13/C16 · U2 裁决）**：本仓历史上 `io.open` / 内置 `open`、
+> `pathlib` / `os.path` 两种形态并存；**不发起全仓统一重构**——`pathlib` 官方明确
+> 「不是 `os.path` 的 drop-in」，改形态会引入路径语义与性能变化，风险 > 整洁度收益。
+> 约定：**新增或修改代码时沿用所在文件既有风格**，不为统一而跨文件改形态。
+> 文本模式 `open` 一律显式带 `encoding="utf-8"`（PEP 686：当前 Python 3.13 仍依赖 locale；
+> 本仓 24 脚本已全覆盖，见 `version_consistency` 同批检查）。
+
 > **判别力门禁的唯一真源 = `scripts/self_gate.py`**（CYCLE-1 第5轮 · S-E62/S-E66/S-E67/S-E68）。
 > 该入口的 `GATES` 清单定义全部脚本自测 + 真实基线越界复核；**具体项数以脚本输出为准，
 > 本文件不写死数字**（第6轮实测：第5轮写「14 项」在第6轮新增安装器后即漂移为 15 项）。
